@@ -86,9 +86,9 @@ export function TrialBanner({
             Premium trial · {PREMIUM_TRIAL.days} days
           </p>
           <p className="mt-1 max-w-[420px] text-[13px] leading-relaxed text-[#697386]">
-            Trial caps: {PREMIUM_TRIAL.pagesLimit} pages and{" "}
-            {PREMIUM_TRIAL.audioMinutesLimit} min of audiobook time. End the
-            trial anytime to unlock full Premium (10,000 pages · 3 hours audio).
+            {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages and{" "}
+            {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours of audio.
+            Unlock full Premium to keep going after the trial.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

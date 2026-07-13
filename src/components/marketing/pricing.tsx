@@ -89,7 +89,7 @@ export function Pricing() {
                 {plan.key === "ENTERPRISE" && (
                   <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
                     <span className="inline-flex whitespace-nowrap rounded-full bg-[#0a2540] px-3.5 py-1.5 text-[12px] font-medium text-white shadow-md">
-                      {PREMIUM_TRIAL.days} days free trial
+                      {PREMIUM_TRIAL.days}-day free trial
                     </span>
                   </div>
                 )}
@@ -114,12 +114,15 @@ export function Pricing() {
                     </span>
                   </div>
 
-                  {plan.key === "ENTERPRISE" && (
-                    <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
-                      Try free for {PREMIUM_TRIAL.days} days, then $
-                      {displayPrice}/{interval === "year" ? "yr" : "mo"}
-                    </p>
-                  )}
+                {plan.key === "ENTERPRISE" && (
+                  <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
+                    {PREMIUM_TRIAL.days}-day free trial, then ${displayPrice}/
+                    {interval === "year" ? "yr" : "mo"} ·{" "}
+                    {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages ·{" "}
+                    {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours
+                    audio
+                  </p>
+                )}
                   {plan.key === "PRO" && interval === "year" && (
                     <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
                       2 months free vs monthly

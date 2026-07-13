@@ -55,10 +55,8 @@ export const PLANS = {
       "10,000 pages per month",
       "3 hours of audiobook narration / mo",
       "Up to 1,000 pages per book",
-      "2-day free trial (200 pages · 30 min audio)",
       "Unlimited books",
       "Private books",
-      "All Pro features",
       "Qwen 32B model access",
       "Custom styles & voices",
       "Priority support",
@@ -69,9 +67,9 @@ export const PLANS = {
 /** Premium trial caps (2 days). */
 export const PREMIUM_TRIAL = {
   days: 2,
-  pagesLimit: 200,
-  maxBookPages: 200,
-  audioMinutesLimit: 30,
+  pagesLimit: 10000,
+  maxBookPages: 1000,
+  audioMinutesLimit: 120,
 } as const;
 
 export type BillingInterval = "month" | "year";

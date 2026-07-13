@@ -372,16 +372,7 @@ export function BillingContent({
         {PRICING_PLANS.map((planMeta) => {
           const key = planMeta.key;
           const plan = PLANS[key];
-          const items =
-            key === "ENTERPRISE" && (canStartTrial || onTrial)
-              ? [
-                  `${PREMIUM_TRIAL.pagesLimit} pages during trial`,
-                  `${PREMIUM_TRIAL.audioMinutesLimit} min audiobook during trial`,
-                  `Up to ${PREMIUM_TRIAL.maxBookPages} pages per book`,
-                  "Then full Premium after unlock",
-                  "Card saved in Stripe · billed after trial",
-                ]
-              : PRICING_FEATURES[key];
+          const items = PRICING_FEATURES[key];
           const displayPrice =
             key === "FREE"
               ? 0
@@ -413,7 +404,7 @@ export function BillingContent({
                   <span className="inline-flex whitespace-nowrap rounded-full bg-[#0a2540] px-3.5 py-1.5 text-[12px] font-medium text-white shadow-md">
                     {onTrial
                       ? "Free trial active"
-                      : `${PREMIUM_TRIAL.days} days free trial`}
+                      : `${PREMIUM_TRIAL.days}-day free trial`}
                   </span>
                 </div>
               )}
@@ -437,43 +428,20 @@ export function BillingContent({
                   Starts at
                 </p>
                 <div className="mt-1 flex items-end gap-2">
-                  {key === "ENTERPRISE" && canStartTrial ? (
-                    <>
-                      <span className="text-[48px] font-bold leading-none tracking-[-0.04em] text-[#0a2540]">
-                        $0
-                      </span>
-                      <span className="mb-1.5 text-[14px] text-[#697386]">
-                        for {PREMIUM_TRIAL.days} days
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[48px] font-bold leading-none tracking-[-0.04em] text-[#0a2540]">
-                        ${displayPrice}
-                      </span>
-                      <span className="mb-1.5 text-[14px] text-[#697386]">
-                        {periodLabel}
-                      </span>
-                    </>
-                  )}
+                  <span className="text-[48px] font-bold leading-none tracking-[-0.04em] text-[#0a2540]">
+                    ${displayPrice}
+                  </span>
+                  <span className="mb-1.5 text-[14px] text-[#697386]">
+                    {periodLabel}
+                  </span>
                 </div>
 
-                {key === "ENTERPRISE" && canStartTrial && (
+                {key === "ENTERPRISE" && (
                   <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
-                    Then ${displayPrice}/{interval === "year" ? "yr" : "mo"} ·{" "}
-                    {PREMIUM_TRIAL.pagesLimit} pages ·{" "}
-                    {PREMIUM_TRIAL.audioMinutesLimit} min audio
-                  </p>
-                )}
-                {key === "ENTERPRISE" && onTrial && (
-                  <p className="mt-2 text-[13px] font-medium text-[#9a6700]">
-                    Trial caps: {PREMIUM_TRIAL.pagesLimit} pages ·{" "}
-                    {PREMIUM_TRIAL.audioMinutesLimit} min audio
-                  </p>
-                )}
-                {key === "ENTERPRISE" && !canStartTrial && !onTrial && (
-                  <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
-                    Includes {PREMIUM_TRIAL.days}-day free trial for new users
+                    {PREMIUM_TRIAL.days}-day free trial ·{" "}
+                    {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages ·{" "}
+                    {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours
+                    audio
                   </p>
                 )}
                 {key === "PRO" && interval === "year" && (
@@ -572,8 +540,8 @@ export function BillingContent({
                     )}
                     {canStartTrial && (
                       <p className="text-center text-[12px] text-[#697386]">
-                        Then ${displayPrice}/{interval === "year" ? "yr" : "mo"}{" "}
-                        after {PREMIUM_TRIAL.days} days · cancel anytime
+                        Then ${displayPrice}/{interval === "year" ? "yr" : "mo"} ·
+                        cancel anytime
                       </p>
                     )}
                   </div>

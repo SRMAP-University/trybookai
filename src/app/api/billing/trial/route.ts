@@ -128,7 +128,7 @@ export async function POST(request: Request) {
         ok: true,
         action: "start",
         user: updated,
-        message: `Premium trial started — ${PREMIUM_TRIAL.days} days with ${PREMIUM_TRIAL.pagesLimit} pages and ${PREMIUM_TRIAL.audioMinutesLimit} min audio.`,
+        message: `Premium trial started — ${PREMIUM_TRIAL.days} days with ${PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages and ${Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours of audio.`,
       });
     }
 

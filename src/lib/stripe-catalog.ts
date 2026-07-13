@@ -26,7 +26,7 @@ export const STRIPE_PRO_INCLUDED_ADDONS = [
 /** Pricing-table / marketing list (includes trial callout). */
 export const STRIPE_PREMIUM_MARKETING_FEATURES = [
   ...STRIPE_PREMIUM_INCLUDED_ADDONS,
-  `${PREMIUM_TRIAL.days}-day free trial at checkout`,
+  `${PREMIUM_TRIAL.days}-day free trial · ${PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages · ${Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours audio`,
 ] as const;
 
 export const STRIPE_PRO_MARKETING_FEATURES = [

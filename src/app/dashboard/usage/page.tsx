@@ -188,8 +188,8 @@ function UsagePageContent() {
                     <> · {formatTrialCountdown(data.user.trialEndsAt)}</>
                   )}
                   {" · "}
-                  {PREMIUM_TRIAL.pagesLimit} page /{" "}
-                  {PREMIUM_TRIAL.audioMinutesLimit} min caps
+                  {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages ·{" "}
+                  {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours audio
                 </>
               ) : (
                 <>
@@ -230,7 +230,7 @@ function UsagePageContent() {
             <p className="mt-1 text-[13px] text-[#697386]">
               {data.summary.audioMinutesRemaining} min remaining ·{" "}
               {data.user.onTrial
-                ? `${PREMIUM_TRIAL.audioMinutesLimit} min on trial`
+                ? `${Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours on trial`
                 : data.user.plan === "PRO"
                   ? "1 hour included"
                   : data.user.plan === "ENTERPRISE"

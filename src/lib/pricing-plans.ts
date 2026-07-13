@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { PREMIUM_TRIAL } from "@/lib/constants";
 
 export const PRICING_PLANS = [
   {
@@ -20,7 +19,7 @@ export const PRICING_PLANS = [
     key: "ENTERPRISE" as const,
     highlight: false,
     description:
-      "For high-volume writing with the largest page and audio limits.",
+      "Maximum page and audio limits for authors and publishers.",
     featuresLabel: "Pro features, plus:",
     headerFrom: "#eaf8f4",
   },
@@ -43,7 +42,6 @@ export const PRICING_FEATURES: Record<string, string[]> = {
     "PDF & EPUB export",
   ],
   ENTERPRISE: [
-    `${PREMIUM_TRIAL.days}-day free trial included`,
     "10,000 pages per month",
     "3 hours of audiobook narration",
     "Up to 1,000 pages per book",

@@ -62,9 +62,9 @@ export function DashboardUpgradeBanner({
           Try Premium free for {PREMIUM_TRIAL.days} days
         </h2>
         <p className="mt-2 max-w-[340px] text-[13px] leading-relaxed text-[#425466]">
-          Get {PREMIUM_TRIAL.pagesLimit} pages and{" "}
-          {PREMIUM_TRIAL.audioMinutesLimit} min of audiobook narration. Starts
-          as a Stripe trial, then Premium billing.
+          {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages and{" "}
+          {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours of audiobook
+          narration. No charge today.
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <Button
