@@ -10,6 +10,7 @@ import {
   formatTrialCountdown,
   TrialBanner,
 } from "@/components/dashboard/trial-banner";
+import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 
 type Analytics = {
   user: {
@@ -54,7 +55,7 @@ type Analytics = {
   }[];
 };
 
-export default function UsagePage() {
+function UsagePageContent() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -400,5 +401,16 @@ export default function UsagePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UsagePage() {
+  return (
+    <AnonymousRouteFallback
+      title="Usage"
+      description="Review page credits, audio minutes, and generation activity."
+    >
+      <UsagePageContent />
+    </AnonymousRouteFallback>
   );
 }

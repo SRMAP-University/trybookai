@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { readJson } from "@/lib/api";
+import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 
 type Settings = {
   name: string | null;
@@ -69,7 +70,7 @@ function nearestCreativity(value: number) {
   ).value;
 }
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("account");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -696,5 +697,16 @@ function Toggle({
         />
       </span>
     </button>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <AnonymousRouteFallback
+      title="Settings"
+      description="Manage your account, writing defaults, and generation preferences."
+    >
+      <SettingsPageContent />
+    </AnonymousRouteFallback>
   );
 }

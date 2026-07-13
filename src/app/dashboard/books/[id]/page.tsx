@@ -33,6 +33,7 @@ import {
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 
 interface Section {
   id: string;
@@ -137,7 +138,7 @@ function parseSseChunk(buffer: string): {
   return { events, rest };
 }
 
-export default function BookDetailPage() {
+function BookDetailPageContent() {
   const { id } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1206,5 +1207,16 @@ export default function BookDetailPage() {
       </div>
     </div>
     </>
+  );
+}
+
+export default function BookDetailPage() {
+  return (
+    <AnonymousRouteFallback
+      title="Book details"
+      description="View book progress, chapters, and generation options."
+    >
+      <BookDetailPageContent />
+    </AnonymousRouteFallback>
   );
 }

@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { GoogleButton } from "@/components/auth/google-button";
 
 export default function RegisterPage() {
   return (
@@ -19,6 +20,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prompt = searchParams.get("prompt");
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -157,6 +159,17 @@ function RegisterForm() {
             Create account
           </button>
         </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-[#e6ebf1]" />
+          </div>
+          <div className="relative flex justify-center text-[11px] uppercase tracking-wide text-[#697386]">
+            <span className="bg-white px-3">or continue with</span>
+          </div>
+        </div>
+
+        <GoogleButton callbackUrl={callbackUrl} />
       </div>
 
       <p className="mt-6 text-center text-[13px] text-[#697386]">

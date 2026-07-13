@@ -6,6 +6,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 
 type Job = {
   id: string;
@@ -46,7 +47,7 @@ const jobStatusStyles: Record<string, string> = {
   FAILED: "text-[#df1b41] bg-[#fde8e8] px-2 py-0.5 rounded",
 };
 
-export default function TrackingPage() {
+function TrackingPageContent() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -231,5 +232,16 @@ export default function TrackingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TrackingPage() {
+  return (
+    <AnonymousRouteFallback
+      title="Tracking"
+      description="Monitor active generation jobs and recently completed books."
+    >
+      <TrackingPageContent />
+    </AnonymousRouteFallback>
   );
 }

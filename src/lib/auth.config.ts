@@ -25,7 +25,7 @@ export const authConfig = {
       const path = request.nextUrl.pathname;
       const isAuthPage =
         path.startsWith("/login") || path.startsWith("/register");
-      const isDashboard = path.startsWith("/dashboard");
+
       const isApiProtected =
         path.startsWith("/api/books") ||
         path.startsWith("/api/billing") ||
@@ -41,13 +41,8 @@ export const authConfig = {
         return Response.redirect(new URL("/dashboard", request.nextUrl));
       }
 
-      if ((isDashboard || isApiProtected) && !isLoggedIn) {
-        if (isApiProtected) {
-          return Response.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        const loginUrl = new URL("/login", request.nextUrl);
-        loginUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
-        return Response.redirect(loginUrl);
+      if (isApiProtected && !isLoggedIn) {
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
       }
 
       return true;

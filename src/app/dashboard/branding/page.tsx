@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 
 type Branding = {
   brandName: string | null;
@@ -25,7 +26,7 @@ type Branding = {
   email: string;
 };
 
-export default function BrandingPage() {
+function BrandingPageContent() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -358,5 +359,16 @@ function Field({
       <Label className="text-[13px] text-[#425466]">{label}</Label>
       {children}
     </div>
+  );
+}
+
+export default function BrandingPage() {
+  return (
+    <AnonymousRouteFallback
+      title="Branding"
+      description="Customize publisher identity for exports and manuscript front matter."
+    >
+      <BrandingPageContent />
+    </AnonymousRouteFallback>
   );
 }

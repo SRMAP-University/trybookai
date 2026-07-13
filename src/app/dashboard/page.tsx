@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { redirect } from "next/navigation";
 import {
   ArrowRight,
   BookOpen,
@@ -14,23 +13,17 @@ import { DashboardUpgradeBanner } from "@/components/dashboard/dashboard-upgrade
 import { DashboardTrialSection } from "@/components/dashboard/dashboard-trial-section";
 import { DashboardBookCard } from "@/components/dashboard/book-card";
 import { BookCover } from "@/components/dashboard/book-cover";
+import { PublicDashboardPreview } from "@/components/dashboard/public-preview";
 import { getRecentLandingCovers } from "@/lib/landing-covers";
 import { SAMPLE_BOOKS } from "@/lib/sample-books";
 import { isTrialActive, syncUserTrialState } from "@/lib/billing";
 import { AUDIO_STUDIO_GENRE } from "@/lib/audio-studio";
 
-const statusStyles: Record<string, string> = {
-  DRAFT: "text-[#697386]",
-  OUTLINING: "text-[#635bff]",
-  GENERATING: "text-[#9a6700] bg-[#fcf5e0] px-2 py-0.5 rounded",
-  COMPLETED: "text-[#0e6245] bg-[#cbf4c9] px-2 py-0.5 rounded",
-  FAILED: "text-[#df1b41] bg-[#fde8e8] px-2 py-0.5 rounded",
-  PAUSED: "text-[#697386]",
-};
-
 export default async function DashboardPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) {
+    return <PublicDashboardPreview />;
+  }
 
   const user = await syncUserTrialState(session.user.id);
   const onTrial = isTrialActive(user);

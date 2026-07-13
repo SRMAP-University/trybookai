@@ -23,8 +23,9 @@ import {
 import { useDashboardUser } from "@/components/dashboard/user-context";
 
 export function DashboardHeader() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { user } = useDashboardUser();
+  const isAnonymous = status === "unauthenticated";
 
   const name = user?.name ?? session?.user?.name ?? "User";
   const email = user?.email ?? session?.user?.email ?? "";
@@ -59,78 +60,98 @@ export function DashboardHeader() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {isFree ? (
-            <UpgradeButton
-              plan="PRO"
-              className="h-8 rounded-md bg-[#635bff] px-3 text-[13px] hover:bg-[#5851e5] sm:h-9 sm:px-4"
-            >
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Upgrade to Pro</span>
-              <span className="sm:hidden">Pro</span>
-            </UpgradeButton>
+          {isAnonymous ? (
+            <>
+              <Button
+                variant="ghost"
+                className="h-8 px-2 text-[13px] text-[#0a2540] hover:bg-[#f6f9fc] sm:h-9 sm:px-3"
+                asChild
+              >
+                <Link href="/login?callbackUrl=/dashboard">Sign in</Link>
+              </Button>
+              <Button
+                className="h-8 rounded-md bg-[#635bff] px-3 text-[13px] hover:bg-[#5851e5] sm:h-9 sm:px-4"
+                asChild
+              >
+                <Link href="/register?callbackUrl=/dashboard">Get started</Link>
+              </Button>
+            </>
           ) : (
-            <Button
-              variant="outline"
-              className="h-8 rounded-md border-[#e6ebf1] px-3 text-[13px] text-[#0a2540] hover:bg-[#f6f9fc] sm:h-9"
-              asChild
-            >
-              <Link href="/dashboard/billing">
-                <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#635bff]" />
-                <span className="capitalize">{plan.toLowerCase()}</span>
-              </Link>
-            </Button>
-          )}
+            <>
+              {isFree ? (
+                <UpgradeButton
+                  plan="PRO"
+                  className="h-8 rounded-md bg-[#635bff] px-3 text-[13px] hover:bg-[#5851e5] sm:h-9 sm:px-4"
+                >
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Upgrade to Pro</span>
+                  <span className="sm:hidden">Pro</span>
+                </UpgradeButton>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-md border-[#e6ebf1] px-3 text-[13px] text-[#0a2540] hover:bg-[#f6f9fc] sm:h-9"
+                  asChild
+                >
+                  <Link href="/dashboard/billing">
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#635bff]" />
+                    <span className="capitalize">{plan.toLowerCase()}</span>
+                  </Link>
+                </Button>
+              )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-2 rounded-full outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-[#635bff]"
-              >
-                <Avatar className="size-8">
-                  <AvatarFallback className="bg-[#f0efff] text-[12px] font-medium text-[#635bff]">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="font-normal">
-                <p className="text-[13px] font-medium text-[#0a2540]">{name}</p>
-                <p className="truncate text-[12px] text-[#697386]">{email}</p>
-                <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-[#635bff]">
-                  {plan.toLowerCase()} plan
-                </p>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings" className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  Profile & settings
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/billing" className="cursor-pointer">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Billing
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/branding" className="cursor-pointer">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Branding
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className="cursor-pointer text-[#df1b41] focus:text-[#df1b41]"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-full outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-[#635bff]"
+                  >
+                    <Avatar className="size-8">
+                      <AvatarFallback className="bg-[#f0efff] text-[12px] font-medium text-[#635bff]">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <p className="text-[13px] font-medium text-[#0a2540]">{name}</p>
+                    <p className="truncate text-[12px] text-[#697386]">{email}</p>
+                    <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-[#635bff]">
+                      {plan.toLowerCase()} plan
+                    </p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/settings" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile & settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/billing" className="cursor-pointer">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Billing
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/branding" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Branding
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    className="cursor-pointer text-[#df1b41] focus:text-[#df1b41]"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
         </div>
       </div>
     </header>
