@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum BookStatus {
+  DRAFT
+  OUTLINING
+  GENERATING
+  COMPLETED
+  FAILED
+  PAUSED
+}
+
+enum ChapterStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum GenerationJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum AudioDerivativeType {
+  AUDIOBOOK
+  PODCAST
+  MUSIC
+}
+
+enum AudioDerivativeStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id               String    @id @default(cuid())
+  name             String?
+  email            String    @unique
+  emailVerified    DateTime?
+  image            String?
+  passwordHash     String?
+  plan             Plan      @default(FREE)
+  pagesUsed        Int       @default(0)
+  pagesLimit       Int       @default(50)
+  audioMinutesUsed Int       @default(0)
+  audioMinutesLimit Int      @default(0)
+  /// One-time purchased page credits (added on top of plan base)
+  pagesBonus       Int       @default(0)
+  /// One-time purchased audio minutes (added on top of plan base)
+  audioMinutesBonus Int      @default(0)
+  /// Premium free-trial window; null when not on a trial
+  trialEndsAt      DateTime?
+  trialStartedAt   DateTime?
+  /// One Premium trial per account
+  hasUsedPremiumTrial Boolean @default(false)
+  stripeCustomerId String?   @unique
+  stripeSubId      String?
+
+  // Writing defaults
+  defaultGenre         String  @default("Fiction")
+  defaultTone          String  @default("Professional")
+  defaultAudience      String  @default("General readers")
+  defaultTargetPages   Int     @default(100)
+  defaultPov           String  @default("third")
+  defaultTense         String  @default("past")
+  defaultLanguage      String  @default("en")
+  defaultModel         String  @default("deepseek-r1")
+  defaultCreativity    Float   @default(0.7)
+  defaultWordsPerPage  Int     @default(300)
+  defaultSectionsPerChapter Int @default(4)
+  styleGuide           String? @db.Text
+  autoGenerateOnCreate Boolean @default(true)
+  emailNotifications   Boolean @default(true)
+
+  // Branding / publisher identity
+  brandName            String?
+  brandTagline         String?
+  authorName           String?
+  imprintName          String?
+  websiteUrl           String?
+  brandColor           String  @default("#635bff")
+  logoUrl              String?
+  copyrightNotice      String? @db.Text
+  dedicationDefault    String? @db.Text
+  exportFooter         String? @db.Text
+  includeBrandInExport Boolean @default(true)
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  books    Book[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Book {
+  id              String     @id @default(cuid())
+  userId          String
+  /// Unique public identifier used in SEO URLs (/books/[slug])
+  slug            String     @unique
+  /// Public by default; only Pro/Enterprise can set private
+  isPublic        Boolean    @default(true)
+  title           String
+  description     String?    @db.Text
+  genre           String?
+  targetPages     Int        @default(100)
+  currentPages    Int        @default(0)
+  status          BookStatus @default(DRAFT)
+  outline         Json?
+  style           String?    @db.Text
+  audience        String?
+  tone            String?
+  errorMessage    String?    @db.Text
+  progress        Float      @default(0)
+
+  // Advanced generation settings
+  pov                 String  @default("third")
+  tense               String  @default("past")
+  language            String  @default("en")
+  chapterCount        Int?
+  sectionsPerChapter  Int     @default(4)
+  wordsPerPage        Int     @default(300)
+  includeDialogue     Boolean @default(true)
+  includeExamples     Boolean @default(false)
+  customInstructions  String? @db.Text
+  characters          Json?
+  themes              Json?
+  forbiddenTopics     String? @db.Text
+  model               String  @default("deepseek-r1")
+  creativity          Float   @default(0.7)
+  templateId          String?
+  coverImage          String? @db.Text
+  coverPrompt         String? @db.Text
+  /// When true, start audiobook narration after the manuscript completes
+  generateAudiobookOnComplete Boolean @default(false)
+
+  /// Edition lineage — first book has edition 1; forks share parentBookId
+  edition             Int     @default(1)
+  parentBookId        String?
+  parentBook          Book?   @relation("BookEditions", fields: [parentBookId], references: [id], onDelete: SetNull)
+  editions            Book[]  @relation("BookEditions")
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  completedAt     DateTime?
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapters        Chapter[]
+  generationJobs  GenerationJob[]
+  audios          BookAudio[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([isPublic])
+  @@index([parentBookId])
+}
+
+model BookAudio {
+  id           String                @id @default(cuid())
+  bookId       String
+  type         AudioDerivativeType
+  status       AudioDerivativeStatus @default(PENDING)
+  progress     Float                 @default(0)
+  title        String?
+  voiceId      String?
+  voiceName    String?
+  /// ElevenLabs voice_settings + modelId JSON
+  voiceSettings Json?
+  /// Full-track URL when a single file is produced (e.g. music theme)
+  audioUrl     String?               @db.Text
+  errorMessage String?               @db.Text
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  completedAt  DateTime?
+
+  book   Book             @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  tracks BookAudioTrack[]
+
+  @@index([bookId])
+  @@index([bookId, type])
+  @@index([status])
+}
+
+model BookAudioTrack {
+  id        String   @id @default(cuid())
+  audioId   String
+  number    Int
+  title     String
+  audioUrl  String   @db.Text
+  chapterId String?
+  durationMs Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  audio BookAudio @relation(fields: [audioId], references: [id], onDelete: Cascade)
+
+  @@unique([audioId, number])
+  @@index([audioId])
+}
+
+model Chapter {
+  id          String        @id @default(cuid())
+  bookId      String
+  number      Int
+  title       String
+  summary     String?       @db.Text
+  content     String?       @db.Text
+  pageCount   Int           @default(0)
+  status      ChapterStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  book        Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sections    Section[]
+
+  @@unique([bookId, number])
+  @@index([bookId])
+}
+
+model Section {
+  id          String   @id @default(cuid())
+  chapterId   String
+  number      Int
+  title       String
+  content     String?  @db.Text
+  pageCount   Int      @default(0)
+  wordCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, number])
+  @@index([chapterId])
+}
+
+model GenerationJob {
+  id          String              @id @default(cuid())
+  bookId      String
+  type        String
+  status      GenerationJobStatus @default(PENDING)
+  payload     Json?
+  result      Json?
+  error       String?             @db.Text
+  attempts    Int                 @default(0)
+  maxAttempts Int                 @default(3)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  book        Book                @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId])
+  @@index([status])
+}

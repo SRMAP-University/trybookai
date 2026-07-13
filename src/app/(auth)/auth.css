@@ -1,0 +1,98 @@
+/* Auth pages — shares the dashboard's Stripe-inspired tokens */
+
+.auth-root {
+  --ds-bg: #f6f9fc;
+  --ds-surface: #ffffff;
+  --ds-ink: #0a2540;
+  --ds-muted: #425466;
+  --ds-muted-2: #697386;
+  --ds-border: #e6ebf1;
+  --ds-primary: #635bff;
+  --ds-primary-hover: #5851e5;
+  --ds-primary-soft: #f0efff;
+
+  background-color: var(--ds-bg);
+  color: var(--ds-ink);
+}
+
+/* Split-screen showcase panel — mirrors the dashboard primary */
+.auth-showcase {
+  background: linear-gradient(150deg, #635bff 0%, #5851e5 45%, #4338ca 100%);
+}
+
+.auth-showcase-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+/* Form field — matches the dashboard Input look */
+.auth-field {
+  width: 100%;
+  height: 2.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: var(--ds-ink);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-field::placeholder {
+  color: #a3acb9;
+}
+
+.auth-field:focus {
+  border-color: var(--ds-primary);
+  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.15);
+}
+
+/* Primary submit — mirrors the dashboard UpgradeButton */
+.auth-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 2.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #ffffff;
+  background: var(--ds-primary);
+  border-radius: 0.375rem;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.auth-submit:hover {
+  background: var(--ds-primary-hover);
+}
+
+.auth-submit:active {
+  transform: translateY(1px);
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-appear {
+    animation: auth-appear 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes auth-appear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

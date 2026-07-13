@@ -1,0 +1,127 @@
+/* Pallet Ross–inspired landing */
+
+.landing-root {
+  --landing-bg: #f3f3f1;
+  --landing-surface: #ffffff;
+  --landing-ink: #111111;
+  --landing-muted: #6b6b6b;
+  --landing-border: #e8e8e6;
+
+  background-color: var(--landing-bg);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  color: var(--landing-ink);
+}
+
+.landing-section {
+  padding: 4rem 0;
+}
+
+@media (min-width: 768px) {
+  .landing-section {
+    padding: 5rem 0;
+  }
+}
+
+.landing-heading {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--landing-ink);
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .landing-heading {
+    font-size: 2.75rem;
+  }
+}
+
+.landing-card {
+  border-radius: 20px;
+  border: 1px solid var(--landing-border);
+  background: var(--landing-surface);
+}
+
+.landing-btn-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.6rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #ffffff;
+  background: #111111;
+  border-radius: 9999px;
+  transition: background 0.15s ease;
+}
+
+.landing-btn-dark:hover {
+  background: #2a2a2a;
+}
+
+.landing-btn-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.6rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--landing-ink);
+  background: transparent;
+  border-radius: 9999px;
+  transition: color 0.15s ease;
+}
+
+.landing-btn-light:hover {
+  color: #000;
+}
+
+.landing-showcase-gradient {
+  background: linear-gradient(
+    135deg,
+    #fb923c 0%,
+    #f97316 35%,
+    #fdba74 100%
+  );
+}
+
+.landing-pill-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.25rem;
+  backdrop-filter: blur(4px);
+}
+
+.landing-pill-tab {
+  border-radius: 9999px;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  transition: all 0.15s ease;
+}
+
+.landing-pill-tab:hover {
+  color: #ffffff;
+}
+
+.landing-pill-tab-active {
+  background: #ffffff;
+  color: var(--landing-ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.landing-book-stage {
+  perspective: 1200px;
+}
+
+.landing-hero-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
