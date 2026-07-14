@@ -42,6 +42,22 @@ export default function RootLayout({
         {children}
         <Toaster richColors position="top-right" />
         <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18323125522"
+          strategy="afterInteractive"
+        />
+        <Script
+          id="gtag-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'AW-18323125522');
+            `,
+          }}
+        />
+        <Script
           id="tawk-to"
           strategy="lazyOnload"
           dangerouslySetInnerHTML={{
