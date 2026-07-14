@@ -17,6 +17,7 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -158,6 +159,7 @@ function BookDetailPageContent() {
   const [derivativesOpen, setDerivativesOpen] = useState(false);
   const [coverGenerating, setCoverGenerating] = useState(false);
   const [creatingEdition, setCreatingEdition] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [editions, setEditions] = useState<BookEdition[]>([]);
   const [audios, setAudios] = useState<BookAudioItem[]>([]);
   const [audioGeneratingType, setAudioGeneratingType] =
@@ -334,13 +336,16 @@ function BookDetailPageContent() {
     return data.status;
   }
 
-  async function subscribeToGeneration(options?: { resetLive?: boolean }) {
+  async function subscribeToGeneration(options?: {
+    resetLive?: boolean;
+    resume?: boolean;
+  }) {
     if (watchingRef.current) return;
     watchingRef.current = true;
 
     setGenerating(true);
     setDockOpen(true);
-    setDockMinimized(false);
+    setDockMinimized(true);
     if (options?.resetLive) {
       setLiveContent("");
       setLiveSection(null);
@@ -348,9 +353,20 @@ function BookDetailPageContent() {
     setPhaseMessage((prev) => prev ?? "Connecting to live generation…");
 
     try {
-      const res = await fetch(`/api/generate/${id}/stream`, { method: "POST" });
+      const url = `/api/generate/${id}/stream${
+        options?.resume ? "?resume=1" : ""
+      }`;
+      const res = await fetch(url, { method: "POST" });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
+        if ((data as { paused?: boolean }).paused) {
+          watchingRef.current = false;
+          setGenerating(false);
+          setPhaseMessage(null);
+          setDockOpen(false);
+          setDockMinimized(false);
+          return;
+        }
         throw new Error(
           (data as { error?: string }).error ?? "Generation failed"
         );
@@ -378,7 +394,9 @@ function BookDetailPageContent() {
       if (status !== "GENERATING" && status !== "OUTLINING") {
         const message =
           error instanceof Error ? error.message : "Generation failed";
-        toast.error(message);
+        if (status !== "PAUSED") {
+          toast.error(message);
+        }
         await fetchBook();
       }
     } finally {
@@ -386,7 +404,7 @@ function BookDetailPageContent() {
       if (status === "GENERATING" || status === "OUTLINING") {
         watchingRef.current = false;
         setTimeout(() => {
-          void subscribeToGeneration();
+          void subscribeToGeneration({ resume: false });
         }, 1200);
         return;
       }
@@ -417,7 +435,34 @@ function BookDetailPageContent() {
     setBook((prev) =>
       prev ? { ...prev, status: "GENERATING", errorMessage: null } : prev
     );
-    await subscribeToGeneration({ resetLive: true });
+    const needsResume = book?.status === "PAUSED" || book?.status === "FAILED";
+    await subscribeToGeneration({ resetLive: true, resume: needsResume });
+  }
+
+  async function stopGeneration() {
+    if (!book) return;
+    setStopping(true);
+    try {
+      const res = await fetch(`/api/generate/${book.id}/cancel`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not stop generation");
+        return;
+      }
+      toast.message("Stopping generation…");
+      setPhaseMessage("Stopping generation…");
+      setBook((prev) =>
+        prev
+          ? { ...prev, status: "PAUSED", errorMessage: "Generation stopped" }
+          : prev
+      );
+    } catch {
+      toast.error("Failed to stop generation");
+    } finally {
+      setStopping(false);
+    }
   }
 
   async function handleAudioStreamEvent(
@@ -855,20 +900,25 @@ function BookDetailPageContent() {
               )}
               New edition
             </Button>
-            {(book.status === "DRAFT" || book.status === "FAILED") && !generating && (
-              <Button
-                onClick={startGeneration}
-                disabled={generating}
-                className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
-              >
-                {generating ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Play className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                {book.status === "FAILED" ? "Retry" : "Generate"}
-              </Button>
-            )}
+            {(book.status === "DRAFT" ||
+              book.status === "FAILED" ||
+              book.status === "PAUSED") &&
+              !generating && (
+                <Button
+                  onClick={startGeneration}
+                  disabled={generating}
+                  className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+                >
+                  {generating ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Play className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {book.status === "FAILED" || book.status === "PAUSED"
+                    ? "Resume"
+                    : "Generate"}
+                </Button>
+              )}
             {book.status === "GENERATING" && (
               <Button
                 variant="outline"
@@ -877,6 +927,21 @@ function BookDetailPageContent() {
               >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Refresh
+              </Button>
+            )}
+            {(book.status === "GENERATING" || book.status === "OUTLINING") && (
+              <Button
+                variant="outline"
+                onClick={stopGeneration}
+                disabled={stopping}
+                className="h-9 border-[#df1b41] text-[13px] text-[#df1b41] hover:bg-[#fde8e8]"
+              >
+                {stopping ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <X className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Stop generation
               </Button>
             )}
             {book.status === "COMPLETED" && (

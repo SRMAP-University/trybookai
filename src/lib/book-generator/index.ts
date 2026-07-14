@@ -124,35 +124,50 @@ ${styleBlock}`,
 
   const outline = JSON.parse(extractJsonPayload(raw)) as BookOutline;
 
-  await db.chapter.deleteMany({ where: { bookId } });
+  // Sanitize LLM output so duplicate or non-sequential chapter/section numbers
+  // never violate the (bookId, number) unique constraint.
+  const normalizedChapters = outline.chapters.map((chapter, chapterIndex) => ({
+    number: chapterIndex + 1,
+    title: chapter.title ?? `Chapter ${chapterIndex + 1}`,
+    summary: chapter.summary ?? "",
+    sections: (chapter.sections ?? []).map((section, sectionIndex) => ({
+      number: sectionIndex + 1,
+      title: section.title ?? `Section ${sectionIndex + 1}`,
+      summary: section.summary ?? "",
+    })),
+  }));
 
-  for (const chapter of outline.chapters) {
-    await db.chapter.create({
-      data: {
-        bookId,
-        number: chapter.number,
-        title: chapter.title,
-        summary: chapter.summary,
-        sections: {
-          create: chapter.sections.map((s) => ({
-            number: s.number,
-            title: s.title,
-          })),
+  await db.$transaction(async (tx) => {
+    await tx.chapter.deleteMany({ where: { bookId } });
+
+    for (const chapter of normalizedChapters) {
+      await tx.chapter.create({
+        data: {
+          bookId,
+          number: chapter.number,
+          title: chapter.title,
+          summary: chapter.summary,
+          sections: {
+            create: chapter.sections.map((s) => ({
+              number: s.number,
+              title: s.title,
+            })),
+          },
         },
+      });
+    }
+
+    await tx.book.update({
+      where: { id: bookId },
+      data: {
+        outline: { ...outline, chapters: normalizedChapters } as object,
+        status: "DRAFT",
+        progress: 5,
+        chapterCount,
+        sectionsPerChapter,
+        wordsPerPage,
       },
     });
-  }
-
-  await db.book.update({
-    where: { id: bookId },
-    data: {
-      outline: outline as object,
-      status: "DRAFT",
-      progress: 5,
-      chapterCount,
-      sectionsPerChapter,
-      wordsPerPage,
-    },
   });
 
   return outline;

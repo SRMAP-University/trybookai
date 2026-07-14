@@ -77,7 +77,10 @@ export async function GET() {
     );
     const completedBooks = books.filter((b) => b.status === "COMPLETED").length;
     const activeJobs = jobs.filter(
-      (j) => j.status === "RUNNING" || j.status === "PENDING"
+      (j) =>
+        j.status === "RUNNING" ||
+        j.status === "QUEUED" ||
+        j.status === "PENDING"
     ).length;
     const failedJobs = jobs.filter((j) => j.status === "FAILED").length;
     const completedChapters = chapters.filter(

@@ -65,7 +65,7 @@ export function GlobalGenerationWidget() {
     books: [],
     audios: [],
   });
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [dismissed, setDismissed] = useState(false);
   const visibleKeyRef = useRef("");
 
@@ -107,7 +107,7 @@ export function GlobalGenerationWidget() {
   useEffect(() => {
     if (total > 0 && key !== visibleKeyRef.current) {
       setDismissed(false);
-      setCollapsed(false);
+      // Keep collapsed by default so the widget does not interrupt the user.
       visibleKeyRef.current = key;
     }
     if (total === 0) {

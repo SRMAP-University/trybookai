@@ -18,10 +18,12 @@ const features = [
 ];
 
 const FAN = [
-  { rotate: -14, y: 16, bubble: true },
-  { rotate: -5, y: 2, bubble: false },
-  { rotate: 5, y: 2, bubble: true },
-  { rotate: 14, y: 16, bubble: false },
+  { rotate: -20, y: 24, bubble: true },
+  { rotate: -12, y: 12, bubble: false },
+  { rotate: -5, y: 2, bubble: true },
+  { rotate: 5, y: 2, bubble: false },
+  { rotate: 12, y: 12, bubble: true },
+  { rotate: 20, y: 24, bubble: false },
 ] as const;
 
 type LandingExperienceProps = {
@@ -32,8 +34,8 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
   const reduce = useReducedMotion();
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
-  const heroCovers = covers.slice(0, 4);
-  const gridCovers = covers.slice(0, 4);
+  const heroCovers = covers.slice(0, 6);
+  const gridCovers = covers.slice(6, 10);
 
   function handlePromptSubmit(e: FormEvent) {
     e.preventDefault();
@@ -47,38 +49,54 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
 
   return (
     <>
-      <section className="px-6 pb-20 pt-[112px] text-center md:pb-24 md:pt-[128px]">
+      <section className="px-6 pb-14 pt-[88px] text-center md:pb-16 md:pt-[104px]">
         <h1 className="mx-auto max-w-[920px] text-[48px] font-bold leading-[1.02] tracking-[-0.04em] text-[#111] sm:text-[64px] md:text-[76px]">
           A place to publish your masterpiece
         </h1>
 
-        <div className="mx-auto mt-12 flex h-[190px] max-w-[700px] items-center justify-center sm:mt-14 sm:h-[210px]">
-          {heroCovers.map((book, i) => (
-            <div
-              key={book.id}
-              className="relative w-[108px] shrink-0 sm:w-[132px] md:w-[148px]"
-              style={{
-                marginLeft: i === 0 ? 0 : -40,
-                transform: `rotate(${FAN[i].rotate}deg) translateY(${FAN[i].y}px)`,
-                zIndex: i + 1,
-              }}
-            >
-              {FAN[i].bubble && (
-                <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[115%]">
-                  <CoverBubble book={book} index={i} />
-                </div>
-              )}
-              <BookCoverCard
-                book={book}
-                index={i}
-                variant="art"
-                className="aspect-square w-full"
-              />
-            </div>
-          ))}
+        <div className="mx-auto mt-8 flex h-[190px] max-w-[700px] items-center justify-center sm:mt-10 sm:h-[215px] md:h-[240px]">
+          {heroCovers.map((book, i) => {
+            const base = FAN[i].rotate;
+            return (
+              <motion.div
+                key={book.id}
+                className="relative w-[86px] shrink-0 sm:w-[102px] md:w-[116px]"
+                initial={{
+                  marginLeft: i === 0 ? 0 : -28,
+                  rotate: base,
+                  y: FAN[i].y,
+                  zIndex: i + 1,
+                }}
+                animate={{
+                  rotate: [base - 2, base + 2, base - 2],
+                }}
+                transition={{
+                  duration: 4 + i * 0.6,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                style={{
+                  marginLeft: i === 0 ? 0 : -28,
+                  zIndex: i + 1,
+                }}
+              >
+                {FAN[i].bubble && (
+                  <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[115%]">
+                    <CoverBubble book={book} index={i} />
+                  </div>
+                )}
+                <BookCoverCard
+                  book={book}
+                  index={i}
+                  variant="art"
+                  className="aspect-square w-full"
+                />
+              </motion.div>
+            );
+          })}
         </div>
 
-        <p className="mx-auto mt-10 max-w-[480px] text-[15px] leading-relaxed text-[#6b6b6b] sm:mt-12 sm:text-[16px]">
+        <p className="mx-auto mt-8 max-w-[480px] text-[15px] leading-relaxed text-[#6b6b6b] sm:mt-10 sm:text-[16px]">
           Writers can publish their masterpieces, and readers can discover them
           in one place.
         </p>

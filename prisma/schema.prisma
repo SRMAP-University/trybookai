@@ -31,6 +31,7 @@ enum ChapterStatus {
 
 enum GenerationJobStatus {
   PENDING
+  QUEUED
   RUNNING
   COMPLETED
   FAILED
@@ -296,6 +297,8 @@ model GenerationJob {
   error       String?             @db.Text
   attempts    Int                 @default(0)
   maxAttempts Int                 @default(3)
+  /// Queue priority — higher value runs first (Enterprise > Pro > Free)
+  priority    Int                 @default(1)
   startedAt   DateTime?
   completedAt DateTime?
   createdAt   DateTime            @default(now())
@@ -304,5 +307,5 @@ model GenerationJob {
   book        Book                @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@index([bookId])
-  @@index([status])
+  @@index([status, priority, createdAt])
 }

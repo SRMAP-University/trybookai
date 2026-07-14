@@ -11,14 +11,23 @@ export function Footer() {
         </Link>
 
         <div className="flex flex-wrap gap-x-8 gap-y-2 text-[14px] text-[#6b6b6b]">
+          <Link href="/features" className="hover:text-[#111]">
+            Features
+          </Link>
           <Link href="/books" className="hover:text-[#111]">
             Books
           </Link>
-          <Link href="/#pricing" className="hover:text-[#111]">
-            Pricing
+          <Link href="/blog" className="hover:text-[#111]">
+            Blog
           </Link>
-          <Link href="/login" className="hover:text-[#111]">
-            Sign in
+          <Link href="/about" className="hover:text-[#111]">
+            About
+          </Link>
+          <Link href="/privacy" className="hover:text-[#111]">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-[#111]">
+            Terms
           </Link>
         </div>
 

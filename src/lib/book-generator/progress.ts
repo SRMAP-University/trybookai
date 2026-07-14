@@ -111,27 +111,35 @@ export async function applyBookProgress(
 ) {
   const book = await db.book.findUnique({
     where: { id: bookId },
-    select: { status: true },
+    select: { status: true, progress: true, currentPages: true },
   });
   if (!book) return null;
 
   const result = await computeBookProgress(bookId, options);
 
+  // Never write a lower progress/currentPages during a single generation run.
+  // This prevents the UI percentage from dropping if two updates race or if a
+  // transient estimate overshoots the final value.
+  const progress = Math.max(result.progress, book.progress ?? 0);
+  const currentPages = Math.max(result.currentPages, book.currentPages ?? 0);
+
   await db.book.update({
     where: { id: bookId },
     data: {
-      currentPages: result.currentPages,
-      progress: result.progress,
+      currentPages,
+      progress,
       status: result.allDone
         ? "COMPLETED"
-        : book.status === "OUTLINING"
-          ? "OUTLINING"
-          : "GENERATING",
+        : book.status === "PAUSED"
+          ? "PAUSED"
+          : book.status === "OUTLINING"
+            ? "OUTLINING"
+            : "GENERATING",
       completedAt: result.allDone ? new Date() : null,
     },
   });
 
-  return result;
+  return { ...result, progress, currentPages };
 }
 
 export async function creditSectionPages(userId: string, pageCount: number) {

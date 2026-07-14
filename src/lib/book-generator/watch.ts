@@ -51,7 +51,7 @@ type BookSnapshot = {
       pageCount: number;
     }[];
   }[];
-  generationJobs: { payload: unknown }[];
+  generationJobs: { payload: unknown; status: string }[];
 };
 
 async function loadBook(bookId: string) {
@@ -63,7 +63,7 @@ async function loadBook(bookId: string) {
         include: { sections: { orderBy: { number: "asc" } } },
       },
       generationJobs: {
-        where: { status: "RUNNING" },
+        where: { status: { in: ["QUEUED", "RUNNING"] } },
         orderBy: { createdAt: "desc" },
         take: 1,
       },
@@ -199,7 +199,16 @@ export async function watchGenerationStream(
       const job = book.generationJobs[0];
       const payload = (job?.payload ?? {}) as JobPayload;
       const currentSectionId = payload.currentSectionId;
-      const generationActive = isGenerationActive(bookId) || !!job;
+      const isQueued = job?.status === "QUEUED";
+      const generationActive = isGenerationActive(bookId) || job?.status === "RUNNING";
+
+      if (isQueued) {
+        emit({
+          type: "phase",
+          phase: "queued",
+          message: "Waiting in queue for a free generation slot…",
+        });
+      }
 
       if (
         !book.outline &&
@@ -239,16 +248,19 @@ export async function watchGenerationStream(
         wordsPerPage,
       });
 
+      const progress = Math.max(computed.progress, lastProgress);
+      const currentPages = Math.max(computed.currentPages, lastCurrentPages);
+
       if (
-        computed.progress !== lastProgress ||
-        computed.currentPages !== lastCurrentPages
+        progress !== lastProgress ||
+        currentPages !== lastCurrentPages
       ) {
-        lastProgress = computed.progress;
-        lastCurrentPages = computed.currentPages;
+        lastProgress = progress;
+        lastCurrentPages = currentPages;
         emit({
           type: "progress",
-          progress: computed.progress,
-          currentPages: computed.currentPages,
+          progress,
+          currentPages,
           targetPages: computed.targetPages,
           status: computed.allDone ? "COMPLETED" : book.status,
         });
@@ -264,6 +276,15 @@ export async function watchGenerationStream(
         emit({
           type: "error",
           message: book.errorMessage ?? "Generation failed",
+        });
+        break;
+      }
+
+      if (book.status === "PAUSED") {
+        emit({
+          type: "phase",
+          phase: "cancelled",
+          message: "Generation stopped",
         });
         break;
       }

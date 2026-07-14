@@ -102,10 +102,14 @@ export default async function DashboardPage() {
             className="h-9 shrink-0 rounded-md bg-white px-4 text-[13px] font-medium text-[#0a2540] hover:bg-white/90"
             asChild
           >
-            <Link href="/dashboard/books/new">
+            <a
+              href="https://litemoov.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Get early access
               <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-            </Link>
+            </a>
           </Button>
         </div>
       </div>

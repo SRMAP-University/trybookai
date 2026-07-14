@@ -7,8 +7,9 @@ import { LogoMark } from "@/components/marketing/landing-showcase";
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/#product", label: "Product" },
+  { href: "/features", label: "Features" },
   { href: "/books", label: "Books" },
+  { href: "/blog", label: "Blog" },
   { href: "/#pricing", label: "Pricing" },
 ];
 

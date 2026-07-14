@@ -1,6 +1,9 @@
 import { after } from "next/server";
 import { auth } from "@/lib/auth";
-import { ensureGenerationRunning } from "@/lib/book-generator/background";
+import {
+  ensureGenerationRunning,
+  GenerationPausedError,
+} from "@/lib/book-generator/background";
 import { type StreamEvent } from "@/lib/book-generator/streaming";
 import { watchGenerationStream } from "@/lib/book-generator/watch";
 
@@ -25,10 +28,18 @@ export async function POST(
   }
 
   const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const resume = searchParams.get("resume") === "1";
 
   try {
-    await ensureGenerationRunning(id, session.user.id);
+    await ensureGenerationRunning(id, session.user.id, resume);
   } catch (error) {
+    if (error instanceof GenerationPausedError) {
+      return new Response(JSON.stringify({ error: error.message, paused: true }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const message =
       error instanceof Error ? error.message : "Generation failed";
     return new Response(JSON.stringify({ error: message }), {
@@ -38,7 +49,8 @@ export async function POST(
   }
 
   after(() => {
-    ensureGenerationRunning(id, session.user.id).catch((error) => {
+    ensureGenerationRunning(id, session.user.id, false).catch((error) => {
+      if (error instanceof GenerationPausedError) return;
       console.error("Failed to resume background generation:", error);
     });
   });

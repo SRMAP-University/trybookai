@@ -17,9 +17,10 @@ export async function POST(
     const result = await ensureGenerationRunning(id, session.user.id);
     return NextResponse.json(
       {
-        started: result.started,
+        queued: result.queued,
         alreadyRunning: result.alreadyRunning,
-        completed: "completed" in result ? result.completed : false,
+        completed: result.completed ?? false,
+        jobId: result.jobId,
       },
       { status: 202 }
     );

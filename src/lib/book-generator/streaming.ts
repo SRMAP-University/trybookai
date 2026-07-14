@@ -5,7 +5,12 @@ import {
   streamChatCompletion,
 } from "@/lib/book-generator/llm";
 import { generateOutline } from "@/lib/book-generator/index";
-import { validateGenerationEligibility } from "@/lib/book-generator/background";
+import {
+  clearGenerationCancellation,
+  GenerationCancelledError,
+  isGenerationCancellationRequested,
+  validateGenerationEligibility,
+} from "@/lib/book-generator/background";
 import {
   applyBookProgress,
   creditSectionPages,
@@ -16,6 +21,31 @@ import {
   mergeEmitters,
 } from "@/lib/book-generator/events";
 import { generateAndSaveBookCover } from "@/lib/book-generator/cover";
+
+async function throwIfCancelled(bookId: string) {
+  if (isGenerationCancellationRequested(bookId)) {
+    clearGenerationCancellation(bookId);
+  }
+
+  const book = await db.book.findUnique({
+    where: { id: bookId },
+    select: { status: true },
+  });
+
+  if (book?.status === "PAUSED") {
+    const runningJob = await db.generationJob.findFirst({
+      where: { bookId, status: "RUNNING" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (runningJob) {
+      await db.generationJob.update({
+        where: { id: runningJob.id },
+        data: { status: "FAILED", error: "Cancelled", completedAt: new Date() },
+      });
+    }
+    throw new GenerationCancelledError();
+  }
+}
 
 export type StreamEvent =
   | { type: "phase"; phase: string; message?: string }
@@ -292,7 +322,15 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
   }
 }
 
-async function getOrCreateRunningJob(bookId: string) {
+async function getRunningJob(bookId: string, jobId?: string) {
+  if (jobId) {
+    const job = await db.generationJob.findUnique({
+      where: { id: jobId },
+    });
+    if (job?.status === "RUNNING") return job;
+    throw new GenerationCancelledError("Job was cancelled before it started");
+  }
+
   const existing = await db.generationJob.findFirst({
     where: { bookId, status: "RUNNING" },
     orderBy: { createdAt: "desc" },
@@ -319,17 +357,20 @@ function sectionNeedsGeneration(section: {
 export async function runBookGeneration(
   bookId: string,
   userId: string,
-  emit: StreamEmitter = noopEmit
+  emit: StreamEmitter = noopEmit,
+  jobId?: string
 ) {
   await validateGenerationEligibility(bookId, userId);
 
   const publisher = mergeEmitters(createBookEventEmitter(bookId), emit);
-  const job = await getOrCreateRunningJob(bookId);
+  const job = await getRunningJob(bookId, jobId);
 
   try {
     const book = await db.book.findUniqueOrThrow({
       where: { id: bookId },
     });
+
+    await throwIfCancelled(bookId);
 
     if (!book.outline) {
       publisher({
@@ -347,6 +388,8 @@ export async function runBookGeneration(
       publisher({ type: "outline_ready", chapterCount });
     }
 
+    await throwIfCancelled(bookId);
+
     const coverStatus = await db.book.findUnique({
       where: { id: bookId },
       select: { coverImage: true },
@@ -360,6 +403,8 @@ export async function runBookGeneration(
           console.error(`Cover generation failed for book ${bookId}:`, error);
         });
     }
+
+    await throwIfCancelled(bookId);
 
     publisher({ type: "phase", phase: "writing", message: "Writing your book…" });
 
@@ -375,6 +420,7 @@ export async function runBookGeneration(
 
     for (const chapter of refreshed.chapters) {
       for (const section of chapter.sections) {
+        await throwIfCancelled(bookId);
         if (sectionNeedsGeneration(section)) {
           if (section.content && section.wordCount === 0) {
             await db.section.update({
@@ -433,6 +479,14 @@ export async function runBookGeneration(
         });
     }
   } catch (error) {
+    if (error instanceof GenerationCancelledError) {
+      publisher({
+        type: "phase",
+        phase: "cancelled",
+        message: "Generation stopped",
+      });
+      return;
+    }
     const message =
       error instanceof Error ? error.message : "Generation failed";
     await db.book.update({
