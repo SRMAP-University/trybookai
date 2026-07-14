@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useDashboardUser } from "@/components/dashboard/user-context";
+import { LogoMark } from "@/components/marketing/landing-showcase";
 
 export function DashboardHeader() {
   const { data: session, status } = useSession();
@@ -45,8 +46,9 @@ export function DashboardHeader() {
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/dashboard"
-            className="text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540] lg:hidden"
+            className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540] lg:hidden"
           >
+            <LogoMark className="h-6 w-6" />
             BookAI
           </Link>
           <div className="hidden min-w-0 lg:block">

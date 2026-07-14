@@ -21,6 +21,7 @@ import {
   isClientTrialActive,
 } from "@/components/dashboard/trial-banner";
 import { PREMIUM_TRIAL } from "@/lib/constants";
+import { LogoMark } from "@/components/marketing/landing-showcase";
 
 const navSections = [
   {
@@ -78,8 +79,9 @@ export function DashboardSidebar() {
       <div className="flex h-16 items-center px-5">
         <Link
           href="/dashboard"
-          className="text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540]"
+          className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540]"
         >
+          <LogoMark className="h-6 w-6" />
           BookAI
         </Link>
       </div>

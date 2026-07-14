@@ -104,16 +104,11 @@ export function LandingShowcase() {
 
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
+    <img
+      src="/LOGO.png"
+      alt="BookAI"
       className={className}
-      fill="none"
       aria-hidden
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1.5" fill="#ef4444" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" fill="#ef4444" opacity="0.7" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" fill="#ef4444" opacity="0.7" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" fill="#ef4444" opacity="0.4" />
-    </svg>
+    />
   );
 }
