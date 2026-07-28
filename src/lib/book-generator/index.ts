@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { DEFAULT_AI_MODEL, isModelAvailable } from "@/lib/ai-models";
+import { dbTransaction } from "@/lib/db-transaction";
+import { DEFAULT_AI_MODEL, OUTLINE_AI_MODEL, isModelAvailable } from "@/lib/ai-models";
 import {
   createChatCompletion,
   extractJsonPayload,
@@ -89,7 +90,10 @@ function buildStyleBlock(book: BookSettings): string {
   return parts.join("\n");
 }
 
-export async function generateOutline(bookId: string) {
+export async function generateOutline(
+  bookId: string,
+  onProgress?: (message: string) => void
+) {
   const book = await db.book.findUniqueOrThrow({ where: { id: bookId } });
   const shape = resolveGenerationShape(book);
   const { chapterCount, sectionsPerChapter, wordsPerPage } = shape;
@@ -99,17 +103,27 @@ export async function generateOutline(bookId: string) {
     data: { status: "OUTLINING" },
   });
 
+  onProgress?.(
+    `Planning ${chapterCount} chapters × ${sectionsPerChapter} sections…`
+  );
+
   const styleBlock = buildStyleBlock(book);
+  const outlineTokens = Math.min(
+    8192,
+    400 + chapterCount * sectionsPerChapter * 100
+  );
+
+  onProgress?.("Generating outline with AI…");
 
   const raw = await createChatCompletion({
-    model: book.model || DEFAULT_AI_MODEL,
-    temperature: book.creativity ?? 0.7,
+    model: OUTLINE_AI_MODEL,
+    temperature: 0.5,
     json: true,
-    max_tokens: 8192,
+    max_tokens: outlineTokens,
     messages: [
       {
         role: "system",
-        content: `You are an expert book architect. Create detailed book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep the outline appropriate for a short ${book.targetPages}-page book — concise chapters and sections.`,
+        content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book.`,
       },
       {
         role: "user",
@@ -121,6 +135,8 @@ ${styleBlock}`,
       },
     ],
   });
+
+  onProgress?.("Saving outline…");
 
   const outline = JSON.parse(extractJsonPayload(raw)) as BookOutline;
 
@@ -137,7 +153,7 @@ ${styleBlock}`,
     })),
   }));
 
-  await db.$transaction(async (tx) => {
+  await dbTransaction(async (tx) => {
     await tx.chapter.deleteMany({ where: { bookId } });
 
     for (const chapter of normalizedChapters) {
@@ -255,7 +271,10 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
 
   const content = extractModelText(raw);
   const wordCount = content.split(/\s+/).filter(Boolean).length;
-  const pageCount = Math.max(1, Math.ceil(wordCount / wordsPerPage));
+  const pageCount = Math.min(
+    pagesPerSection,
+    Math.max(1, Math.ceil(wordCount / wordsPerPage))
+  );
 
   await db.section.update({
     where: { id: sectionId },

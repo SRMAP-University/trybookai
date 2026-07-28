@@ -16,11 +16,25 @@ import {
   syncUserTrialState,
 } from "@/lib/billing";
 import { PREMIUM_TRIAL, planPriceId } from "@/lib/constants";
+import { legalConsentField } from "@/lib/legal";
 import { getBaseUrl } from "@/lib/url";
 import {
   downgradeToFree,
   syncUserFromSubscription,
 } from "@/lib/stripe-sync";
+import { z } from "zod";
+
+const trialSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("start"),
+    interval: z.enum(["month", "year"]).optional(),
+    acceptedTerms: legalConsentField,
+  }),
+  z.object({
+    action: z.literal("end"),
+    interval: z.enum(["month", "year"]).optional(),
+  }),
+]);
 
 export async function POST(request: Request) {
   try {
@@ -29,23 +43,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: { action?: string; interval?: string };
+    let body: unknown;
     try {
-      body = (await request.json()) as { action?: string; interval?: string };
+      body = await request.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const action = body.action;
-    if (action !== "start" && action !== "end") {
-      return NextResponse.json(
-        { error: "action must be start or end" },
-        { status: 400 }
-      );
+    const parsed = trialSchema.safeParse(body);
+    if (!parsed.success) {
+      const flat = parsed.error.flatten();
+      const fieldErrors = flat.fieldErrors as Record<string, string[] | undefined>;
+      const message =
+        fieldErrors.acceptedTerms?.[0] ??
+        flat.formErrors[0] ??
+        "Invalid trial request";
+      return NextResponse.json({ error: message }, { status: 400 });
     }
 
+    const { action } = parsed.data;
+
     const user = await syncUserTrialState(session.user.id);
-    const interval = body.interval === "year" ? "year" : "month";
+    const interval = parsed.data.interval === "year" ? "year" : "month";
 
     if (action === "start") {
       if (isStripeBillingEnabled()) {

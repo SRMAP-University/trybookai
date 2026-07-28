@@ -10,6 +10,7 @@ import {
   resolveUserIdFromSubscription,
   syncUserFromSubscription,
 } from "@/lib/stripe-sync";
+import { notifyTrialStarted } from "@/lib/emails/notify-trial-started";
 
 function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
   const raw = (
@@ -102,6 +103,15 @@ export async function POST(request: Request) {
         }
 
         await syncUserFromSubscription(userId, subscription, customerId);
+
+        if (
+          subscription.status === "trialing" ||
+          session.metadata?.trial === "premium"
+        ) {
+          notifyTrialStarted(userId).catch((error) => {
+            console.error("[stripe webhook] trial started email", error);
+          });
+        }
         break;
       }
 

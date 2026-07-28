@@ -6,12 +6,19 @@ import { Loader2 } from "lucide-react";
 
 interface GoogleButtonProps {
   callbackUrl?: string;
+  disabled?: boolean;
+  disabledHint?: string;
 }
 
-export function GoogleButton({ callbackUrl = "/dashboard" }: GoogleButtonProps) {
+export function GoogleButton({
+  callbackUrl = "/dashboard",
+  disabled = false,
+  disabledHint,
+}: GoogleButtonProps) {
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
+    if (disabled) return;
     setLoading(true);
     await signIn("google", { callbackUrl });
   }
@@ -20,8 +27,9 @@ export function GoogleButton({ callbackUrl = "/dashboard" }: GoogleButtonProps) 
     <button
       type="button"
       onClick={handleClick}
-      disabled={loading}
-      className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[#e6ebf1] bg-white px-4 py-2.5 text-[13px] font-medium text-[#0a2540] shadow-sm transition hover:bg-[#f8fafc] disabled:opacity-70"
+      disabled={loading || disabled}
+      title={disabled ? disabledHint : undefined}
+      className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[#e6ebf1] bg-white px-4 py-2.5 text-[13px] font-medium text-[#0a2540] shadow-sm transition hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-70"
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />

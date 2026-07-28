@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { legalConsentField } from "@/lib/legal";
+import { sendWelcomeEmail } from "@/lib/emails/transactional";
 import { z } from "zod";
 
 const registerSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email(),
   password: z.string().min(8).max(100),
+  acceptedTerms: legalConsentField,
 });
 
 export async function POST(request: Request) {
@@ -14,10 +17,12 @@ export async function POST(request: Request) {
   const parsed = registerSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.flatten() },
-      { status: 400 }
-    );
+    const flat = parsed.error.flatten();
+    const message =
+      flat.fieldErrors.acceptedTerms?.[0] ??
+      flat.formErrors[0] ??
+      "Invalid registration data";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   const existing = await db.user.findUnique({
@@ -39,6 +44,10 @@ export async function POST(request: Request) {
       email: parsed.data.email,
       passwordHash,
     },
+  });
+
+  sendWelcomeEmail({ to: user.email, name: user.name }).catch((error) => {
+    console.error("[register] welcome email", error);
   });
 
   return NextResponse.json(

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { getAppUrl } from "@/lib/book-public";
+import { LEGAL, SUPPORT_EMAIL } from "@/lib/legal";
+import { PLANS, PREMIUM_TRIAL } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Terms of Service — BookAI",
@@ -21,7 +23,7 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="mt-2 text-[14px] text-[#697386]">
-            Last updated: July 14, 2026
+            Last updated: July 24, 2026
           </p>
 
           <div className="mt-8 space-y-6 text-[16px] leading-relaxed text-[#425466]">
@@ -74,13 +76,26 @@ export default function TermsPage() {
 
             <section>
               <h2 className="mb-2 text-[20px] font-semibold text-[#0a2540]">
-                5. Subscriptions and refunds
+                5. Subscriptions, trials, and refunds
               </h2>
               <p>
-                Paid plans are billed in advance. You may cancel at any time.
-                Refunds are offered at our discretion unless required by law.
-                Free trial limits are described on the pricing and billing
-                pages.
+                Paid plans (Pro ${PLANS.PRO.price}/mo, Premium $
+                {PLANS.ENTERPRISE.price}/mo) renew automatically until canceled.
+                Premium may include a {PREMIUM_TRIAL.days}-day free trial; a
+                payment method is required, and you will be charged the plan
+                price when the trial ends unless you cancel first. You may cancel
+                anytime from Dashboard → Billing.
+              </p>
+              <p className="mt-3">
+                Refunds and cancellations are described in our{" "}
+                <a href={LEGAL.refund} className="text-[#635bff] hover:underline">
+                  Refund &amp; Cancellation Policy
+                </a>
+                . By subscribing, you agree to these Terms, our{" "}
+                <a href={LEGAL.privacy} className="text-[#635bff] hover:underline">
+                  Privacy Policy
+                </a>
+                , and Refund Policy.
               </p>
             </section>
 
@@ -112,8 +127,14 @@ export default function TermsPage() {
                 8. Contact us
               </h2>
               <p>
-                For questions about these Terms, contact us at
-                support@bookai.example.
+                For questions about these Terms, contact us at{" "}
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  className="text-[#635bff] hover:underline"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+                .
               </p>
             </section>
           </div>

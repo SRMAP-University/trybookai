@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { UpgradeButton } from "@/components/dashboard/upgrade-button";
+import { LegalClickAgreement } from "@/components/legal/legal-consent";
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { PREMIUM_TRIAL } from "@/lib/constants";
 import { readJson } from "@/lib/api";
@@ -27,7 +28,7 @@ export function DashboardUpgradeBanner({
       const res = await fetch("/api/billing/trial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start" }),
+        body: JSON.stringify({ action: "start", acceptedTerms: true }),
       });
       const result = await readJson<{
         error?: string;
@@ -53,61 +54,65 @@ export function DashboardUpgradeBanner({
 
   if (canStartTrial) {
     return (
-      <div className="relative overflow-hidden rounded-xl border border-[#f0e0a8] bg-linear-to-br from-[#fffbeb] to-white p-6">
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#fcf5e0] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#9a6700]">
-          <Sparkles className="h-3 w-3" />
-          Free trial
-        </span>
-        <h2 className="mt-3 text-[22px] font-semibold tracking-[-0.03em] text-[#0a2540]">
-          Try Premium free for {PREMIUM_TRIAL.days} days
-        </h2>
-        <p className="mt-2 max-w-[340px] text-[13px] leading-relaxed text-[#425466]">
-          {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages and{" "}
-          {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours of audiobook
-          narration. No charge today.
-        </p>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button
-            className="h-9 rounded-md bg-[#0e6245] px-4 text-[13px] hover:bg-[#0a4d37]"
-            onClick={startTrial}
-            disabled={trialLoading}
-          >
-            {trialLoading ? "Starting…" : "Start free trial · $0 today"}
-            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-          </Button>
-          <Link
-            href="/dashboard/billing"
-            className="text-[12px] font-medium text-[#635bff] hover:underline"
-          >
-            Or upgrade to Pro
-          </Link>
+      <div className="relative overflow-hidden rounded-lg border border-[#f0e0a8] bg-linear-to-br from-[#fffbeb] to-white px-4 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#9a6700]">
+              <Sparkles className="h-2.5 w-2.5" />
+              Free trial · {PREMIUM_TRIAL.days} days
+            </span>
+            <h2 className="mt-0.5 text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540]">
+              Try Premium free
+            </h2>
+            <p className="mt-0.5 text-[12px] leading-snug text-[#697386]">
+              {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages ·{" "}
+              {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)}h audio · $0
+              today · {pagesRemaining} free left
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Button
+              className="h-7 rounded-md bg-[#0e6245] px-3 text-[12px] hover:bg-[#0a4d37]"
+              onClick={startTrial}
+              disabled={trialLoading}
+            >
+              {trialLoading ? "Starting…" : "Start trial"}
+              <ArrowRight className="ml-1 h-3 w-3" />
+            </Button>
+            <Link
+              href="/dashboard/billing"
+              className="text-[11px] font-medium text-[#635bff] hover:underline"
+            >
+              Or upgrade to Pro
+            </Link>
+          </div>
         </div>
-        <p className="mt-3 text-[12px] text-[#697386]">
-          {pagesRemaining} free pages left on your current plan
-        </p>
+        <LegalClickAgreement
+          className="mt-2"
+          actionLabel="By starting a trial"
+        />
       </div>
     );
   }
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-[#e6ebf1] bg-linear-to-br from-[#f0efff] to-white p-6">
-      <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-[#0a2540]">
-        Unlock more pages & audiobooks
-      </h2>
-      <p className="mt-2 max-w-[320px] text-[13px] leading-relaxed text-[#425466]">
-        Pro includes 5,000 pages, 1 hour of narration, and priority generation.
-      </p>
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+    <div className="relative overflow-hidden rounded-lg border border-[#e6ebf1] bg-linear-to-br from-[#f0efff] to-white px-4 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540]">
+            Unlock more pages & audiobooks
+          </h2>
+          <p className="mt-0.5 text-[12px] leading-snug text-[#697386]">
+            Pro: 5,000 pages · 1h narration · {pagesRemaining} free left
+          </p>
+        </div>
         <UpgradeButton
           plan="PRO"
-          className="h-9 rounded-md bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
+          className="h-7 shrink-0 rounded-md bg-[#635bff] px-3 text-[12px] hover:bg-[#5851e5]"
         >
           Upgrade to Pro
-          <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+          <ArrowRight className="ml-1 h-3 w-3" />
         </UpgradeButton>
-        <span className="text-[12px] text-[#697386]">
-          {pagesRemaining} free pages left
-        </span>
       </div>
     </div>
   );

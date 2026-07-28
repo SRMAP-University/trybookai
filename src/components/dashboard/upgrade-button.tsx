@@ -1,8 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { toast } from "sonner";
@@ -12,6 +12,10 @@ import { cn } from "@/lib/utils";
 type PaidPlan = "PRO" | "ENTERPRISE";
 type BillingInterval = "month" | "year";
 
+type UpgradeOptions = {
+  acceptedTerms?: boolean;
+};
+
 export function useUpgradePlan() {
   const router = useRouter();
   const { refresh } = useDashboardUser();
@@ -19,14 +23,19 @@ export function useUpgradePlan() {
 
   async function upgrade(
     plan: PaidPlan = "PRO",
-    interval: BillingInterval = "month"
+    interval: BillingInterval = "month",
+    _options?: UpgradeOptions
   ) {
     setLoading(plan);
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, interval }),
+        body: JSON.stringify({
+          plan,
+          interval,
+          acceptedTerms: true,
+        }),
       });
       const result = await readJson<{
         error?: string;
@@ -77,25 +86,14 @@ type UpgradeButtonProps = {
 };
 
 export function UpgradeButton({
-  plan = "PRO",
   children,
   className,
   variant = "default",
   size = "default",
 }: UpgradeButtonProps) {
-  const { upgrade, loading } = useUpgradePlan();
-
   return (
-    <Button
-      type="button"
-      variant={variant}
-      size={size}
-      className={cn(className)}
-      disabled={!!loading}
-      onClick={() => upgrade(plan)}
-    >
-      {loading === plan && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-      {children}
+    <Button variant={variant} size={size} className={cn(className)} asChild>
+      <Link href="/dashboard/billing">{children}</Link>
     </Button>
   );
 }
@@ -106,25 +104,13 @@ type UpgradeLinkProps = {
   className?: string;
 };
 
-export function UpgradeLink({
-  plan = "PRO",
-  children,
-  className,
-}: UpgradeLinkProps) {
-  const { upgrade, loading } = useUpgradePlan();
-
+export function UpgradeLink({ children, className }: UpgradeLinkProps) {
   return (
-    <button
-      type="button"
-      disabled={!!loading}
-      onClick={() => upgrade(plan)}
-      className={cn(
-        "inline-flex items-center gap-1 disabled:opacity-60",
-        className
-      )}
+    <Link
+      href="/dashboard/billing"
+      className={cn("inline-flex items-center gap-1", className)}
     >
-      {loading === plan && <Loader2 className="h-3 w-3 animate-spin" />}
       {children}
-    </button>
+    </Link>
   );
 }

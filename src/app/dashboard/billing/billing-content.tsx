@@ -14,6 +14,7 @@ import {
   pricingHeaderStyle,
 } from "@/lib/pricing-plans";
 import { useUpgradePlan } from "@/components/dashboard/upgrade-button";
+import { LegalClickAgreement } from "@/components/legal/legal-consent";
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import {
   TrialBanner,
@@ -95,6 +96,10 @@ export function BillingContent({
   const onTrial = isClientTrialActive(user?.trialEndsAt, user?.onTrial);
   const canStartTrial = !user?.hasStripeSubscription && !onTrial;
   const currentPlan = user?.plan;
+  const showLegalConsent =
+    currentPlan !== "ENTERPRISE" ||
+    onTrial ||
+    !user?.hasStripeSubscription;
   const canManageAddons =
     (currentPlan === "PRO" || currentPlan === "ENTERPRISE") && !onTrial;
   const addonTotal =
@@ -195,7 +200,7 @@ export function BillingContent({
   }, [canManageAddons, currentPlan, user?.hasStripeSubscription]);
 
   async function handleCheckout(plan: "PRO" | "ENTERPRISE") {
-    await upgrade(plan, interval);
+    await upgrade(plan, interval, { acceptedTerms: true });
   }
 
   async function handleTrial(action: "start" | "end") {
@@ -204,7 +209,11 @@ export function BillingContent({
       const res = await fetch("/api/billing/trial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, interval }),
+        body: JSON.stringify({
+          action,
+          interval,
+          ...(action === "start" ? { acceptedTerms: true } : {}),
+        }),
       });
       const result = await readJson<{
         error?: string;
@@ -365,6 +374,13 @@ export function BillingContent({
           audioMinutesLimit={user.audioMinutesLimit ?? 0}
           onEndTrial={() => handleTrial("end")}
           ending={trialLoading === "end"}
+        />
+      )}
+
+      {showLegalConsent && (
+        <LegalClickAgreement
+          className="pt-1"
+          actionLabel="By starting a trial or subscription"
         />
       )}
 

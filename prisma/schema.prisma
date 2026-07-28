@@ -71,6 +71,8 @@ model User {
   trialStartedAt   DateTime?
   /// One Premium trial per account
   hasUsedPremiumTrial Boolean @default(false)
+  /// Set when we email the user ~24h before trialEndsAt
+  trialReminderSentAt DateTime?
   stripeCustomerId String?   @unique
   stripeSubId      String?
 

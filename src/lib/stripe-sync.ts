@@ -55,6 +55,7 @@ export async function downgradeToFree(userId: string) {
       audioMinutesBonus: 0,
       stripeSubId: null,
       trialEndsAt: null,
+      trialReminderSentAt: null,
     },
   });
 }
@@ -143,6 +144,7 @@ export async function syncUserFromSubscription(
     audioMinutesBonus: limits.audioMinutesBonus,
     stripeSubId: subscription.id,
     trialEndsAt: isTrialing ? trialEndsAt : null,
+    ...(isTrialing ? {} : { trialReminderSentAt: null }),
   };
 
   if (customerId) {

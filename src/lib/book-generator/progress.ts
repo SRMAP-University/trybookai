@@ -72,10 +72,6 @@ export async function computeBookProgress(
 
   const sectionProgress =
     (completedSections + inSectionFraction) / sections.length;
-  const progress = Math.min(
-    99,
-    Math.round((5 + sectionProgress * 90) * 10) / 10
-  );
 
   let currentPages = sections
     .filter((s) => s.wordCount > 0)
@@ -95,7 +91,23 @@ export async function computeBookProgress(
     }
   }
 
-  const allDone = completedSections === sections.length;
+  const pageRatio =
+    book.targetPages > 0
+      ? Math.min(1, currentPages / book.targetPages)
+      : sectionProgress;
+
+  const sectionBased = (5 + sectionProgress * 90);
+  const pageBased =
+    book.targetPages > 0 ? Math.min(99, pageRatio * 100) : 0;
+
+  const progress = Math.min(
+    99,
+    Math.round(Math.max(sectionBased, pageBased) * 10) / 10
+  );
+
+  const allDone =
+    completedSections === sections.length ||
+    (book.targetPages > 0 && currentPages >= book.targetPages);
 
   return {
     progress: allDone ? 100 : progress,

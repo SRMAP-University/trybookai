@@ -4,6 +4,7 @@ import { runBookGeneration } from "@/lib/book-generator/streaming";
 import { type Plan } from "@/generated/prisma/client";
 
 const MAX_CONCURRENT_GENERATIONS = 2;
+const QUEUE_POLL_MS = 15_000;
 
 const PLAN_PRIORITY: Record<Plan, number> = {
   FREE: 1,
@@ -11,8 +12,20 @@ const PLAN_PRIORITY: Record<Plan, number> = {
   ENTERPRISE: 3,
 };
 
-const activeBookIds = new Set<string>();
-const cancellationRequests = new Set<string>();
+const globalQueue = globalThis as unknown as {
+  bookaiActiveBookIds?: Set<string>;
+  bookaiCancellationRequests?: Set<string>;
+  bookaiWorkerPromise?: Promise<void> | null;
+  bookaiQueueInterval?: ReturnType<typeof setInterval> | null;
+};
+
+const activeBookIds =
+  globalQueue.bookaiActiveBookIds ?? new Set<string>();
+const cancellationRequests =
+  globalQueue.bookaiCancellationRequests ?? new Set<string>();
+
+globalQueue.bookaiActiveBookIds = activeBookIds;
+globalQueue.bookaiCancellationRequests = cancellationRequests;
 
 export class GenerationCancelledError extends Error {
   constructor(message = "Generation cancelled") {
@@ -71,6 +84,18 @@ export class GenerationPausedError extends Error {
   }
 }
 
+function isTransientDbError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /P2028|Unable to start a transaction|Connection terminated|connection timeout|ECONNRESET|ETIMEDOUT|too many clients/i.test(
+    message
+  );
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Queue a generation without interactive transactions (Neon-pooler safe). */
 export async function ensureGenerationRunning(
   bookId: string,
   userId: string,
@@ -79,95 +104,76 @@ export async function ensureGenerationRunning(
   const STALE_MS = 10 * 60 * 1000;
   const staleBefore = new Date(Date.now() - STALE_MS);
 
-  const result = await db.$transaction(async (tx) => {
-    const book = await tx.book.findUniqueOrThrow({
-      where: { id: bookId, userId },
-      include: { user: true },
-    });
-
-    if (book.status === "COMPLETED") {
-      return { action: "completed" as const };
-    }
-
-    // Fail stale running jobs so recovery can happen after a crash.
-    await tx.generationJob.updateMany({
-      where: {
-        bookId,
-        status: "RUNNING",
-        createdAt: { lt: staleBefore },
-      },
-      data: {
-        status: "FAILED",
-        error: "Stale job",
-        completedAt: new Date(),
-      },
-    });
-
-    const activeJob = await tx.generationJob.findFirst({
-      where: { bookId, status: { in: ["QUEUED", "RUNNING"] } },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (activeJob) {
-      return { action: "already-running" as const, jobId: activeJob.id };
-    }
-
-    if (book.status === "PAUSED" && !resume) {
-      return { action: "paused" as const };
-    }
-
-    const remaining = book.user.pagesLimit - book.user.pagesUsed;
-    if (book.targetPages > remaining) {
-      throw new Error(
-        `Insufficient page credits. You have ${remaining} pages remaining.`
-      );
-    }
-
-    if (!isModelAvailable(book.model || DEFAULT_AI_MODEL, book.user.plan)) {
-      throw new Error("This model requires a Pro or Enterprise plan.");
-    }
-
-    if (book.status === "FAILED" || book.status === "PAUSED") {
-      await tx.book.update({
-        where: { id: bookId },
-        data: { status: "DRAFT", errorMessage: null },
-      });
-    }
-
-    const job = await tx.generationJob.create({
-      data: {
-        bookId,
-        type: "FULL_BOOK",
-        status: "QUEUED",
-        priority: PLAN_PRIORITY[book.user.plan] ?? 1,
-      },
-    });
-
-    // Show the book as generating in the UI even when it is only queued.
-    await tx.book.update({
-      where: { id: bookId },
-      data: { status: "GENERATING" },
-    });
-
-    return { action: "queued" as const, jobId: job.id };
+  const book = await db.book.findUniqueOrThrow({
+    where: { id: bookId, userId },
+    include: { user: true },
   });
 
-  if (result.action === "completed") {
+  if (book.status === "COMPLETED") {
     return { queued: false, alreadyRunning: false, completed: true };
   }
 
-  if (result.action === "paused") {
+  await db.generationJob.updateMany({
+    where: {
+      bookId,
+      status: "RUNNING",
+      createdAt: { lt: staleBefore },
+    },
+    data: {
+      status: "FAILED",
+      error: "Stale job",
+      completedAt: new Date(),
+    },
+  });
+
+  const activeJob = await db.generationJob.findFirst({
+    where: { bookId, status: { in: ["QUEUED", "RUNNING"] } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (activeJob) {
+    void processQueue();
+    return { queued: false, alreadyRunning: true, jobId: activeJob.id };
+  }
+
+  if (book.status === "PAUSED" && !resume) {
     throw new GenerationPausedError();
   }
 
-  if (result.action === "already-running") {
-    return { queued: false, alreadyRunning: true, jobId: result.jobId };
+  const remaining = book.user.pagesLimit - book.user.pagesUsed;
+  if (book.targetPages > remaining) {
+    throw new Error(
+      `Insufficient page credits. You have ${remaining} pages remaining.`
+    );
   }
 
-  // Try to start the next job in the queue immediately. If the slots are full,
-  // processQueue will no-op and the pending job waits until a slot frees up.
+  if (!isModelAvailable(book.model || DEFAULT_AI_MODEL, book.user.plan)) {
+    throw new Error("This model requires a Pro or Enterprise plan.");
+  }
+
+  if (book.status === "FAILED" || book.status === "PAUSED") {
+    await db.book.update({
+      where: { id: bookId },
+      data: { status: "DRAFT", errorMessage: null },
+    });
+  }
+
+  const job = await db.generationJob.create({
+    data: {
+      bookId,
+      type: "FULL_BOOK",
+      status: "QUEUED",
+      priority: PLAN_PRIORITY[book.user.plan] ?? 1,
+    },
+  });
+
+  await db.book.update({
+    where: { id: bookId },
+    data: { status: "GENERATING" },
+  });
+
   void processQueue();
-  return { queued: true, alreadyRunning: false, jobId: result.jobId };
+  return { queued: true, alreadyRunning: false, jobId: job.id };
 }
 
 async function runQueuedJob(jobId: string, bookId: string, userId: string) {
@@ -191,22 +197,24 @@ async function runQueuedJob(jobId: string, bookId: string, userId: string) {
   }
 }
 
-let workerPromise: Promise<void> | null = null;
-
 async function processQueue() {
   if (activeBookIds.size >= MAX_CONCURRENT_GENERATIONS) return;
 
-  if (workerPromise) return;
-  workerPromise = processQueueInner().finally(() => {
-    workerPromise = null;
+  if (globalQueue.bookaiWorkerPromise) return;
+  globalQueue.bookaiWorkerPromise = processQueueInner().finally(() => {
+    globalQueue.bookaiWorkerPromise = null;
   });
-  return workerPromise;
+  return globalQueue.bookaiWorkerPromise;
 }
 
-async function processQueueInner() {
-  while (activeBookIds.size < MAX_CONCURRENT_GENERATIONS) {
-    const job = await db.$transaction(async (tx) => {
-      const candidate = await tx.generationJob.findFirst({
+async function claimNextQueuedJob(): Promise<{
+  id: string;
+  bookId: string;
+  userId: string;
+} | null> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const candidate = await db.generationJob.findFirst({
         where: { status: "QUEUED" },
         orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
         include: { book: { select: { userId: true } } },
@@ -214,31 +222,51 @@ async function processQueueInner() {
 
       if (!candidate) return null;
 
-      // Claim the job only if it is still queued.
-      const claimed = await tx.generationJob
-        .update({
-          where: { id: candidate.id, status: "QUEUED" },
-          data: { status: "RUNNING", startedAt: new Date() },
-        })
-        .catch(() => null);
+      // Skip books already running in this process.
+      if (activeBookIds.has(candidate.bookId)) {
+        continue;
+      }
 
-      return claimed
-        ? {
-            id: claimed.id,
-            bookId: claimed.bookId,
-            userId: candidate.book.userId,
-          }
-        : null;
-    });
+      const claimed = await db.generationJob.updateMany({
+        where: { id: candidate.id, status: "QUEUED" },
+        data: { status: "RUNNING", startedAt: new Date() },
+      });
 
-    if (!job) break;
+      if (claimed.count === 1) {
+        return {
+          id: candidate.id,
+          bookId: candidate.bookId,
+          userId: candidate.book.userId,
+        };
+      }
+    } catch (error) {
+      if (isTransientDbError(error) && attempt < 4) {
+        await sleep(500 * (attempt + 1));
+        continue;
+      }
+      throw error;
+    }
+  }
 
-    void runQueuedJob(job.id, job.bookId, job.userId);
+  return null;
+}
+
+async function processQueueInner() {
+  try {
+    while (activeBookIds.size < MAX_CONCURRENT_GENERATIONS) {
+      const job = await claimNextQueuedJob();
+      if (!job) break;
+      void runQueuedJob(job.id, job.bookId, job.userId);
+    }
+  } catch (error) {
+    console.error("[generation queue] processQueue failed:", error);
   }
 }
 
-// Safety net: periodically scan for orphaned queued jobs in case the chain of
-// processQueue() triggers is broken by a server restart or deploy.
-setInterval(() => {
+// One interval across Fast Refresh — stacking setIntervals was exhausting Neon.
+if (globalQueue.bookaiQueueInterval) {
+  clearInterval(globalQueue.bookaiQueueInterval);
+}
+globalQueue.bookaiQueueInterval = setInterval(() => {
   void processQueue();
-}, 5000);
+}, QUEUE_POLL_MS);

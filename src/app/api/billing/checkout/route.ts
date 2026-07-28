@@ -13,7 +13,16 @@ import {
   type PaidPlan,
 } from "@/lib/billing";
 import { PREMIUM_TRIAL, planPriceId, type BillingInterval } from "@/lib/constants";
+import { legalConsentField } from "@/lib/legal";
 import { getBaseUrl } from "@/lib/url";
+import { z } from "zod";
+
+const checkoutSchema = z.object({
+  plan: z.enum(["PRO", "ENTERPRISE"]),
+  interval: z.enum(["month", "year"]).optional(),
+  withTrial: z.boolean().optional(),
+  acceptedTerms: legalConsentField,
+});
 
 export async function POST(request: Request) {
   try {
@@ -22,24 +31,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: { plan?: string; interval?: string; withTrial?: boolean };
+    let body: unknown;
     try {
-      body = (await request.json()) as {
-        plan?: string;
-        interval?: string;
-        withTrial?: boolean;
-      };
+      body = await request.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { plan } = body;
-    const interval: BillingInterval =
-      body.interval === "year" ? "year" : "month";
-
-    if (plan !== "PRO" && plan !== "ENTERPRISE") {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+    const parsed = checkoutSchema.safeParse(body);
+    if (!parsed.success) {
+      const flat = parsed.error.flatten();
+      const message =
+        flat.fieldErrors.acceptedTerms?.[0] ??
+        flat.formErrors[0] ??
+        "Invalid checkout request";
+      return NextResponse.json({ error: message }, { status: 400 });
     }
+
+    const { plan } = parsed.data;
+    const interval: BillingInterval =
+      parsed.data.interval === "year" ? "year" : "month";
 
     const paidPlan = plan as PaidPlan;
 
@@ -101,7 +112,7 @@ export async function POST(request: Request) {
     const offerTrial =
       paidPlan === "ENTERPRISE" &&
       !hasActive &&
-      body.withTrial !== false;
+      parsed.data.withTrial !== false;
 
     const checkoutSession = await createCheckoutSession({
       customerId: customer.id,

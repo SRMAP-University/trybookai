@@ -208,12 +208,10 @@ export async function watchGenerationStream(
           phase: "queued",
           message: "Waiting in queue for a free generation slot…",
         });
-      }
-
-      if (
+      } else if (
         !book.outline &&
-        book.status !== "COMPLETED" &&
-        book.status !== "FAILED"
+        generationActive &&
+        (book.status === "OUTLINING" || book.status === "GENERATING")
       ) {
         emit({
           type: "phase",

@@ -447,17 +447,20 @@ function BookDetailPageContent() {
         method: "POST",
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      if (!res.ok && res.status !== 409) {
         toast.error(data.error ?? "Could not stop generation");
         return;
       }
-      toast.message("Stopping generation…");
-      setPhaseMessage("Stopping generation…");
+      toast.message(
+        data.alreadyStopped ? "Generation already stopped" : "Stopping generation…"
+      );
+      setPhaseMessage("Generation stopped");
       setBook((prev) =>
         prev
           ? { ...prev, status: "PAUSED", errorMessage: "Generation stopped" }
           : prev
       );
+      await fetchBook();
     } catch {
       toast.error("Failed to stop generation");
     } finally {

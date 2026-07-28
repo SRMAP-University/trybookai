@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { getAppUrl } from "@/lib/book-public";
+import { SUPPORT_EMAIL } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — BookAI",
@@ -114,7 +115,14 @@ export default function PrivacyPage() {
               </h2>
               <p>
                 If you have questions about this Privacy Policy, please contact
-                us at support@bookai.example.
+                us at{" "}
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  className="text-[#635bff] hover:underline"
+                >
+                  {SUPPORT_EMAIL}
+                </a>
+                .
               </p>
             </section>
           </div>

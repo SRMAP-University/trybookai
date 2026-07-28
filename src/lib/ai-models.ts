@@ -39,6 +39,9 @@ export const AI_MODELS: readonly AiModelConfig[] = [
 
 export const DEFAULT_AI_MODEL = "deepseek-r1";
 
+/** Faster model for structured JSON outlines (avoid slow reasoning models). */
+export const OUTLINE_AI_MODEL = "llama-3.3";
+
 /** Legacy OpenAI model ids stored on older books/settings → Cloudflare default */
 const LEGACY_MODEL_MAP: Record<string, string> = {
   "gpt-4o": "deepseek-r1",

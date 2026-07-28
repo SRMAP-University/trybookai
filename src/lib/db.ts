@@ -1,42 +1,52 @@
+import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { cleanEnv } from "@/lib/env";
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-  prismaSchemaVersion?: number;
+  prisma?: PrismaClient;
+  pgPool?: Pool;
 };
 
-/** Bump when Prisma schema fields change so the HMR singleton reloads. */
-const PRISMA_SCHEMA_VERSION = 7;
+function getPool() {
+  if (globalForPrisma.pgPool) {
+    return globalForPrisma.pgPool;
+  }
 
-function createPrismaClient() {
-  const adapter = new PrismaPg({
-    connectionString: cleanEnv(process.env.DATABASE_URL),
+  const connectionString = cleanEnv(process.env.DATABASE_URL);
+  const pool = new Pool({
+    connectionString,
+    max: 3,
+    min: 0,
+    idleTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 10_000,
+    allowExitOnIdle: true,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
   });
-  return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+
+  pool.on("error", (error) => {
+    // Neon terminates idle clients — log and keep process alive.
+    console.warn("[pg pool]", error.message);
   });
+
+  // Never pool.end() on HMR — background queue + Prisma still hold this pool.
+  globalForPrisma.pgPool = pool;
+  return pool;
 }
 
 function getPrismaClient() {
-  if (
-    globalForPrisma.prisma &&
-    globalForPrisma.prismaSchemaVersion === PRISMA_SCHEMA_VERSION
-  ) {
+  if (globalForPrisma.prisma) {
     return globalForPrisma.prisma;
   }
 
-  if (globalForPrisma.prisma) {
-    void globalForPrisma.prisma.$disconnect().catch(() => undefined);
-  }
+  const client = new PrismaClient({
+    adapter: new PrismaPg(getPool()),
+    log:
+      process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
 
-  const client = createPrismaClient();
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = client;
-    globalForPrisma.prismaSchemaVersion = PRISMA_SCHEMA_VERSION;
-  }
+  globalForPrisma.prisma = client;
   return client;
 }
 

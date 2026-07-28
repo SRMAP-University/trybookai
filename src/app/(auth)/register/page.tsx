@@ -7,6 +7,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { GoogleButton } from "@/components/auth/google-button";
+import {
+  LegalClickAgreement,
+  LegalFooterLinks,
+} from "@/components/legal/legal-consent";
 
 export default function RegisterPage() {
   return (
@@ -35,7 +39,7 @@ function RegisterForm() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, acceptedTerms: true }),
     });
 
     if (!res.ok) {
@@ -158,6 +162,10 @@ function RegisterForm() {
             )}
             Create account
           </button>
+          <LegalClickAgreement
+            className="text-center"
+            actionLabel="By creating an account"
+          />
         </form>
 
         <div className="relative my-6">
@@ -170,9 +178,15 @@ function RegisterForm() {
         </div>
 
         <GoogleButton callbackUrl={callbackUrl} />
+        <LegalClickAgreement
+          className="mt-3 text-center"
+          actionLabel="By continuing with Google"
+        />
       </div>
 
-      <p className="mt-6 text-center text-[13px] text-[#697386]">
+      <LegalFooterLinks className="mt-6 text-center" />
+
+      <p className="mt-4 text-center text-[13px] text-[#697386]">
         Already have an account?{" "}
         <Link href="/login" className="font-medium text-[#635bff] hover:underline">
           Sign in

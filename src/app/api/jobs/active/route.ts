@@ -12,13 +12,15 @@ export async function GET() {
 
   const userId = session.user.id;
 
-  const [books, audios] = await Promise.all([
-    db.book.findMany({
+  try {
+    // Sequential queries — one pool client at a time (Neon-friendly).
+    const books = await db.book.findMany({
       where: {
         userId,
         status: { in: ["OUTLINING", "GENERATING"] },
       },
       orderBy: { updatedAt: "desc" },
+      take: 10,
       select: {
         id: true,
         title: true,
@@ -28,13 +30,15 @@ export async function GET() {
         targetPages: true,
         updatedAt: true,
       },
-    }),
-    db.bookAudio.findMany({
+    });
+
+    const audios = await db.bookAudio.findMany({
       where: {
         status: { in: ["PENDING", "GENERATING"] },
         book: { userId },
       },
       orderBy: { updatedAt: "desc" },
+      take: 10,
       select: {
         id: true,
         bookId: true,
@@ -45,20 +49,27 @@ export async function GET() {
         updatedAt: true,
         book: { select: { title: true } },
       },
-    }),
-  ]);
+    });
 
-  return NextResponse.json({
-    books,
-    audios: audios.map((audio) => ({
-      id: audio.id,
-      bookId: audio.bookId,
-      bookTitle: audio.book.title,
-      type: audio.type,
-      status: audio.status,
-      progress: audio.progress,
-      title: audio.title,
-      updatedAt: audio.updatedAt,
-    })),
-  });
+    return NextResponse.json({
+      books,
+      audios: audios.map((audio) => ({
+        id: audio.id,
+        bookId: audio.bookId,
+        bookTitle: audio.book.title,
+        type: audio.type,
+        status: audio.status,
+        progress: audio.progress,
+        title: audio.title,
+        updatedAt: audio.updatedAt,
+      })),
+    });
+  } catch (error) {
+    // Neon pooler drops idle connections — don't 500 the widget poll.
+    console.warn(
+      "[jobs/active]",
+      error instanceof Error ? error.message : error
+    );
+    return NextResponse.json({ books: [], audios: [], degraded: true });
+  }
 }

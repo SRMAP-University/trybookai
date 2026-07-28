@@ -1,7 +1,9 @@
 import Stripe from "stripe";
-import { PREMIUM_TRIAL } from "@/lib/constants";
+import { PREMIUM_TRIAL, PLANS } from "@/lib/constants";
 import { addonPriceId } from "@/lib/addons";
 import { cleanEnv } from "@/lib/env";
+import { getAppUrl } from "@/lib/book-public";
+import { LEGAL } from "@/lib/legal";
 import {
   featureLookupKey,
   premiumProductDescription,
@@ -217,6 +219,9 @@ export async function createCheckoutSession({
     subscriptionData.trial_end = trialEnd;
   }
 
+  const appUrl = getAppUrl();
+  const legalNote = `By subscribing you agree to our Terms (${appUrl}${LEGAL.terms}), Privacy (${appUrl}${LEGAL.privacy}), and Refund Policy (${appUrl}${LEGAL.refund}).`;
+
   return stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
@@ -240,8 +245,8 @@ export async function createCheckoutSession({
     custom_text: {
       submit: {
         message: withTrial
-          ? "2-day free trial · $0 due today. “Included ·” rows are plan features (not extra charges)."
-          : "“Included ·” rows are plan features at $0. Extra pages/audio are optional paid capacity.",
+          ? `${PREMIUM_TRIAL.days}-day free trial · $0 due today. After the trial, your card is charged $${PLANS.ENTERPRISE.price}/mo (or the yearly price if selected). Cancel anytime before the trial ends to avoid charges. ${legalNote}`
+          : `${legalNote} “Included ·” rows are plan features at $0. Extra pages/audio are optional paid capacity.`,
       },
     },
     ...(withTrial ? { payment_method_collection: "always" as const } : {}),

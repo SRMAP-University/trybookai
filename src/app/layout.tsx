@@ -42,7 +42,7 @@ export default function RootLayout({
         {children}
         <Toaster richColors position="top-right" />
         <Script
-          src="https://www.googletagmanager.com/gtag/js?id=AW-18323125522"
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18336512996"
           strategy="afterInteractive"
         />
         <Script
@@ -53,7 +53,7 @@ export default function RootLayout({
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', 'AW-18323125522');
+              gtag('config', 'AW-18336512996');
             `,
           }}
         />

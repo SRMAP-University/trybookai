@@ -5,7 +5,7 @@ export default function AudioStudioPage() {
   return (
     <AnonymousRouteFallback
       title="Audio Studio"
-      description="Generate audiobooks, podcasts, and theme music from completed books."
+      description="Turn pasted text or a PDF into an audiobook or podcast."
     >
       <AudioStudioClient />
     </AnonymousRouteFallback>

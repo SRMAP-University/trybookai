@@ -22,21 +22,37 @@ export async function POST(
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
 
+  if (book.status === "COMPLETED") {
+    return NextResponse.json(
+      { error: "Book is already complete" },
+      { status: 409 }
+    );
+  }
+
+  const activeJob = await db.generationJob.findFirst({
+    where: { bookId: id, status: { in: ["QUEUED", "RUNNING"] } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Idempotent: UI may still show GENERATING after a crash left the book FAILED.
   if (
-    book.status !== "GENERATING" &&
-    book.status !== "OUTLINING"
+    !activeJob &&
+    (book.status === "PAUSED" ||
+      book.status === "FAILED" ||
+      book.status === "DRAFT")
   ) {
-    // Allow cancelling a queued job even if the book is still DRAFT.
-    const queuedJob = await db.generationJob.findFirst({
-      where: { bookId: id, status: { in: ["QUEUED", "RUNNING"] } },
-      orderBy: { createdAt: "desc" },
+    await db.book.update({
+      where: { id },
+      data: {
+        status: "PAUSED",
+        errorMessage: book.errorMessage ?? "Generation stopped",
+      },
     });
-    if (!queuedJob) {
-      return NextResponse.json(
-        { error: "No active generation to stop" },
-        { status: 409 }
-      );
-    }
+    return NextResponse.json({
+      ok: true,
+      status: "PAUSED",
+      alreadyStopped: true,
+    });
   }
 
   requestGenerationCancellation(id);

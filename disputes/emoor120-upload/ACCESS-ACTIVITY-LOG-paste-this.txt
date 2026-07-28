@@ -1,0 +1,14 @@
+BookAI Access Activity Log
+Customer: Erin Strohfeldt (emoor120@eq.edu.au)
+User ID: cmrohu82v000004lctffe6t61
+Stripe Customer: cus_Uts0PErQUbTXrR
+
+16 Jul 2026 23:39 UTC | ACCOUNT_CREATED | Email: Emoor120@eq.edu.au
+16 Jul 2026 23:43 UTC | BOOK_CREATED | Title: "My Plan when I feel sick or worried"
+16 Jul 2026 23:43 UTC | GENERATION_STARTED | Type: FULL_BOOK
+17 Jul 2026 05:25 UTC | CHECKOUT_COMPLETE | Stripe session cs_live_b1WJwz8... | Premium trial started
+17-19 Jul 2026 | TRIAL_ACTIVE | Premium limits: 10,000 pages, 180 min audio
+19 Jul 2026 06:25 UTC | PAYMENT_SUCCESS | Invoice CKOKDVIN-0002 | USD $30.00
+19 Jul 2026 06:25 UTC | SUBSCRIPTION_ACTIVE | sub_1Tu4HbCYJHbBgX5Lb7Z2yOiO
+
+Book URL: https://www.trybookai.com/books/my-plan-when-i-feel-sick-or-worried-f37d170c

@@ -23,28 +23,38 @@ import {
 import { generateAndSaveBookCover } from "@/lib/book-generator/cover";
 
 async function throwIfCancelled(bookId: string) {
-  if (isGenerationCancellationRequested(bookId)) {
-    clearGenerationCancellation(bookId);
-  }
+  const requested = isGenerationCancellationRequested(bookId);
 
   const book = await db.book.findUnique({
     where: { id: bookId },
     select: { status: true },
   });
 
-  if (book?.status === "PAUSED") {
-    const runningJob = await db.generationJob.findFirst({
-      where: { bookId, status: "RUNNING" },
-      orderBy: { createdAt: "desc" },
-    });
-    if (runningJob) {
-      await db.generationJob.update({
-        where: { id: runningJob.id },
-        data: { status: "FAILED", error: "Cancelled", completedAt: new Date() },
-      });
-    }
-    throw new GenerationCancelledError();
+  if (!requested && book?.status !== "PAUSED") {
+    return;
   }
+
+  clearGenerationCancellation(bookId);
+
+  const runningJob = await db.generationJob.findFirst({
+    where: { bookId, status: "RUNNING" },
+    orderBy: { createdAt: "desc" },
+  });
+  if (runningJob) {
+    await db.generationJob.update({
+      where: { id: runningJob.id },
+      data: { status: "FAILED", error: "Cancelled", completedAt: new Date() },
+    });
+  }
+
+  if (book?.status !== "PAUSED") {
+    await db.book.update({
+      where: { id: bookId },
+      data: { status: "PAUSED", errorMessage: "Generation stopped by user" },
+    });
+  }
+
+  throw new GenerationCancelledError();
 }
 
 export type StreamEvent =
@@ -86,15 +96,11 @@ async function updateJobProgress(
   jobId: string,
   data: { currentSectionId?: string; partialContent?: string }
 ) {
-  const job = await db.generationJob.findUnique({ where: { id: jobId } });
-  const payload = (job?.payload ?? {}) as Record<string, unknown>;
+  // Single update — avoid findUnique + update (2 pool clients per draft tick).
   await db.generationJob.update({
     where: { id: jobId },
     data: {
-      payload: {
-        ...payload,
-        ...data,
-      },
+      payload: data,
     },
   });
 }
@@ -169,23 +175,6 @@ async function streamGenerateSection(
     synopsis?: string;
   } | null;
 
-  const emitProgress = async (draftWordCount?: number) => {
-    const result = await applyBookProgress(book.id, {
-      activeSectionId: section.id,
-      draftWordCount,
-      targetSectionWords: targetWords,
-      wordsPerPage,
-    });
-    if (!result) return;
-    emit({
-      type: "progress",
-      progress: result.progress,
-      currentPages: result.currentPages,
-      targetPages: result.targetPages,
-      status: result.allDone ? "COMPLETED" : "GENERATING",
-    });
-  };
-
   const styleParts = [
     `Point of view: ${book.pov}`,
     `Tense: ${book.tense}`,
@@ -198,22 +187,64 @@ async function streamGenerateSection(
   ].filter(Boolean);
 
   let draftContent = "";
-  let lastPersist = Date.now();
-  let lastVisibleLength = 0;
+  let lastPersist = 0;
+  let persistInFlight: Promise<void> | null = null;
+  let pendingPersist: string | null = null;
 
-  const persistDraft = async (content: string) => {
-    const draftWordCount = content.split(/\s+/).filter(Boolean).length;
-    await Promise.all([
-      db.section.update({
-        where: { id: sectionId },
-        data: { content, wordCount: 0, pageCount: 0 },
-      }),
-      updateJobProgress(jobId, {
-        currentSectionId: section.id,
-        partialContent: content,
-      }),
-    ]);
-    await emitProgress(draftWordCount);
+  /** Live UI already gets tokens via emit — only lightly sync DB so Neon isn't flooded. */
+  const persistDraft = async (content: string, force = false) => {
+    pendingPersist = content;
+    if (persistInFlight) return persistInFlight;
+
+    persistInFlight = (async () => {
+      while (pendingPersist !== null) {
+        const snapshot = pendingPersist;
+        pendingPersist = null;
+        const now = Date.now();
+        if (!force && now - lastPersist < 3000) {
+          break;
+        }
+        lastPersist = now;
+        const draftWordCount = snapshot.split(/\s+/).filter(Boolean).length;
+        try {
+          // Job payload only during stream — avoids stacking section + progress writes.
+          await updateJobProgress(jobId, {
+            currentSectionId: section.id,
+            partialContent: snapshot,
+          });
+          const estimatedPages = Math.min(
+            book.targetPages,
+            Math.max(
+              book.currentPages ?? 0,
+              Math.ceil(draftWordCount / wordsPerPage)
+            )
+          );
+          emit({
+            type: "progress",
+            progress: Math.min(
+              99,
+              Math.round(
+                (5 +
+                  Math.min(1, draftWordCount / Math.max(1, targetWords)) * 90) *
+                  10
+              ) / 10
+            ),
+            currentPages: estimatedPages,
+            targetPages: book.targetPages,
+            status: "GENERATING",
+          });
+        } catch (error) {
+          console.warn(
+            "[generation] draft persist skipped:",
+            error instanceof Error ? error.message : error
+          );
+        }
+      }
+    })().finally(() => {
+      persistInFlight = null;
+    });
+
+    return persistInFlight;
   };
 
   const raw = await streamChatCompletion({
@@ -225,13 +256,7 @@ async function streamGenerateSection(
       draftContent += text;
       emit({ type: "token", sectionId: section.id, text });
 
-      const now = Date.now();
-      if (
-        draftContent.length - lastVisibleLength >= 80 ||
-        now - lastPersist >= 500
-      ) {
-        lastVisibleLength = draftContent.length;
-        lastPersist = now;
+      if (Date.now() - lastPersist >= 3000) {
         void persistDraft(draftContent);
       }
     },
@@ -262,17 +287,22 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
 
   const content = extractModelText(raw) || extractModelText(draftContent);
   const wordCount = content.split(/\s+/).filter(Boolean).length;
-  const pageCount = Math.max(1, Math.ceil(wordCount / wordsPerPage));
+  const pageCount = Math.min(
+    pagesPerSection,
+    Math.max(1, Math.ceil(wordCount / wordsPerPage))
+  );
 
-  if (draftContent !== content) {
-    await persistDraft(content);
-  }
+  // Wait for any in-flight throttle, then write the final section once.
+  await (persistInFlight as Promise<void> | null)?.catch(() => undefined);
 
   await db.section.update({
     where: { id: sectionId },
     data: { content, wordCount, pageCount },
   });
-  await updateJobProgress(jobId, { partialContent: content });
+  await updateJobProgress(jobId, {
+    currentSectionId: section.id,
+    partialContent: content,
+  });
 
   const allSections = await db.section.findMany({
     where: { chapterId: chapter.id },
@@ -382,7 +412,13 @@ export async function runBookGeneration(
         where: { id: bookId },
         data: { status: "OUTLINING", progress: 2 },
       });
-      await generateOutline(bookId);
+      await generateOutline(bookId, (message) => {
+        publisher({
+          type: "phase",
+          phase: "outlining",
+          message,
+        });
+      });
       await applyBookProgress(bookId);
       const chapterCount = await db.chapter.count({ where: { bookId } });
       publisher({ type: "outline_ready", chapterCount });
@@ -419,6 +455,7 @@ export async function runBookGeneration(
     });
 
     for (const chapter of refreshed.chapters) {
+      let reachedTarget = false;
       for (const section of chapter.sections) {
         await throwIfCancelled(bookId);
         if (sectionNeedsGeneration(section)) {
@@ -429,8 +466,21 @@ export async function runBookGeneration(
             });
           }
           await streamGenerateSection(section.id, job.id, publisher);
+
+          const pageCheck = await db.book.findUnique({
+            where: { id: bookId },
+            select: { currentPages: true, targetPages: true },
+          });
+          if (
+            pageCheck &&
+            pageCheck.currentPages >= pageCheck.targetPages
+          ) {
+            reachedTarget = true;
+            break;
+          }
         }
       }
+      if (reachedTarget) break;
     }
 
     await db.generationJob.update({

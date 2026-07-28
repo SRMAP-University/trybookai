@@ -29,6 +29,9 @@ export function Footer() {
           <Link href="/terms" className="hover:text-[#111]">
             Terms
           </Link>
+          <Link href="/refund" className="hover:text-[#111]">
+            Refunds
+          </Link>
         </div>
 
         <p className="text-[13px] text-[#6b6b6b]">
