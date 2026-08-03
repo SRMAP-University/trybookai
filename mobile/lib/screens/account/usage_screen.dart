@@ -19,25 +19,27 @@ class UsageScreen extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               children: [
                 StripeCard(
-                  child: ProgressRow(
-                    label: 'Pages this cycle',
-                    value: user.pagesUsed,
-                    total: user.pagesLimit,
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.onTrial ? 'Premium trial' : user.planLabel,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      CompactUsageStats(
+                        pagesUsed: user.pagesUsed,
+                        pagesLimit: user.pagesLimit,
+                        audioUsed: user.audioMinutesUsed,
+                        audioLimit: user.audioMinutesLimit,
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                StripeCard(
-                  child: ProgressRow(
-                    label: 'Audio minutes',
-                    value: user.audioMinutesUsed,
-                    total: user.audioMinutesLimit,
-                    unit: ' min',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Plan: ${user.onTrial ? 'Premium trial' : user.planLabel}',
-                  style: const TextStyle(color: AppColors.textMuted),
                 ),
               ],
             ),

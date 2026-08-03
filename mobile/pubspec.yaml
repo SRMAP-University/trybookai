@@ -53,6 +53,7 @@ dependencies:
   flutter_local_notifications: ^19.4.0
   just_audio: ^0.10.4
   purchases_flutter: ^10.7.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

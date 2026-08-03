@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
+import 'package:bookai_mobile/routing/app_page.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/services/revenuecat_service.dart';
@@ -113,16 +114,19 @@ GoRouter _buildRouter(AuthProvider auth) {
     routes: [
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) =>
+            AppPage.fadeUp(state, const LoginScreen()),
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) =>
+            AppPage.fadeUp(state, const RegisterScreen()),
       ),
       GoRoute(
         path: '/billing',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const BillingScreen(),
+        pageBuilder: (context, state) =>
+            AppPage.slide(state, const BillingScreen()),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -133,7 +137,7 @@ GoRouter _buildRouter(AuthProvider auth) {
               GoRoute(
                 path: '/home',
                 pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: HomeScreen()),
+                    AppPage.none(state, const HomeScreen()),
               ),
             ],
           ),
@@ -142,18 +146,22 @@ GoRouter _buildRouter(AuthProvider auth) {
               GoRoute(
                 path: '/books',
                 pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: BooksScreen()),
+                    AppPage.none(state, const BooksScreen()),
                 routes: [
                   GoRoute(
                     path: 'new',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const NewBookScreen(),
+                    pageBuilder: (context, state) =>
+                        AppPage.slide(state, const NewBookScreen()),
                   ),
                   GoRoute(
                     path: ':id',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => BookDetailScreen(
-                      bookId: state.pathParameters['id']!,
+                    pageBuilder: (context, state) => AppPage.slide(
+                      state,
+                      BookDetailScreen(
+                        bookId: state.pathParameters['id']!,
+                      ),
                     ),
                   ),
                 ],
@@ -165,13 +173,16 @@ GoRouter _buildRouter(AuthProvider auth) {
               GoRoute(
                 path: '/discover',
                 pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: PublicBooksScreen()),
+                    AppPage.none(state, const PublicBooksScreen()),
                 routes: [
                   GoRoute(
                     path: ':slug',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => PublicBookDetailScreen(
-                      slug: state.pathParameters['slug']!,
+                    pageBuilder: (context, state) => AppPage.slide(
+                      state,
+                      PublicBookDetailScreen(
+                        slug: state.pathParameters['slug']!,
+                      ),
                     ),
                   ),
                 ],
@@ -183,7 +194,7 @@ GoRouter _buildRouter(AuthProvider auth) {
               GoRoute(
                 path: '/studio',
                 pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: AudioStudioScreen()),
+                    AppPage.none(state, const AudioStudioScreen()),
               ),
             ],
           ),
@@ -192,27 +203,31 @@ GoRouter _buildRouter(AuthProvider auth) {
               GoRoute(
                 path: '/account',
                 pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: AccountScreen()),
+                    AppPage.none(state, const AccountScreen()),
                 routes: [
                   GoRoute(
                     path: 'usage',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const UsageScreen(),
+                    pageBuilder: (context, state) =>
+                        AppPage.slide(state, const UsageScreen()),
                   ),
                   GoRoute(
                     path: 'settings',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const SettingsScreen(),
+                    pageBuilder: (context, state) =>
+                        AppPage.slide(state, const SettingsScreen()),
                   ),
                   GoRoute(
                     path: 'profile',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const ProfileScreen(),
+                    pageBuilder: (context, state) =>
+                        AppPage.slide(state, const ProfileScreen()),
                   ),
                   GoRoute(
                     path: 'branding',
                     parentNavigatorKey: _rootNavigatorKey,
-                    builder: (context, state) => const BrandingScreen(),
+                    pageBuilder: (context, state) =>
+                        AppPage.slide(state, const BrandingScreen()),
                   ),
                 ],
               ),

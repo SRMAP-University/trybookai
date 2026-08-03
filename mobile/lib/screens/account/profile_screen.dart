@@ -5,6 +5,7 @@ import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/common.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -97,45 +98,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
               children: [
-                TextField(
-                  controller: _name,
-                  decoration: const InputDecoration(labelText: 'Display name'),
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 14),
-                InputDecorator(
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  child: Text(
-                    _email,
-                    style: const TextStyle(color: AppColors.textMuted),
+                const MenuSectionLabel('Identity'),
+                StripeCard(
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _name,
+                        decoration:
+                            const InputDecoration(labelText: 'Display name'),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 14),
+                      InputDecorator(
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        child: Text(
+                          _email,
+                          style: const TextStyle(color: AppColors.textMuted),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      InputDecorator(
+                        decoration: const InputDecoration(labelText: 'Plan'),
+                        child: Text(
+                          _planLabel,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                InputDecorator(
-                  decoration: const InputDecoration(labelText: 'Plan'),
-                  child: Text(
-                    _planLabel,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
+                const MenuSectionLabel('Notifications'),
+                StripeCard(
+                  padding: EdgeInsets.zero,
+                  child: SwitchListTile(
+                    title: const Text('Email notifications'),
+                    subtitle: const Text(
+                      'Usage alerts and billing emails',
+                      style:
+                          TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),
+                    value: _emailNotifications,
+                    activeThumbColor: AppColors.primary,
+                    onChanged: (v) => setState(() => _emailNotifications = v),
                   ),
                 ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Email notifications'),
-                  subtitle: const Text(
-                    'Usage alerts and billing emails',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-                  ),
-                  value: _emailNotifications,
-                  activeThumbColor: AppColors.primary,
-                  onChanged: (v) => setState(() => _emailNotifications = v),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 FilledButton(
                   onPressed: _saving ? null : _save,
                   child: _saving

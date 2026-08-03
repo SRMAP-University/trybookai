@@ -49,7 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final books = context.watch<BooksProvider>();
     final pub = context.watch<PublicBooksProvider>();
     final user = auth.user;
-    final firstName = user?.name?.split(' ').first;
 
     return Scaffold(
       appBar: AppBar(
@@ -73,13 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
           children: [
-            Text(
-              firstName != null ? 'Welcome back, $firstName' : 'Your workspace',
-              style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 16),
             if (user != null)
               StripeCard(
+                padding: const EdgeInsets.fromLTRB(14, 10, 10, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -96,22 +91,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const Spacer(),
                         TextButton(
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                           onPressed: () => context.push('/billing'),
                           child: const Text('Manage'),
                         ),
                       ],
                     ),
-                    ProgressRow(
-                      label: 'Pages',
-                      value: user.pagesUsed,
-                      total: user.pagesLimit,
-                    ),
-                    const SizedBox(height: 14),
-                    ProgressRow(
-                      label: 'Audio minutes',
-                      value: user.audioMinutesUsed,
-                      total: user.audioMinutesLimit,
-                      unit: ' min',
+                    const SizedBox(height: 6),
+                    CompactUsageStats(
+                      pagesUsed: user.pagesUsed,
+                      pagesLimit: user.pagesLimit,
+                      audioUsed: user.audioMinutesUsed,
+                      audioLimit: user.audioMinutesLimit,
                     ),
                   ],
                 ),

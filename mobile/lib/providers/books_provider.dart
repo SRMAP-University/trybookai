@@ -66,8 +66,15 @@ class BooksProvider extends ChangeNotifier {
     required int targetPages,
     bool startGeneration = true,
     bool generateAudiobookOnComplete = true,
+    String? customInstructions,
+    String? characters,
   }) async {
     try {
+      final characterList = (characters ?? '')
+          .split(RegExp(r'[\n,]'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
       final res = await _api.dio.post(
         ApiConfig.books,
         data: {
@@ -82,6 +89,9 @@ class BooksProvider extends ChangeNotifier {
           'pov': 'third',
           'tense': 'past',
           'language': 'en',
+          if (customInstructions != null && customInstructions.isNotEmpty)
+            'customInstructions': customInstructions,
+          if (characterList.isNotEmpty) 'characters': characterList,
         },
       );
       final book = BookModel.fromJson(res.data as Map<String, dynamic>);

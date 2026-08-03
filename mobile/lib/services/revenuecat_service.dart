@@ -101,10 +101,18 @@ class RevenueCatService extends ChangeNotifier {
     }
   }
 
+  bool _isLifetime(Package p) {
+    final text = _packageText(p);
+    return p.packageType == PackageType.lifetime ||
+        text.contains('lifetime') ||
+        text.contains(r'$rc_lifetime');
+  }
+
   bool _matchesInterval(Package p, {required bool wantAnnual}) {
-    final id =
-        '${p.identifier} ${p.storeProduct.identifier} ${p.storeProduct.title}'
-            .toLowerCase();
+    // Lifetime is not a monthly/yearly sub — keep it out of those pools.
+    if (_isLifetime(p)) return false;
+
+    final id = _packageText(p);
     final type = p.packageType;
     if (wantAnnual) {
       return type == PackageType.annual ||
@@ -121,74 +129,79 @@ class RevenueCatService extends ChangeNotifier {
         type == PackageType.threeMonth ||
         type == PackageType.sixMonth ||
         id.contains('month') ||
-        id.contains('_mo') ||
-        (!id.contains('year') && !id.contains('annual'));
+        id.contains('_mo');
   }
 
-  int? _planRankFromText(String text) {
-    final t = text.toLowerCase();
-    if (t.contains('unlimited')) return 3;
-    if (t.contains('premium') || t.contains('enterprise')) return 2;
-    if (t.contains('pro') && !t.contains('premium')) return 1;
+  String _packageText(Package p) =>
+      '${p.identifier} ${p.storeProduct.identifier} ${p.storeProduct.title}'
+          .toLowerCase();
+
+  /// Which BookAI plan a package belongs to, or null if unknown.
+  String? _planIdForPackage(Package p) {
+    final text = _packageText(p);
+
+    // Duration defaults first — avoids false matches like "pro" inside other words.
+    if (_isLifetime(p)) return 'UNLIMITED';
+
+    if (RegExp(r'\bunlimited\b').hasMatch(text)) return 'UNLIMITED';
+    if (RegExp(r'\b(premium|enterprise)\b').hasMatch(text)) {
+      return 'ENTERPRISE';
+    }
+    if (RegExp(r'\bpro\b').hasMatch(text)) return 'PRO';
+
+    // Default Test Store: monthly + annual → Pro only.
+    if (p.packageType == PackageType.annual ||
+        text.contains(r'$rc_annual') ||
+        RegExp(r'\byearly\b').hasMatch(text) ||
+        text.contains('annual')) {
+      return 'PRO';
+    }
+    if (p.packageType == PackageType.monthly ||
+        text.contains(r'$rc_monthly') ||
+        RegExp(r'\bmonthly\b').hasMatch(text)) {
+      return 'PRO';
+    }
     return null;
   }
 
-  int? _planRank(String plan) {
-    return switch (plan) {
-      'PRO' => 1,
-      'ENTERPRISE' => 2,
-      'UNLIMITED' => 3,
-      _ => null,
-    };
-  }
-
-  /// Resolve a package for a BookAI plan. Matching order:
-  /// 1) product/package id contains plan name
-  /// 2) same-interval packages sorted by price → pro < premium < unlimited
-  /// 3) any same-interval package if only one exists
+  /// Resolve a package for a BookAI plan.
+  /// Unlimited → lifetime only. Never buy monthly/annual for Unlimited.
   Package? packageForPlan(String plan, {required String interval}) {
     final packages = availablePackages;
     if (packages.isEmpty) return null;
 
+    if (plan == 'UNLIMITED') {
+      for (final p in packages) {
+        if (_isLifetime(p) || _planIdForPackage(p) == 'UNLIMITED') {
+          return p;
+        }
+      }
+      return null;
+    }
+
     final wantAnnual = interval == 'year';
-    final intervalPkgs =
-        packages.where((p) => _matchesInterval(p, wantAnnual: wantAnnual)).toList();
-    final pool = intervalPkgs.isNotEmpty ? intervalPkgs : packages;
+    final intervalPkgs = packages
+        .where((p) => _matchesInterval(p, wantAnnual: wantAnnual))
+        .toList();
 
-    final wantRank = _planRank(plan);
-    if (wantRank == null) return null;
-
-    // Explicit name match.
-    for (final p in pool) {
-      final text =
-          '${p.identifier} ${p.storeProduct.identifier} ${p.storeProduct.title}';
-      if (_planRankFromText(text) == wantRank) return p;
+    for (final p in intervalPkgs) {
+      if (_planIdForPackage(p) == plan) return p;
     }
 
-    // Price-tier mapping when products aren't named after plans.
-    final sorted = [...pool]
-      ..sort(
-        (a, b) => a.storeProduct.price.compareTo(b.storeProduct.price),
-      );
-    if (sorted.length >= 3) {
+    // Only auto-tier unnamed products when there are 3+ for this interval.
+    final unnamed = intervalPkgs
+        .where((p) => _planIdForPackage(p) == null)
+        .toList()
+      ..sort((a, b) => a.storeProduct.price.compareTo(b.storeProduct.price));
+
+    if (unnamed.length >= 3) {
       return switch (plan) {
-        'PRO' => sorted[0],
-        'ENTERPRISE' => sorted[1],
-        'UNLIMITED' => sorted[sorted.length - 1],
+        'PRO' => unnamed[0],
+        'ENTERPRISE' => unnamed[1],
         _ => null,
       };
     }
-    if (sorted.length == 2) {
-      return switch (plan) {
-        'PRO' => sorted[0],
-        'ENTERPRISE' || 'UNLIMITED' => sorted[1],
-        _ => null,
-      };
-    }
-    if (sorted.length == 1) {
-      // Single product offering — use it for every upgrade button.
-      return sorted.first;
-    }
+
     return null;
   }
 
@@ -205,9 +218,21 @@ class RevenueCatService extends ChangeNotifier {
     final package = packageForPlan(plan, interval: interval);
     if (package == null) {
       throw Exception(
-        'No RevenueCat packages found. In the RevenueCat dashboard, create '
-        'Test Store products, attach entitlements (pro / premium / unlimited), '
-        'and add them to the current Offering.',
+        plan == 'UNLIMITED'
+            ? 'No Unlimited product found. Add a lifetime (or unlimited) '
+                'product to your RevenueCat Offering.'
+            : 'No RevenueCat package for $plan ($interval). Add products '
+                'named pro / premium / unlimited to your Offering.',
+      );
+    }
+    if (plan == 'UNLIMITED' && !_isLifetime(package) &&
+        _planIdForPackage(package) != 'UNLIMITED') {
+      throw Exception('Refusing to purchase a non-Unlimited package for Unlimited.');
+    }
+    if (kDebugMode) {
+      debugPrint(
+        'RevenueCat purchase plan=$plan → ${package.identifier} / '
+        '${package.storeProduct.identifier} (${package.packageType})',
       );
     }
     return purchasePackage(package);

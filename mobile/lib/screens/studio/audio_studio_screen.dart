@@ -103,20 +103,21 @@ class _AudioStudioScreenState extends State<AudioStudioScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Audio Studio')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
         children: [
           if (user != null)
             StripeCard(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: ProgressRow(
-                label: 'Audio left this month',
+                label: 'Audio left',
                 value: (user.audioMinutesLimit - user.audioMinutesUsed)
                     .clamp(0, user.audioMinutesLimit),
                 total: user.audioMinutesLimit,
-                unit: ' min',
+                unit: 'm',
+                compact: true,
               ),
             ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           TextField(
             controller: _title,
             decoration: const InputDecoration(labelText: 'Title'),

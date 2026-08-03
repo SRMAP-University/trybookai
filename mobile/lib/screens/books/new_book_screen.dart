@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
+import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/common.dart';
 
 const _genres = [
   'Fiction',
@@ -27,16 +30,67 @@ class NewBookScreen extends StatefulWidget {
 class _NewBookScreenState extends State<NewBookScreen> {
   final _title = TextEditingController();
   final _description = TextEditingController();
+  final _customInstructions = TextEditingController();
+  final _characters = TextEditingController();
   String _genre = 'Fiction';
   double _pages = 100;
   bool _starting = false;
   bool _audiobookAfter = true;
+  bool _showAdvanced = false;
+  String? _enhancing;
 
   @override
   void dispose() {
     _title.dispose();
     _description.dispose();
+    _customInstructions.dispose();
+    _characters.dispose();
     super.dispose();
+  }
+
+  Future<void> _enhance(String field, TextEditingController controller) async {
+    if (_enhancing != null) return;
+    if (controller.text.trim().length < 3 &&
+        _title.text.trim().isEmpty &&
+        _genre.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add a title or a short draft first.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _enhancing = field);
+    final api = context.read<ApiClient>();
+    try {
+      final res = await api.dio.post(
+        ApiConfig.enhancePrompt,
+        data: {
+          'field': field,
+          'text': controller.text,
+          'title': _title.text.trim(),
+          'genre': _genre,
+          'tone': 'Professional',
+        },
+      );
+      final text = res.data['text'] as String?;
+      if (text != null && text.isNotEmpty) {
+        controller.text = text;
+        controller.selection = TextSelection.collapsed(offset: text.length);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Prompt enhanced')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(api.extractError(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _enhancing = null);
+    }
   }
 
   Future<void> _create() async {
@@ -57,6 +111,12 @@ class _NewBookScreenState extends State<NewBookScreen> {
       targetPages: _pages.round(),
       startGeneration: true,
       generateAudiobookOnComplete: _audiobookAfter,
+      customInstructions: _customInstructions.text.trim().isEmpty
+          ? null
+          : _customInstructions.text.trim(),
+      characters: _characters.text.trim().isEmpty
+          ? null
+          : _characters.text.trim(),
     );
     if (!mounted) return;
     setState(() => _starting = false);
@@ -67,6 +127,27 @@ class _NewBookScreenState extends State<NewBookScreen> {
         SnackBar(content: Text(books.error ?? 'Could not create book')),
       );
     }
+  }
+
+  Widget _enhanceButton(String field, TextEditingController controller) {
+    final loading = _enhancing == field;
+    return TextButton.icon(
+      onPressed: _enhancing != null
+          ? null
+          : () => _enhance(field, controller),
+      icon: loading
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.auto_awesome, size: 16),
+      label: Text(loading ? 'Enhancing…' : 'Enhance'),
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        visualDensity: VisualDensity.compact,
+      ),
+    );
   }
 
   @override
@@ -90,10 +171,25 @@ class _NewBookScreenState extends State<NewBookScreen> {
             maxLength: 200,
           ),
           const SizedBox(height: 8),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textBody,
+                  ),
+                ),
+              ),
+              _enhanceButton('description', _description),
+            ],
+          ),
+          const SizedBox(height: 6),
           TextField(
             controller: _description,
             decoration: const InputDecoration(
-              labelText: 'Description',
               hintText: 'What is this book about?',
               alignLabelWithHint: true,
             ),
@@ -166,9 +262,81 @@ class _NewBookScreenState extends State<NewBookScreen> {
             activeThumbColor: AppColors.primary,
             onChanged: (v) => setState(() => _audiobookAfter = v),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_showAdvanced ? 'Hide advanced' : 'Advanced settings'),
+                const SizedBox(width: 6),
+                Icon(
+                  _showAdvanced
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+          if (_showAdvanced) ...[
+            const SizedBox(height: 12),
+            StripeCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Characters',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      _enhanceButton('characters', _characters),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _characters,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      hintText: 'One character per line',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Custom instructions',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      _enhanceButton(
+                        'customInstructions',
+                        _customInstructions,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _customInstructions,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      hintText:
+                          'Pacing, chapter endings, voice notes…',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: _starting ? null : _create,
+            onPressed: _starting || _enhancing != null ? null : _create,
             child: _starting
                 ? const SizedBox(
                     width: 20,

@@ -15,7 +15,7 @@ class AccountScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Account')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
         children: [
           StripeCard(
             child: Row(
@@ -70,49 +70,59 @@ class AccountScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.only(top: 12, bottom: 4),
-            child: Text(
-              'Manage',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textMuted,
-                letterSpacing: 0.4,
+          // Partitions = separate cards (no section titles).
+          MenuSection(
+            children: [
+              MenuTile(
+                icon: Icons.person_outline_rounded,
+                label: 'Profile',
+                onTap: () => context.push('/account/profile'),
               ),
-            ),
+              MenuTile(
+                icon: Icons.palette_outlined,
+                label: 'Branding',
+                onTap: () => context.push('/account/branding'),
+              ),
+            ],
           ),
-          _tile(context, Icons.person_outline_rounded, 'Profile', '/account/profile'),
-          _tile(context, Icons.palette_outlined, 'Branding', '/account/branding'),
-          _tile(context, Icons.tune_rounded, 'Writing defaults', '/settings'),
-          _tile(context, Icons.bar_chart_rounded, 'Usage', '/usage'),
-          _tile(context, Icons.credit_card_rounded, 'Billing', '/billing'),
-          const SizedBox(height: 20),
-          OutlinedButton(
-            onPressed: () async {
-              await context.read<AuthProvider>().logout();
-              if (context.mounted) context.go('/login');
-            },
-            child: const Text('Sign out'),
+          MenuSection(
+            children: [
+              MenuTile(
+                icon: Icons.tune_rounded,
+                label: 'Writing defaults',
+                onTap: () => context.push('/settings'),
+              ),
+            ],
+          ),
+          MenuSection(
+            children: [
+              MenuTile(
+                icon: Icons.bar_chart_rounded,
+                label: 'Usage',
+                onTap: () => context.push('/usage'),
+              ),
+              MenuTile(
+                icon: Icons.credit_card_rounded,
+                label: 'Billing',
+                onTap: () => context.push('/billing'),
+              ),
+            ],
+          ),
+          MenuSection(
+            children: [
+              MenuTile(
+                icon: Icons.logout_rounded,
+                label: 'Sign out',
+                trailing: const SizedBox.shrink(),
+                onTap: () async {
+                  await context.read<AuthProvider>().logout();
+                  if (context.mounted) context.go('/login');
+                },
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _tile(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String route,
-  ) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: AppColors.navy),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-      trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
-      onTap: () => context.push(route),
     );
   }
 }

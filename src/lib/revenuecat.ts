@@ -34,6 +34,11 @@ function planRank(plan: PaidPlan | "FREE"): number {
 export function planFromIdentifier(raw: string): PaidPlan | "FREE" {
   const id = raw.trim().toLowerCase();
   if (!id) return "FREE";
+
+  // Test Store default product ids
+  if (id === "lifetime" || id.includes("lifetime") || id.includes("$rc_lifetime")) {
+    return "UNLIMITED";
+  }
   if (id.includes("unlimited") || id === RC_ENTITLEMENTS.unlimited) {
     return "UNLIMITED";
   }
@@ -46,7 +51,11 @@ export function planFromIdentifier(raw: string): PaidPlan | "FREE" {
     return "ENTERPRISE";
   }
   if (
-    (id.includes("pro") && !id.includes("premium")) ||
+    id === "monthly" ||
+    id === "yearly" ||
+    id.includes("$rc_monthly") ||
+    id.includes("$rc_annual") ||
+    /\bpro\b/.test(id) ||
     id === RC_ENTITLEMENTS.pro ||
     id === "bookai_pro"
   ) {
@@ -78,16 +87,18 @@ export function planFromRevenueCatSignals(input: {
     if (planRank(plan) > planRank(best)) best = plan;
   }
 
-  // Purchase just succeeded but products aren't attached to named entitlements
-  // yet — honor the plan the user bought in the app.
-  if (best === "FREE" && input.requestedPlan) {
+  // The plan button the user tapped wins when it is a paid plan.
+  // Prevents Test Store default "pro" entitlements from overriding Unlimited.
+  if (input.requestedPlan) {
     const requested = input.requestedPlan.toUpperCase();
     if (
       requested === "PRO" ||
       requested === "ENTERPRISE" ||
       requested === "UNLIMITED"
     ) {
-      best = requested;
+      if (planRank(requested) >= planRank(best)) {
+        best = requested;
+      }
     }
   }
 

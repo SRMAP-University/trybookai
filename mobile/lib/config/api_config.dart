@@ -9,9 +9,11 @@ class ApiConfig {
 
   static const String login = '/api/mobile/auth/login';
   static const String register = '/api/mobile/auth/register';
+  static const String google = '/api/mobile/auth/google';
   static const String me = '/api/mobile/auth/me';
   static const String devices = '/api/mobile/devices';
   static const String books = '/api/books';
+  static const String enhancePrompt = '/api/books/enhance-prompt';
   static const String settings = '/api/settings';
   static const String branding = '/api/branding';
   static const String jobsActive = '/api/jobs/active';

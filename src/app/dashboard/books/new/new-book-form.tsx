@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -96,6 +96,54 @@ export function NewBookForm() {
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [defaultsLoaded, setDefaultsLoaded] = useState(false);
+  const [enhancing, setEnhancing] = useState<string | null>(null);
+
+  async function enhanceField(
+    field:
+      | "description"
+      | "customInstructions"
+      | "characters"
+      | "themes"
+      | "style"
+  ) {
+    const current = form[field];
+    if (
+      !current.trim() &&
+      !form.title.trim() &&
+      !form.genre.trim()
+    ) {
+      toast.error("Add a title, genre, or a short draft first.");
+      return;
+    }
+
+    setEnhancing(field);
+    try {
+      const res = await fetch("/api/books/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          field,
+          text: current,
+          title: form.title,
+          genre: form.genre,
+          tone: form.tone,
+          audience: form.audience,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Could not enhance");
+      }
+      setForm((prev) => ({ ...prev, [field]: data.text as string }));
+      toast.success("Prompt enhanced");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not enhance prompt"
+      );
+    } finally {
+      setEnhancing(null);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/settings")
@@ -258,7 +306,16 @@ export function NewBookForm() {
           />
         </Field>
 
-        <Field label="Description / premise">
+        <Field
+          label="Description / premise"
+          action={
+            <EnhanceButton
+              loading={enhancing === "description"}
+              disabled={Boolean(enhancing)}
+              onClick={() => enhanceField("description")}
+            />
+          }
+        >
           <Textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -459,7 +516,16 @@ export function NewBookForm() {
               />
             </div>
 
-            <Field label="Characters (one per line)">
+            <Field
+              label="Characters (one per line)"
+              action={
+                <EnhanceButton
+                  loading={enhancing === "characters"}
+                  disabled={Boolean(enhancing)}
+                  onClick={() => enhanceField("characters")}
+                />
+              }
+            >
               <Textarea
                 rows={3}
                 value={form.characters}
@@ -471,7 +537,16 @@ export function NewBookForm() {
               />
             </Field>
 
-            <Field label="Themes (comma-separated)">
+            <Field
+              label="Themes (comma-separated)"
+              action={
+                <EnhanceButton
+                  loading={enhancing === "themes"}
+                  disabled={Boolean(enhancing)}
+                  onClick={() => enhanceField("themes")}
+                />
+              }
+            >
               <Input
                 value={form.themes}
                 onChange={(e) => setForm({ ...form, themes: e.target.value })}
@@ -492,7 +567,16 @@ export function NewBookForm() {
               />
             </Field>
 
-            <Field label="Custom instructions">
+            <Field
+              label="Custom instructions"
+              action={
+                <EnhanceButton
+                  loading={enhancing === "customInstructions"}
+                  disabled={Boolean(enhancing)}
+                  onClick={() => enhanceField("customInstructions")}
+                />
+              }
+            >
               <Textarea
                 rows={3}
                 value={form.customInstructions}
@@ -520,7 +604,16 @@ export function NewBookForm() {
                   </button>
                 ))}
               </div>
-              <Field label="Style guide">
+              <Field
+                label="Style guide"
+                action={
+                  <EnhanceButton
+                    loading={enhancing === "style"}
+                    disabled={Boolean(enhancing)}
+                    onClick={() => enhanceField("style")}
+                  />
+                }
+              >
                 <Textarea
                   rows={4}
                   value={form.style}
@@ -680,15 +773,46 @@ export function NewBookForm() {
 function Field({
   label,
   children,
+  action,
 }: {
   label: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-[13px] text-[#425466]">{label}</Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-[13px] text-[#425466]">{label}</Label>
+        {action}
+      </div>
       {children}
     </div>
+  );
+}
+
+function EnhanceButton({
+  loading,
+  disabled,
+  onClick,
+}: {
+  loading: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-[#635bff] hover:bg-[#f0efff] disabled:opacity-50"
+    >
+      {loading ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Sparkles className="h-3.5 w-3.5" />
+      )}
+      Enhance
+    </button>
   );
 }
 

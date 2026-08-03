@@ -71,6 +71,103 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
+/// Small uppercase label used to partition menus / settings lists.
+class MenuSectionLabel extends StatelessWidget {
+  const MenuSectionLabel(this.title, {super.key});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8, left: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textMuted,
+          letterSpacing: 0.7,
+        ),
+      ),
+    );
+  }
+}
+
+/// Grouped menu rows inside a StripeCard with dividers.
+/// Pass [label] only when you want a visible section title; omit for silent partitions.
+class MenuSection extends StatelessWidget {
+  const MenuSection({
+    super.key,
+    this.label,
+    required this.children,
+  });
+
+  final String? label;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (label != null && label!.trim().isNotEmpty)
+          MenuSectionLabel(label!)
+        else
+          const SizedBox(height: 12),
+        StripeCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 1, indent: 56, endIndent: 16),
+                children[i],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class MenuTile extends StatelessWidget {
+  const MenuTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.onTap,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Icon(icon, color: AppColors.navy),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+      trailing: trailing ??
+          const Icon(Icons.chevron_right, color: AppColors.textMuted),
+      onTap: onTap,
+    );
+  }
+}
+
 class ProgressRow extends StatelessWidget {
   const ProgressRow({
     super.key,
@@ -78,12 +175,14 @@ class ProgressRow extends StatelessWidget {
     required this.value,
     required this.total,
     this.unit = '',
+    this.compact = false,
   });
 
   final String label;
   final int value;
   final int total;
   final String unit;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -96,27 +195,72 @@ class ProgressRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                style: TextStyle(
+                  fontSize: compact ? 11 : 12,
+                  color: AppColors.textMuted,
+                ),
               ),
             ),
             Text(
-              '$value / $total$unit',
-              style: const TextStyle(
-                fontSize: 12,
+              '$value/$total$unit',
+              style: TextStyle(
+                fontSize: compact ? 11 : 12,
                 fontWeight: FontWeight.w600,
                 color: AppColors.navy,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: compact ? 4 : 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(99),
           child: LinearProgressIndicator(
             value: pct,
-            minHeight: 6,
+            minHeight: compact ? 3 : 4,
             backgroundColor: AppColors.border,
             color: AppColors.primary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Side-by-side pages + audio usage — one short line each.
+class CompactUsageStats extends StatelessWidget {
+  const CompactUsageStats({
+    super.key,
+    required this.pagesUsed,
+    required this.pagesLimit,
+    required this.audioUsed,
+    required this.audioLimit,
+  });
+
+  final int pagesUsed;
+  final int pagesLimit;
+  final int audioUsed;
+  final int audioLimit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: ProgressRow(
+            label: 'Pages',
+            value: pagesUsed,
+            total: pagesLimit,
+            compact: true,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: ProgressRow(
+            label: 'Audio',
+            value: audioUsed,
+            total: audioLimit,
+            unit: 'm',
+            compact: true,
           ),
         ),
       ],

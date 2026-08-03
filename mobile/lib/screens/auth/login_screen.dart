@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
-import 'package:bookai_mobile/widgets/bookai_logo.dart';
+import 'package:bookai_mobile/widgets/auth_scaffold.dart';
+import 'package:bookai_mobile/widgets/google_sign_in_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _googleLoading = false;
 
   @override
   void dispose() {
@@ -38,80 +40,121 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _google() async {
+    setState(() => _googleLoading = true);
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.loginWithGoogle();
+    if (!mounted) return;
+    setState(() => _googleLoading = false);
+    if (ok) {
+      context.go('/home');
+    } else if (auth.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.error!)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const BookAiLogo(height: 44),
-                const SizedBox(height: 16),
-                const Text(
-                  'Sign in to write, narrate, and ship books.',
-                  style: TextStyle(fontSize: 15, color: AppColors.textMuted),
-                ),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (v) =>
-                      v != null && v.contains('@') ? null : 'Enter a valid email',
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _password,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.password],
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  validator: (v) =>
-                      v != null && v.length >= 8 ? null : 'Min 8 characters',
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: auth.loading ? null : _submit,
-                  child: auth.loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Sign in'),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.go('/register'),
-                    child: const Text.rich(
-                      TextSpan(
-                        text: 'New here? ',
-                        style: TextStyle(color: AppColors.textMuted),
-                        children: [
-                          TextSpan(
-                            text: 'Create account',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+    return AuthScaffold(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const AuthHero(
+                headline: 'Write the book\nyou’ve been holding.',
+                subtitle:
+                    'Sign in to outline, generate, and narrate from one workspace.',
+              ),
+              const SizedBox(height: 28),
+              GoogleSignInButton(
+                onPressed: (auth.loading || _googleLoading) ? null : _google,
+                loading: _googleLoading,
+              ),
+              const SizedBox(height: 16),
+              const AuthOrDivider(),
+              const SizedBox(height: 16),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.navy.withValues(alpha: 0.06),
+                      blurRadius: 28,
+                      offset: const Offset(0, 12),
                     ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.mail_outline_rounded, size: 20),
+                        ),
+                        validator: (v) => v != null && v.contains('@')
+                            ? null
+                            : 'Enter a valid email',
+                      ),
+                      const SizedBox(height: 12),
+                      AuthPasswordField(
+                        controller: _password,
+                        validator: (v) => v != null && v.length >= 8
+                            ? null
+                            : 'Min 8 characters',
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        onPressed: auth.loading ? null : _submit,
+                        child: auth.loading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Sign in'),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 22),
+              TextButton(
+                onPressed: () => context.go('/register'),
+                child: const Text.rich(
+                  TextSpan(
+                    text: 'New here? ',
+                    style: TextStyle(color: AppColors.textMuted),
+                    children: [
+                      TextSpan(
+                        text: 'Create account',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

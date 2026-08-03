@@ -1,6 +1,7 @@
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/services/api_client.dart';
+import 'package:bookai_mobile/services/google_auth_service.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/services/revenuecat_service.dart';
 import 'package:flutter/foundation.dart';
@@ -10,12 +11,15 @@ class AuthProvider extends ChangeNotifier {
     this._api, {
     PushNotificationService? push,
     RevenueCatService? revenueCat,
+    GoogleAuthService? google,
   })  : _push = push,
-        _revenueCat = revenueCat;
+        _revenueCat = revenueCat,
+        _google = google ?? GoogleAuthService();
 
   final ApiClient _api;
   final PushNotificationService? _push;
   final RevenueCatService? _revenueCat;
+  final GoogleAuthService _google;
   UserModel? user;
   bool loading = true;
   String? error;
@@ -112,6 +116,38 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> loginWithGoogle() async {
+    error = null;
+    loading = true;
+    notifyListeners();
+    try {
+      final idToken = await _google.signInForIdToken();
+      if (idToken == null) {
+        return false;
+      }
+      final res = await _api.dio.post(
+        ApiConfig.google,
+        data: {'idToken': idToken},
+      );
+      final token = res.data['token'] as String;
+      await _api.setToken(token);
+      user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
+      await _linkRevenueCat(user!.id);
+      await _push?.registerToken();
+      return true;
+    } catch (e) {
+      final message = _api.extractError(e);
+      error = message.startsWith('Exception: ')
+          ? message.substring('Exception: '.length)
+          : message;
+      user = null;
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> refreshUser() async {
     try {
       final res = await _api.dio.get(ApiConfig.me);
@@ -123,6 +159,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _push?.unregisterToken();
     await _revenueCat?.logOut();
+    await _google.signOut();
     await _api.setToken(null);
     user = null;
     notifyListeners();
