@@ -136,16 +136,28 @@ class AuthProvider extends ChangeNotifier {
       await _push?.registerToken();
       return true;
     } catch (e) {
-      final message = _api.extractError(e);
-      error = message.startsWith('Exception: ')
-          ? message.substring('Exception: '.length)
-          : message;
+      error = _friendlyGoogleError(e);
       user = null;
       return false;
     } finally {
       loading = false;
       notifyListeners();
     }
+  }
+
+  String _friendlyGoogleError(Object e) {
+    final raw = _api.extractError(e);
+    final text = raw.startsWith('Exception: ')
+        ? raw.substring('Exception: '.length)
+        : raw;
+    if (text.contains('Missing Web OAuth') ||
+        text.contains('Developer console is not set up') ||
+        text.contains('clientConfigurationError')) {
+      return 'Create a Web OAuth client in Google Cloud project 603877706963 '
+          '(same project as your Android client), then paste that Client ID '
+          'into the app. The Android client ID cannot be used here.';
+    }
+    return text;
   }
 
   Future<void> refreshUser() async {

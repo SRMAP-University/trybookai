@@ -10,6 +10,13 @@ class GoogleAuthService {
 
   Future<void> ensureInitialized() async {
     if (_ready) return;
+    if (!GoogleAuthConfig.hasServerClientId) {
+      throw StateError(
+        'Missing Web OAuth client ID. In Google Cloud project 603877706963, '
+        'create Credentials → OAuth client ID → Web application, then put '
+        'that Client ID in google_auth_config.dart (not the Android one).',
+      );
+    }
     await GoogleSignIn.instance.initialize(
       serverClientId: GoogleAuthConfig.serverClientId,
       clientId: defaultTargetPlatform == TargetPlatform.iOS ||
