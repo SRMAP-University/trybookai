@@ -41,20 +41,35 @@ class _BillingScreenState extends State<BillingScreen> {
     if (mounted) setState(() => _loadingOfferings = false);
   }
 
-  Future<void> _syncRevenueCat(CustomerInfo? info) async {
+  Future<Map<String, dynamic>?> _syncRevenueCat(
+    CustomerInfo? info, {
+    String? requestedPlan,
+    bool allowDowngrade = false,
+  }) async {
     final api = context.read<ApiClient>();
     final auth = context.read<AuthProvider>();
     final rc = context.read<RevenueCatService>();
     final entitlements =
         info?.entitlements.active.keys.toList() ?? await rc.activeEntitlements();
-    await api.dio.post(
+    final productIds = <String>{
+      ...?info?.activeSubscriptions,
+      for (final e in info?.entitlements.active.values ?? const [])
+        if (e.productIdentifier.isNotEmpty) e.productIdentifier,
+    }.toList();
+
+    final res = await api.dio.post(
       ApiConfig.billingRevenueCatSync,
       data: {
         'entitlements': entitlements,
+        'productIds': productIds,
         'appUserId': auth.user?.id,
+        if (requestedPlan != null) 'requestedPlan': requestedPlan,
+        'allowDowngrade': allowDowngrade,
       },
     );
     await auth.refreshUser();
+    final data = res.data;
+    return data is Map<String, dynamic> ? data : null;
   }
 
   Future<void> _checkout(String plan) async {
@@ -65,10 +80,14 @@ class _BillingScreenState extends State<BillingScreen> {
     try {
       final info = await rc.purchasePlan(plan, interval: _interval);
       if (info == null) return; // cancelled
-      await _syncRevenueCat(info);
+      final sync = await _syncRevenueCat(info, requestedPlan: plan);
       if (!mounted) return;
+      await auth.refreshUser();
+      final label = auth.user?.planLabel ??
+          (sync?['plan'] as String?) ??
+          plan;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upgraded to ${auth.user?.planLabel ?? plan}')),
+        SnackBar(content: Text('Upgraded to $label')),
       );
     } on PlatformException catch (e) {
       if (!mounted) return;
@@ -90,13 +109,18 @@ class _BillingScreenState extends State<BillingScreen> {
   Future<void> _restore() async {
     setState(() => _loadingPlan = 'RESTORE');
     final api = context.read<ApiClient>();
+    final auth = context.read<AuthProvider>();
     final rc = context.read<RevenueCatService>();
     try {
       final info = await rc.restore();
-      await _syncRevenueCat(info);
+      await _syncRevenueCat(info, allowDowngrade: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Purchases restored')),
+        SnackBar(
+          content: Text(
+            'Purchases restored · ${auth.user?.planLabel ?? 'Free'}',
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import {
   applyPlanFromRevenueCat,
   fetchSubscriberEntitlements,
+  fetchSubscriberProductIds,
 } from "@/lib/revenuecat";
 
 export const runtime = "nodejs";
@@ -11,11 +12,16 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   entitlements: z.array(z.string()).optional(),
+  productIds: z.array(z.string()).optional(),
+  /** Plan the user just purchased in the app (PRO | ENTERPRISE | UNLIMITED). */
+  requestedPlan: z.enum(["PRO", "ENTERPRISE", "UNLIMITED"]).optional(),
   appUserId: z.string().optional(),
+  /** When true (default on purchase), never downgrade to FREE from empty RC data. */
+  allowDowngrade: z.boolean().optional(),
 });
 
 /**
- * Sync the logged-in user's plan from RevenueCat entitlements.
+ * Sync the logged-in user's plan from RevenueCat entitlements / products.
  * Prefer server-side verification via REVENUECAT_SECRET_API_KEY when set.
  */
 export async function POST(request: Request) {
@@ -46,19 +52,31 @@ export async function POST(request: Request) {
 
   try {
     let entitlements = parsed.data.entitlements ?? [];
-    const verified = await fetchSubscriberEntitlements(appUserId);
-    if (verified) {
-      entitlements = verified;
+    let productIds = parsed.data.productIds ?? [];
+
+    const verifiedEntitlements = await fetchSubscriberEntitlements(appUserId);
+    if (verifiedEntitlements) {
+      entitlements = verifiedEntitlements;
+    }
+    const verifiedProducts = await fetchSubscriberProductIds(appUserId);
+    if (verifiedProducts) {
+      productIds = verifiedProducts;
     }
 
+    const allowDowngrade =
+      parsed.data.allowDowngrade ?? !parsed.data.requestedPlan;
+
     const result = await applyPlanFromRevenueCat(session.user.id, entitlements, {
-      allowDowngrade: true,
+      allowDowngrade,
+      productIds,
+      requestedPlan: parsed.data.requestedPlan,
     });
 
     return NextResponse.json({
       synced: true,
-      verified: Boolean(verified),
+      verified: Boolean(verifiedEntitlements || verifiedProducts),
       entitlements,
+      productIds,
       ...result,
     });
   } catch (error) {

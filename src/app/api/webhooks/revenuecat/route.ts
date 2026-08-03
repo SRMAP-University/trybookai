@@ -14,6 +14,7 @@ type RevenueCatEvent = {
   original_app_user_id?: string;
   aliases?: string[];
   entitlement_ids?: string[] | null;
+  product_id?: string | null;
   expiration_at_ms?: number | null;
 };
 
@@ -83,9 +84,12 @@ export async function POST(request: Request) {
   }
 
   try {
+    const productIds = event.product_id ? [event.product_id] : [];
+
     if (GRANT_TYPES.has(event.type)) {
       await applyPlanFromRevenueCat(userId, event.entitlement_ids ?? [], {
         allowDowngrade: false,
+        productIds,
       });
     } else if (REVOKE_TYPES.has(event.type) || event.type === "EXPIRATION") {
       const stillActive =
@@ -96,6 +100,7 @@ export async function POST(request: Request) {
       if (stillActive) {
         await applyPlanFromRevenueCat(userId, event.entitlement_ids ?? [], {
           allowDowngrade: false,
+          productIds,
         });
       } else if (event.type === "EXPIRATION") {
         await applyPlanFromRevenueCat(userId, [], { allowDowngrade: true });
