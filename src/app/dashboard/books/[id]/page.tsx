@@ -211,6 +211,43 @@ function BookDetailPageContent() {
     }
   }, [loading, book?.status, searchParams]);
 
+  // Fallback: keep progress bar fresh if SSE is quiet / background queue only.
+  useEffect(() => {
+    const inProgress =
+      book?.status === "GENERATING" || book?.status === "OUTLINING";
+    if (!inProgress || !id) return;
+
+    let cancelled = false;
+    async function pollProgress() {
+      try {
+        const res = await fetch(`/api/books/${id}`, { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        setBook((prev) =>
+          prev
+            ? {
+                ...prev,
+                progress: data.progress ?? prev.progress,
+                currentPages: data.currentPages ?? prev.currentPages,
+                status: data.status ?? prev.status,
+                coverImage: data.coverImage ?? prev.coverImage,
+              }
+            : prev
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void pollProgress();
+    }, 4_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [id, book?.status]);
+
   useEffect(() => {
     if (!generating || dockMinimized || !liveRef.current) return;
     liveRef.current.scrollTop = liveRef.current.scrollHeight;

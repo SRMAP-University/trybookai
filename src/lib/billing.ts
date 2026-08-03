@@ -3,7 +3,11 @@ import { knownAddonPriceIds } from "@/lib/addons";
 import { PLANS, PREMIUM_TRIAL, type BillingInterval } from "@/lib/constants";
 import { cleanEnv } from "@/lib/env";
 
-export type PaidPlan = "PRO" | "ENTERPRISE";
+export type PaidPlan = "PRO" | "ENTERPRISE" | "UNLIMITED";
+
+export function isPaidPlan(plan: string): plan is PaidPlan {
+  return plan === "PRO" || plan === "ENTERPRISE" || plan === "UNLIMITED";
+}
 
 function envPrice(...keys: string[]) {
   for (const key of keys) {
@@ -20,16 +24,31 @@ export function knownPaidPriceIds(): Set<string> {
       envPrice("STRIPE_PRO_YEARLY_PRICE_ID"),
       envPrice("STRIPE_ENTERPRISE_PRICE_ID"),
       envPrice("STRIPE_ENTERPRISE_YEARLY_PRICE_ID"),
+      envPrice("STRIPE_UNLIMITED_PRICE_ID"),
+      envPrice("STRIPE_UNLIMITED_YEARLY_PRICE_ID"),
       cleanEnv(PLANS.PRO.priceId),
       cleanEnv(PLANS.PRO.yearlyPriceId),
       cleanEnv(PLANS.ENTERPRISE.priceId),
       cleanEnv(PLANS.ENTERPRISE.yearlyPriceId),
+      cleanEnv(PLANS.UNLIMITED.priceId),
+      cleanEnv(PLANS.UNLIMITED.yearlyPriceId),
     ].filter(Boolean)
   );
 }
 
 export function planFromPriceId(priceId: string | undefined): PaidPlan {
   const id = cleanEnv(priceId);
+  const unlimitedIds = new Set(
+    [
+      envPrice("STRIPE_UNLIMITED_PRICE_ID"),
+      envPrice("STRIPE_UNLIMITED_YEARLY_PRICE_ID"),
+      cleanEnv(PLANS.UNLIMITED.priceId),
+      cleanEnv(PLANS.UNLIMITED.yearlyPriceId),
+    ].filter(Boolean)
+  );
+  if (id && unlimitedIds.has(id)) {
+    return "UNLIMITED";
+  }
   const enterpriseIds = new Set(
     [
       envPrice("STRIPE_ENTERPRISE_PRICE_ID"),
@@ -179,7 +198,7 @@ export async function upgradeUserPlan(userId: string, plan: PaidPlan) {
   return db.user.update({
     where: { id: userId },
     data: {
-      plan,
+      plan: plan as "PRO" | "ENTERPRISE" | "UNLIMITED",
       pagesLimit: config.pagesLimit,
       audioMinutesLimit: config.audioMinutesLimit,
       trialEndsAt: null,

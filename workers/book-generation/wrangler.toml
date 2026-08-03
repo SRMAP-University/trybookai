@@ -1,0 +1,34 @@
+name = "bookai-generation"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[ai]
+binding = "AI"
+
+[[queues.consumers]]
+queue = "book-generation"
+max_batch_size = 5
+max_batch_timeout = 5
+
+[[queues.producers]]
+queue = "book-generation"
+binding = "GENERATION_QUEUE"
+
+[[workflows]]
+name = "book-generation-workflow"
+binding = "BOOK_GENERATION_WORKFLOW"
+class_name = "BookGenerationWorkflow"
+
+# Optional Hyperdrive (recommended in production):
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "REPLACE_WITH_HYPERDRIVE_ID"
+
+# App origin for progress/completion push callbacks
+[vars]
+APP_NOTIFY_URL = "https://www.trybookai.com"
+
+# Secrets: wrangler secret put GENERATION_WORKER_SECRET
+#          wrangler secret put DATABASE_URL

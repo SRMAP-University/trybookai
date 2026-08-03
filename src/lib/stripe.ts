@@ -8,11 +8,15 @@ import {
   featureLookupKey,
   premiumProductDescription,
   proProductDescription,
+  unlimitedProductDescription,
   STRIPE_PREMIUM_INCLUDED_ADDONS,
   STRIPE_PREMIUM_MARKETING_FEATURES,
   STRIPE_PRO_INCLUDED_ADDONS,
   STRIPE_PRO_MARKETING_FEATURES,
+  STRIPE_UNLIMITED_INCLUDED_ADDONS,
+  STRIPE_UNLIMITED_MARKETING_FEATURES,
 } from "@/lib/stripe-catalog";
+import type { PaidPlan } from "@/lib/billing";
 
 let stripeInstance: Stripe | null = null;
 
@@ -42,7 +46,7 @@ const includedPriceCache = new Map<string, string>();
 /** Keep Stripe Product description + marketing feature list in sync. */
 async function syncProductCatalog(
   priceId: string,
-  plan: "PRO" | "ENTERPRISE"
+  plan: PaidPlan
 ) {
   if (syncedProducts.has(priceId)) return;
   const stripe = getStripe();
@@ -50,24 +54,36 @@ async function syncProductCatalog(
   const productId =
     typeof price.product === "string" ? price.product : price.product.id;
 
-  const isPremium = plan === "ENTERPRISE";
-  const features = isPremium
-    ? STRIPE_PREMIUM_MARKETING_FEATURES
-    : STRIPE_PRO_MARKETING_FEATURES;
+  const catalog =
+    plan === "UNLIMITED"
+      ? {
+          name: "BookAI Unlimited",
+          description: unlimitedProductDescription(),
+          features: STRIPE_UNLIMITED_MARKETING_FEATURES,
+        }
+      : plan === "ENTERPRISE"
+        ? {
+            name: "BookAI Premium",
+            description: premiumProductDescription(),
+            features: STRIPE_PREMIUM_MARKETING_FEATURES,
+          }
+        : {
+            name: "BookAI Pro",
+            description: proProductDescription(),
+            features: STRIPE_PRO_MARKETING_FEATURES,
+          };
 
   await stripe.products.update(productId, {
-    name: isPremium ? "BookAI Premium" : "BookAI Pro",
-    description: isPremium
-      ? premiumProductDescription()
-      : proProductDescription(),
-    marketing_features: features.slice(0, 15).map((name) => ({ name })),
+    name: catalog.name,
+    description: catalog.description,
+    marketing_features: catalog.features.slice(0, 15).map((name) => ({ name })),
   });
 
   syncedProducts.add(priceId);
 }
 
 async function ensureIncludedFeaturePriceId(
-  plan: "PRO" | "ENTERPRISE",
+  plan: PaidPlan,
   feature: string,
   interval: "month" | "year"
 ): Promise<string> {
@@ -113,13 +129,15 @@ async function ensureIncludedFeaturePriceId(
 }
 
 async function includedFeatureLineItems(
-  plan: "PRO" | "ENTERPRISE",
+  plan: PaidPlan,
   interval: "month" | "year"
 ): Promise<Stripe.Checkout.SessionCreateParams.LineItem[]> {
   const features =
-    plan === "ENTERPRISE"
-      ? STRIPE_PREMIUM_INCLUDED_ADDONS
-      : STRIPE_PRO_INCLUDED_ADDONS;
+    plan === "UNLIMITED"
+      ? STRIPE_UNLIMITED_INCLUDED_ADDONS
+      : plan === "ENTERPRISE"
+        ? STRIPE_PREMIUM_INCLUDED_ADDONS
+        : STRIPE_PRO_INCLUDED_ADDONS;
 
   const priceIds = await Promise.all(
     features.map((feature) =>
@@ -164,7 +182,7 @@ export async function createCheckoutSession({
   cancelUrl: string;
   /** When set (≥2), subscription starts with a free trial — $0 due today. */
   trialPeriodDays?: number;
-  plan?: "PRO" | "ENTERPRISE";
+  plan?: PaidPlan;
   pagesAddonQty?: number;
   audioAddonQty?: number;
 }) {
@@ -174,12 +192,16 @@ export async function createCheckoutSession({
     ? premiumTrialEndUnix(trialPeriodDays!)
     : undefined;
 
-  const resolvedPlan =
+  const resolvedPlan: PaidPlan =
     plan ||
-    (cleanEnv(priceId) === cleanEnv(process.env.STRIPE_ENTERPRISE_PRICE_ID) ||
-    cleanEnv(priceId) === cleanEnv(process.env.STRIPE_ENTERPRISE_YEARLY_PRICE_ID)
-      ? "ENTERPRISE"
-      : "PRO");
+    (cleanEnv(priceId) === cleanEnv(process.env.STRIPE_UNLIMITED_PRICE_ID) ||
+    cleanEnv(priceId) === cleanEnv(process.env.STRIPE_UNLIMITED_YEARLY_PRICE_ID)
+      ? "UNLIMITED"
+      : cleanEnv(priceId) === cleanEnv(process.env.STRIPE_ENTERPRISE_PRICE_ID) ||
+          cleanEnv(priceId) ===
+            cleanEnv(process.env.STRIPE_ENTERPRISE_YEARLY_PRICE_ID)
+        ? "ENTERPRISE"
+        : "PRO");
 
   try {
     await syncProductCatalog(priceId, resolvedPlan);
@@ -210,9 +232,11 @@ export async function createCheckoutSession({
         ...(withTrial ? { trial: "premium" } : {}),
       },
       description:
-        resolvedPlan === "ENTERPRISE"
-          ? "Premium includes audiobook narration, Qwen 32B, unlimited books, and priority support."
-          : "Pro includes audiobook narration, private books, and priority generation.",
+        resolvedPlan === "UNLIMITED"
+          ? "Unlimited pages and audio subject to fair use and rate limits."
+          : resolvedPlan === "ENTERPRISE"
+            ? "Premium includes audiobook narration, Qwen 32B, unlimited books, and priority support."
+            : "Pro includes audiobook narration, private books, and priority generation.",
     };
 
   if (trialEnd) {
@@ -225,6 +249,7 @@ export async function createCheckoutSession({
   return stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
+    allow_promotion_codes: true,
     line_items: [
       { price: priceId, quantity: 1 },
       ...featureItems,
@@ -246,7 +271,9 @@ export async function createCheckoutSession({
       submit: {
         message: withTrial
           ? `${PREMIUM_TRIAL.days}-day free trial · $0 due today. After the trial, your card is charged $${PLANS.ENTERPRISE.price}/mo (or the yearly price if selected). Cancel anytime before the trial ends to avoid charges. ${legalNote}`
-          : `${legalNote} “Included ·” rows are plan features at $0. Extra pages/audio are optional paid capacity.`,
+          : resolvedPlan === "UNLIMITED"
+            ? `Unlimited is subject to fair use and rate limits in our Terms. ${legalNote}`
+            : `${legalNote} “Included ·” rows are plan features at $0. Extra pages/audio are optional paid capacity.`,
       },
     },
     ...(withTrial ? { payment_method_collection: "always" as const } : {}),
@@ -281,6 +308,7 @@ export async function createCapacityCheckoutSession({
   return stripe.checkout.sessions.create({
     customer: customerId,
     mode: "payment",
+    allow_promotion_codes: true,
     line_items: lineItems,
     success_url: successUrl,
     cancel_url: cancelUrl,

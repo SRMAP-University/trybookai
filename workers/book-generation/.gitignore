@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+.deploy-secrets.tmp
+*.log
+.DS_Store

@@ -62,6 +62,46 @@ export const PLANS = {
       "Priority support",
     ],
   },
+  UNLIMITED: {
+    name: "Unlimited",
+    price: 99,
+    /** Billed yearly with 2 months free (10 × monthly). */
+    yearlyPrice: 990,
+    priceId: process.env.STRIPE_UNLIMITED_PRICE_ID,
+    yearlyPriceId: process.env.STRIPE_UNLIMITED_YEARLY_PRICE_ID,
+    /** Soft anti-abuse caps — marketed as unlimited subject to fair use. */
+    pagesLimit: 100_000,
+    maxBookPages: 5_000,
+    booksPerMonth: -1,
+    audioMinutesLimit: 3_000,
+    features: [
+      "Unlimited pages*",
+      "Unlimited audiobook narration*",
+      "Up to 5,000 pages per book",
+      "Unlimited books & Audio Studio",
+      "All models, voices & styles",
+      "Private books",
+      "Highest generation priority",
+      "Priority support",
+      "*Subject to fair-use Terms",
+    ],
+  },
+} as const;
+
+/**
+ * Fair-use / rate-limit policy for Unlimited (and abuse protection generally).
+ * Soft technical caps still apply; these govern acceptable use.
+ */
+export const UNLIMITED_FAIR_USE = {
+  maxConcurrentBookJobs: 3,
+  maxConcurrentAudioJobs: 2,
+  maxNewBookJobsPerHour: 10,
+  maxAudioJobsPerHour: 6,
+  maxApiRequestsPerMinute: 60,
+  softReviewPagesPerMonth: 100_000,
+  softReviewAudioMinutesPerMonth: 3_000,
+  note:
+    "Unlimited means no hard monthly allotment for normal authoring. Automated abuse, resale, shared-account farming, or sustained rate-limit evasion may reduce throughput, pause jobs, or require a custom agreement.",
 } as const;
 
 /** Premium trial caps (2 days). */
@@ -85,11 +125,21 @@ export function planPrice(
 }
 
 export function planPriceId(
-  plan: "PRO" | "ENTERPRISE",
+  plan: "PRO" | "ENTERPRISE" | "UNLIMITED",
   interval: BillingInterval = "month"
 ) {
   // Read env at call time so updated Stripe price IDs apply after .env changes
   const clean = (v?: string) => cleanEnv(v) || undefined;
+
+  if (plan === "UNLIMITED") {
+    if (interval === "year") {
+      return (
+        clean(process.env.STRIPE_UNLIMITED_YEARLY_PRICE_ID) ||
+        clean(process.env.STRIPE_UNLIMITED_PRICE_ID)
+      );
+    }
+    return clean(process.env.STRIPE_UNLIMITED_PRICE_ID);
+  }
 
   if (plan === "ENTERPRISE") {
     if (interval === "year") {

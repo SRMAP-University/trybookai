@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   DashboardBookCard,
@@ -98,6 +99,59 @@ export function AnimatedCoverGrid({ covers }: { covers: CoverBook[] }) {
 }
 
 export function AnimatedGeneratingList({ books }: { books: GeneratingBook[] }) {
+  const [live, setLive] = useState(books);
+  const bookIds = books.map((b) => b.id).join("|");
+
+  useEffect(() => {
+    setLive(books);
+  }, [books]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const res = await fetch("/api/jobs/active", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          books?: Array<{
+            id: string;
+            title: string;
+            status: string;
+            progress: number;
+            currentPages: number;
+            targetPages: number;
+          }>;
+        };
+        const byId = new Map((data.books ?? []).map((b) => [b.id, b]));
+        setLive((prev) =>
+          prev.map((book) => {
+            const next = byId.get(book.id);
+            if (!next) return book;
+            return {
+              ...book,
+              status: next.status,
+              progress: next.progress,
+              currentPages: next.currentPages,
+              targetPages: next.targetPages,
+            };
+          })
+        );
+      } catch {
+        // ignore transient poll errors
+      }
+    }
+
+    void poll();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void poll();
+    }, 4_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [bookIds]);
+
   return (
     <motion.div
       className="grid gap-3 sm:grid-cols-2"
@@ -105,7 +159,7 @@ export function AnimatedGeneratingList({ books }: { books: GeneratingBook[] }) {
       initial="hidden"
       animate="show"
     >
-      {books.map((book) => (
+      {live.map((book) => (
         <motion.div key={book.id} variants={item}>
           <Link
             href={`/dashboard/books/${book.id}`}

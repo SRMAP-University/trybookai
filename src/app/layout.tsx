@@ -25,6 +25,10 @@ export const metadata: Metadata = {
   description:
     "Generate full-length books up to 1,000 pages with AI. Outline, write, and export publication-ready manuscripts.",
   metadataBase: new URL(getAppUrl()),
+  icons: {
+    icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({

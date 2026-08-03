@@ -36,10 +36,29 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Flutter mobile app (built separately; do not typecheck with Next.js)
+/mobile/.dart_tool/
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/.packages
+/mobile/build/
+/mobile/.idea/
+/mobile/android/.gradle/
+/mobile/android/local.properties
+/mobile/ios/Pods/
+/mobile/ios/.symlinks/
+/mobile/node_modules/
+/workers/book-generation/node_modules/
+/workers/book-generation/.wrangler/
+/mobile/package-lock.json
+/mobile/.expo/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 /src/generated/prisma
+
+.vercel
 
 .vercel

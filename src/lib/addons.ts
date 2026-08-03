@@ -1,6 +1,6 @@
 import { PLANS, PREMIUM_TRIAL } from "@/lib/constants";
 
-type PaidPlan = "PRO" | "ENTERPRISE";
+type PaidPlan = "PRO" | "ENTERPRISE" | "UNLIMITED";
 
 /** One-time capacity packs — charged immediately via Checkout (mode: payment). */
 export const ADDONS = {

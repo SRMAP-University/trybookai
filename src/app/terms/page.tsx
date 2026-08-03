@@ -3,7 +3,7 @@ import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { getAppUrl } from "@/lib/book-public";
 import { LEGAL, SUPPORT_EMAIL } from "@/lib/legal";
-import { PLANS, PREMIUM_TRIAL } from "@/lib/constants";
+import { PLANS, PREMIUM_TRIAL, UNLIMITED_FAIR_USE } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "Terms of Service — BookAI",
@@ -23,7 +23,7 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="mt-2 text-[14px] text-[#697386]">
-            Last updated: July 24, 2026
+            Last updated: July 28, 2026
           </p>
 
           <div className="mt-8 space-y-6 text-[16px] leading-relaxed text-[#425466]">
@@ -79,12 +79,13 @@ export default function TermsPage() {
                 5. Subscriptions, trials, and refunds
               </h2>
               <p>
-                Paid plans (Pro ${PLANS.PRO.price}/mo, Premium $
-                {PLANS.ENTERPRISE.price}/mo) renew automatically until canceled.
-                Premium may include a {PREMIUM_TRIAL.days}-day free trial; a
-                payment method is required, and you will be charged the plan
-                price when the trial ends unless you cancel first. You may cancel
-                anytime from Dashboard → Billing.
+                Paid plans include Pro (${PLANS.PRO.price}/mo), Premium ($
+                {PLANS.ENTERPRISE.price}/mo), and Unlimited ($
+                {PLANS.UNLIMITED.price}/mo). Plans renew automatically until
+                canceled. Premium may include a {PREMIUM_TRIAL.days}-day free
+                trial; a payment method is required, and you will be charged the
+                plan price when the trial ends unless you cancel first. You may
+                cancel anytime from Dashboard → Billing.
               </p>
               <p className="mt-3">
                 Refunds and cancellations are described in our{" "}
@@ -99,9 +100,64 @@ export default function TermsPage() {
               </p>
             </section>
 
+            <section id="unlimited-fair-use">
+              <h2 className="mb-2 text-[20px] font-semibold text-[#0a2540]">
+                6. Unlimited plan — fair use &amp; rate limits
+              </h2>
+              <p>
+                The Unlimited plan ($
+                {PLANS.UNLIMITED.price}/mo or $
+                {PLANS.UNLIMITED.yearlyPrice}/year) is marketed as unlimited
+                pages and audiobook narration for normal authoring. It is{" "}
+                <strong>not</strong> a guarantee of infinite compute, storage, or
+                concurrent capacity. Soft anti-abuse safeguards and rate limits
+                apply. {UNLIMITED_FAIR_USE.note}
+              </p>
+              <ul className="mt-3 list-disc space-y-2 pl-5">
+                <li>
+                  Concurrent book generations: up to{" "}
+                  {UNLIMITED_FAIR_USE.maxConcurrentBookJobs} at a time.
+                </li>
+                <li>
+                  Concurrent audio jobs: up to{" "}
+                  {UNLIMITED_FAIR_USE.maxConcurrentAudioJobs} at a time.
+                </li>
+                <li>
+                  New book jobs: up to{" "}
+                  {UNLIMITED_FAIR_USE.maxNewBookJobsPerHour} per hour per
+                  account.
+                </li>
+                <li>
+                  New audio jobs: up to{" "}
+                  {UNLIMITED_FAIR_USE.maxAudioJobsPerHour} per hour per account.
+                </li>
+                <li>
+                  API / dashboard request pacing: about{" "}
+                  {UNLIMITED_FAIR_USE.maxApiRequestsPerMinute} requests per
+                  minute.
+                </li>
+                <li>
+                  Sustained usage above roughly{" "}
+                  {UNLIMITED_FAIR_USE.softReviewPagesPerMonth.toLocaleString()}{" "}
+                  pages or{" "}
+                  {Math.round(
+                    UNLIMITED_FAIR_USE.softReviewAudioMinutesPerMonth / 60
+                  )}{" "}
+                  hours of audio in a month may trigger a fair-use review,
+                  throttling, or a custom enterprise agreement.
+                </li>
+              </ul>
+              <p className="mt-3">
+                Prohibited: reselling access, account sharing for capacity
+                farming, automated bulk scraping of generation endpoints, or
+                bypassing rate limits. We may pause jobs, reduce throughput, or
+                suspend accounts that violate this section.
+              </p>
+            </section>
+
             <section>
               <h2 className="mb-2 text-[20px] font-semibold text-[#0a2540]">
-                6. Disclaimers
+                7. Disclaimers
               </h2>
               <p>
                 BookAI is provided &ldquo;as is&rdquo; without warranties of any kind. AI
@@ -113,7 +169,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="mb-2 text-[20px] font-semibold text-[#0a2540]">
-                7. Limitation of liability
+                8. Limitation of liability
               </h2>
               <p>
                 To the extent permitted by law, BookAI shall not be liable for
@@ -124,7 +180,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="mb-2 text-[20px] font-semibold text-[#0a2540]">
-                8. Contact us
+                9. Contact us
               </h2>
               <p>
                 For questions about these Terms, contact us at{" "}

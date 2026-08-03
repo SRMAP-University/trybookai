@@ -81,7 +81,7 @@ export async function POST(request: Request) {
 
   if (parsed.data.model && !isModelAvailable(parsed.data.model, user.plan)) {
     return NextResponse.json(
-      { error: "This model requires a Pro or Enterprise plan." },
+      { error: "This model requires a Pro, Premium, or Unlimited plan." },
       { status: 403 }
     );
   }

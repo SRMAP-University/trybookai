@@ -9,10 +9,12 @@ import { readJson } from "@/lib/api";
 import { ADDONS } from "@/lib/addons";
 import { PLANS, PREMIUM_TRIAL, type BillingInterval } from "@/lib/constants";
 import {
+  FREE_PLAN_BANNER,
   PRICING_FEATURES,
   PRICING_PLANS,
   pricingHeaderStyle,
 } from "@/lib/pricing-plans";
+import { LEGAL } from "@/lib/legal";
 import { useUpgradePlan } from "@/components/dashboard/upgrade-button";
 import { LegalClickAgreement } from "@/components/legal/legal-consent";
 import { useDashboardUser } from "@/components/dashboard/user-context";
@@ -97,21 +99,28 @@ export function BillingContent({
   const canStartTrial = !user?.hasStripeSubscription && !onTrial;
   const currentPlan = user?.plan;
   const showLegalConsent =
-    currentPlan !== "ENTERPRISE" ||
+    currentPlan === "FREE" ||
     onTrial ||
     !user?.hasStripeSubscription;
   const canManageAddons =
-    (currentPlan === "PRO" || currentPlan === "ENTERPRISE") && !onTrial;
+    (currentPlan === "PRO" ||
+      currentPlan === "ENTERPRISE" ||
+      currentPlan === "UNLIMITED") &&
+    !onTrial;
   const addonTotal =
     pagesQty * ADDONS.PAGES.unitPrice + audioQty * ADDONS.AUDIO.unitPrice;
   const projectedPages =
-    (currentPlan === "PRO" || currentPlan === "ENTERPRISE"
+    (currentPlan === "PRO" ||
+    currentPlan === "ENTERPRISE" ||
+    currentPlan === "UNLIMITED"
       ? PLANS[currentPlan].pagesLimit
       : 0) +
     pagesBonus +
     pagesQty * ADDONS.PAGES.pagesPerUnit;
   const projectedAudio =
-    (currentPlan === "PRO" || currentPlan === "ENTERPRISE"
+    (currentPlan === "PRO" ||
+    currentPlan === "ENTERPRISE" ||
+    currentPlan === "UNLIMITED"
       ? PLANS[currentPlan].audioMinutesLimit
       : 0) +
     audioBonus +
@@ -164,6 +173,9 @@ export function BillingContent({
       }
       if (searchParams.get("canceled") && !cancelled) {
         toast.info("Checkout canceled.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("canceled");
+        window.history.replaceState({}, "", url.pathname + url.search);
       }
     }
 
@@ -199,7 +211,7 @@ export function BillingContent({
     };
   }, [canManageAddons, currentPlan, user?.hasStripeSubscription]);
 
-  async function handleCheckout(plan: "PRO" | "ENTERPRISE") {
+  async function handleCheckout(plan: "PRO" | "ENTERPRISE" | "UNLIMITED") {
     await upgrade(plan, interval, { acceptedTerms: true });
   }
 
@@ -390,20 +402,14 @@ export function BillingContent({
           const plan = PLANS[key];
           const items = PRICING_FEATURES[key];
           const displayPrice =
-            key === "FREE"
-              ? 0
-              : interval === "year"
-                ? plan.yearlyPrice
-                : plan.price;
-          const periodLabel =
-            key === "FREE"
-              ? "forever"
-              : interval === "year"
-                ? "per year"
-                : "per month";
+            interval === "year" ? plan.yearlyPrice : plan.price;
+          const periodLabel = interval === "year" ? "per year" : "per month";
           const isCurrent =
             currentPlan === key ||
             (key === "ENTERPRISE" && onTrial && currentPlan === "ENTERPRISE");
+          const isHigherPlan =
+            currentPlan === "UNLIMITED" ||
+            (currentPlan === "ENTERPRISE" && key === "PRO");
 
           return (
             <div
@@ -421,6 +427,13 @@ export function BillingContent({
                     {onTrial
                       ? "Free trial active"
                       : `${PREMIUM_TRIAL.days}-day free trial`}
+                  </span>
+                </div>
+              )}
+              {key === "UNLIMITED" && (
+                <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
+                  <span className="inline-flex whitespace-nowrap rounded-full bg-[#635bff] px-3.5 py-1.5 text-[12px] font-medium text-white shadow-md">
+                    Everything unlimited*
                   </span>
                 </div>
               )}
@@ -460,11 +473,17 @@ export function BillingContent({
                     audio
                   </p>
                 )}
-                {key === "PRO" && interval === "year" && (
-                  <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
-                    2 months free vs monthly
+                {key === "UNLIMITED" && (
+                  <p className="mt-2 text-[13px] font-medium text-[#635bff]">
+                    Fair use &amp; rate limits apply
                   </p>
                 )}
+                {(key === "PRO" || key === "UNLIMITED") &&
+                  interval === "year" && (
+                    <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
+                      2 months free vs monthly
+                    </p>
+                  )}
 
                 <p className="mt-4 min-h-[48px] text-[14px] leading-relaxed text-[#697386]">
                   {planMeta.description}
@@ -472,16 +491,6 @@ export function BillingContent({
               </div>
 
               <div className="flex flex-1 flex-col px-7 pb-7 pt-3">
-                {key === "FREE" && (
-                  <Button
-                    variant="outline"
-                    className="mt-1 h-11 w-full border-[#e6ebf1] text-[14px] font-semibold text-[#0a2540]"
-                    disabled
-                  >
-                    {isCurrent ? "Your current plan" : "Free plan"}
-                  </Button>
-                )}
-
                 {key === "PRO" && (
                   <Button
                     className="mt-1 h-11 w-full bg-[#635bff] text-[14px] font-semibold hover:bg-[#5851e5]"
@@ -490,7 +499,8 @@ export function BillingContent({
                       !!loading ||
                       !!trialLoading ||
                       currentPlan === "PRO" ||
-                      currentPlan === "ENTERPRISE"
+                      currentPlan === "ENTERPRISE" ||
+                      currentPlan === "UNLIMITED"
                     }
                   >
                     {loading === "PRO" && (
@@ -498,8 +508,8 @@ export function BillingContent({
                     )}
                     {currentPlan === "PRO"
                       ? "Your current plan"
-                      : currentPlan === "ENTERPRISE"
-                        ? "Included in Premium"
+                      : isHigherPlan
+                        ? "Included in higher plan"
                         : instantUpgrade
                           ? "Upgrade to Pro"
                           : "Checkout Pro"}
@@ -539,6 +549,7 @@ export function BillingContent({
                         disabled={
                           !!loading ||
                           !!trialLoading ||
+                          currentPlan === "UNLIMITED" ||
                           (currentPlan === "ENTERPRISE" &&
                             !!user?.hasStripeSubscription)
                         }
@@ -546,12 +557,14 @@ export function BillingContent({
                         {loading === "ENTERPRISE" && (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         )}
-                        {currentPlan === "ENTERPRISE" &&
-                        user?.hasStripeSubscription
-                          ? "Your current plan"
-                          : instantUpgrade
-                            ? "Upgrade to Premium"
-                            : "Checkout Premium"}
+                        {currentPlan === "UNLIMITED"
+                          ? "Included in Unlimited"
+                          : currentPlan === "ENTERPRISE" &&
+                              user?.hasStripeSubscription
+                            ? "Your current plan"
+                            : instantUpgrade
+                              ? "Upgrade to Premium"
+                              : "Checkout Premium"}
                       </Button>
                     )}
                     {canStartTrial && (
@@ -560,6 +573,40 @@ export function BillingContent({
                         cancel anytime
                       </p>
                     )}
+                  </div>
+                )}
+
+                {key === "UNLIMITED" && (
+                  <div className="mt-1 space-y-2">
+                    <Button
+                      className="h-11 w-full bg-[#635bff] text-[14px] font-semibold text-white hover:bg-[#5851e5]"
+                      onClick={() => handleCheckout("UNLIMITED")}
+                      disabled={
+                        !!loading ||
+                        !!trialLoading ||
+                        (currentPlan === "UNLIMITED" &&
+                          !!user?.hasStripeSubscription)
+                      }
+                    >
+                      {loading === "UNLIMITED" && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      {currentPlan === "UNLIMITED" &&
+                      user?.hasStripeSubscription
+                        ? "Your current plan"
+                        : instantUpgrade
+                          ? "Upgrade to Unlimited"
+                          : "Checkout Unlimited"}
+                    </Button>
+                    <p className="text-center text-[12px] text-[#697386]">
+                      <a
+                        href={`${LEGAL.terms}#unlimited-fair-use`}
+                        className="text-[#635bff] hover:underline"
+                      >
+                        Terms &amp; fair use
+                      </a>{" "}
+                      apply
+                    </p>
                   </div>
                 )}
 
@@ -583,6 +630,50 @@ export function BillingContent({
             </div>
           );
         })}
+      </div>
+
+      <div
+        className={cn(
+          "flex flex-col gap-4 rounded-2xl border border-[#e8e8e8] bg-[#fafbfc] px-6 py-5 sm:flex-row sm:items-center sm:justify-between",
+          currentPlan === "FREE" && "ring-2 ring-[#635bff]/30"
+        )}
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 className="text-[18px] font-semibold tracking-[-0.02em] text-[#0a2540]">
+              {PLANS.FREE.name}
+            </h3>
+            <p className="text-[15px] font-medium text-[#0a2540]">
+              $0 <span className="font-normal text-[#697386]">forever</span>
+            </p>
+            {currentPlan === "FREE" && (
+              <span className="rounded-full bg-[#f0efff] px-2 py-0.5 text-[11px] font-semibold text-[#635bff]">
+                Current
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[14px] text-[#697386]">
+            {FREE_PLAN_BANNER.description}
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+            {FREE_PLAN_BANNER.features.map((item) => (
+              <li
+                key={item}
+                className="flex items-center gap-1.5 text-[13px] text-[#425466]"
+              >
+                <Check className="h-3.5 w-3.5 shrink-0 text-[#0a2540]" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <Button
+          variant="outline"
+          className="h-10 shrink-0 border-[#e6ebf1] text-[13px] font-semibold text-[#0a2540]"
+          disabled
+        >
+          {currentPlan === "FREE" ? "Your current plan" : "Free plan"}
+        </Button>
       </div>
 
       <section className="rounded-2xl border border-[#e8e8e8] bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] sm:p-8">

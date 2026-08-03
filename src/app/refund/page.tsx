@@ -57,9 +57,12 @@ export default function RefundPage() {
               </h2>
               <p>
                 BookAI offers paid plans including Pro (${PLANS.PRO.price}/month
-                or ${PLANS.PRO.yearlyPrice}/year) and Premium ($
+                or ${PLANS.PRO.yearlyPrice}/year), Premium ($
                 {PLANS.ENTERPRISE.price}/month or $
-                {PLANS.ENTERPRISE.yearlyPrice}/year). Subscriptions renew
+                {PLANS.ENTERPRISE.yearlyPrice}/year), and Unlimited ($
+                {PLANS.UNLIMITED.price}/month or $
+                {PLANS.UNLIMITED.yearlyPrice}/year). Unlimited is subject to
+                fair use and rate limits in our Terms. Subscriptions renew
                 automatically at the end of each billing period until canceled.
               </p>
             </section>

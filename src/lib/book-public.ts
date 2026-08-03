@@ -20,7 +20,7 @@ export function createBookSlug(title: string): string {
 }
 
 export function canMakePrivate(plan: string): boolean {
-  return plan === "PRO" || plan === "ENTERPRISE";
+  return plan === "PRO" || plan === "ENTERPRISE" || plan === "UNLIMITED";
 }
 
 export function getAppUrl(): string {

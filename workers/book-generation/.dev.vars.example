@@ -1,0 +1,5 @@
+/* BookAI generation worker — local secrets for `wrangler dev`
+ * Copy to .dev.vars and fill in (never commit .dev.vars).
+ */
+GENERATION_WORKER_SECRET=
+DATABASE_URL=

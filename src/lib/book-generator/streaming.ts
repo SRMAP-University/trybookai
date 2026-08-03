@@ -21,6 +21,10 @@ import {
   mergeEmitters,
 } from "@/lib/book-generator/events";
 import { generateAndSaveBookCover } from "@/lib/book-generator/cover";
+import {
+  nextPushMilestone,
+  notifyBookProgress,
+} from "@/lib/push";
 
 async function throwIfCancelled(bookId: string) {
   const requested = isGenerationCancellationRequested(bookId);
@@ -148,7 +152,18 @@ async function streamGenerateSection(
   });
   await db.book.update({
     where: { id: book.id },
-    data: { status: "GENERATING" },
+    data: {
+      status: "GENERATING",
+      // Seed progress so UI isn't stuck at 0 before the first draft persist.
+      progress: Math.max(book.progress ?? 0, 5),
+    },
+  });
+  emit({
+    type: "progress",
+    progress: Math.max(book.progress ?? 0, 5),
+    currentPages: book.currentPages ?? 0,
+    targetPages: book.targetPages,
+    status: "GENERATING",
   });
 
   const priorSections = chapter.sections
@@ -212,27 +227,22 @@ async function streamGenerateSection(
             currentSectionId: section.id,
             partialContent: snapshot,
           });
-          const estimatedPages = Math.min(
-            book.targetPages,
-            Math.max(
-              book.currentPages ?? 0,
-              Math.ceil(draftWordCount / wordsPerPage)
-            )
-          );
-          emit({
-            type: "progress",
-            progress: Math.min(
-              99,
-              Math.round(
-                (5 +
-                  Math.min(1, draftWordCount / Math.max(1, targetWords)) * 90) *
-                  10
-              ) / 10
-            ),
-            currentPages: estimatedPages,
-            targetPages: book.targetPages,
-            status: "GENERATING",
+          // Persist book.progress so dashboard / jobs widget update without a full refresh.
+          const result = await applyBookProgress(book.id, {
+            activeSectionId: section.id,
+            draftWordCount,
+            targetSectionWords: targetWords,
+            wordsPerPage,
           });
+          if (result) {
+            emit({
+              type: "progress",
+              progress: result.progress,
+              currentPages: result.currentPages,
+              targetPages: result.targetPages,
+              status: "GENERATING",
+            });
+          }
         } catch (error) {
           console.warn(
             "[generation] draft persist skipped:",
@@ -394,6 +404,7 @@ export async function runBookGeneration(
 
   const publisher = mergeEmitters(createBookEventEmitter(bookId), emit);
   const job = await getRunningJob(bookId, jobId);
+  let lastPushMilestone = 0;
 
   try {
     const book = await db.book.findUniqueOrThrow({
@@ -422,6 +433,13 @@ export async function runBookGeneration(
       await applyBookProgress(bookId);
       const chapterCount = await db.chapter.count({ where: { bookId } });
       publisher({ type: "outline_ready", chapterCount });
+      void notifyBookProgress({
+        userId,
+        bookId,
+        title: book.title,
+        progress: 5,
+        phase: "outline",
+      });
     }
 
     await throwIfCancelled(bookId);
@@ -469,14 +487,32 @@ export async function runBookGeneration(
 
           const pageCheck = await db.book.findUnique({
             where: { id: bookId },
-            select: { currentPages: true, targetPages: true },
+            select: {
+              currentPages: true,
+              targetPages: true,
+              progress: true,
+              title: true,
+            },
           });
-          if (
-            pageCheck &&
-            pageCheck.currentPages >= pageCheck.targetPages
-          ) {
-            reachedTarget = true;
-            break;
+          if (pageCheck) {
+            const milestone = nextPushMilestone(
+              lastPushMilestone,
+              pageCheck.progress ?? 0
+            );
+            if (milestone != null) {
+              lastPushMilestone = milestone;
+              void notifyBookProgress({
+                userId,
+                bookId,
+                title: pageCheck.title,
+                progress: milestone,
+                phase: "progress",
+              });
+            }
+            if (pageCheck.currentPages >= pageCheck.targetPages) {
+              reachedTarget = true;
+              break;
+            }
           }
         }
       }
@@ -498,9 +534,20 @@ export async function runBookGeneration(
       select: {
         coverImage: true,
         userId: true,
+        title: true,
         generateAudiobookOnComplete: true,
       },
     });
+
+    if (finished) {
+      void notifyBookProgress({
+        userId: finished.userId,
+        bookId,
+        title: finished.title,
+        progress: 100,
+        phase: "completed",
+      });
+    }
 
     if (finished?.generateAudiobookOnComplete) {
       void import("@/lib/audio-generator/background")
@@ -546,6 +593,17 @@ export async function runBookGeneration(
     await db.generationJob.update({
       where: { id: job.id },
       data: { status: "FAILED", error: message, completedAt: new Date() },
+    });
+    const failedBook = await db.book.findUnique({
+      where: { id: bookId },
+      select: { title: true },
+    });
+    void notifyBookProgress({
+      userId,
+      bookId,
+      title: failedBook?.title ?? "Your book",
+      progress: 0,
+      phase: "failed",
     });
     publisher({ type: "error", message });
     throw error;

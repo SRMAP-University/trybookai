@@ -5,10 +5,12 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { PLANS, PREMIUM_TRIAL, type BillingInterval } from "@/lib/constants";
 import {
+  FREE_PLAN_BANNER,
   PRICING_FEATURES,
   PRICING_PLANS,
   pricingHeaderStyle,
 } from "@/lib/pricing-plans";
+import { LEGAL } from "@/lib/legal";
 import { cn } from "@/lib/utils";
 
 export function Pricing() {
@@ -59,22 +61,13 @@ export function Pricing() {
             const config = PLANS[plan.key];
             const items = PRICING_FEATURES[plan.key];
             const displayPrice =
-              plan.key === "FREE"
-                ? 0
-                : interval === "year"
-                  ? config.yearlyPrice
-                  : config.price;
-            const periodLabel =
-              plan.key === "FREE"
-                ? "forever"
-                : interval === "year"
-                  ? "per year"
-                  : "per month";
+              interval === "year" ? config.yearlyPrice : config.price;
+            const periodLabel = interval === "year" ? "per year" : "per month";
             const cta =
-              plan.key === "FREE"
-                ? "Start free"
-                : plan.key === "ENTERPRISE"
-                  ? "Start free trial"
+              plan.key === "ENTERPRISE"
+                ? "Start free trial"
+                : plan.key === "UNLIMITED"
+                  ? "Get Unlimited"
                   : "Get Pro";
 
             return (
@@ -90,6 +83,13 @@ export function Pricing() {
                   <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
                     <span className="inline-flex whitespace-nowrap rounded-full bg-[#0a2540] px-3.5 py-1.5 text-[12px] font-medium text-white shadow-md">
                       {PREMIUM_TRIAL.days}-day free trial
+                    </span>
+                  </div>
+                )}
+                {plan.key === "UNLIMITED" && (
+                  <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
+                    <span className="inline-flex whitespace-nowrap rounded-full bg-[#635bff] px-3.5 py-1.5 text-[12px] font-medium text-white shadow-md">
+                      Everything unlimited*
                     </span>
                   </div>
                 )}
@@ -114,20 +114,23 @@ export function Pricing() {
                     </span>
                   </div>
 
-                {plan.key === "ENTERPRISE" && (
-                  <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
-                    {PREMIUM_TRIAL.days}-day free trial, then ${displayPrice}/
-                    {interval === "year" ? "yr" : "mo"} ·{" "}
-                    {PREMIUM_TRIAL.pagesLimit.toLocaleString()} pages ·{" "}
-                    {Math.round(PREMIUM_TRIAL.audioMinutesLimit / 60)} hours
-                    audio
-                  </p>
-                )}
-                  {plan.key === "PRO" && interval === "year" && (
+                  {plan.key === "ENTERPRISE" && (
                     <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
-                      2 months free vs monthly
+                      {PREMIUM_TRIAL.days}-day free trial, then ${displayPrice}/
+                      {interval === "year" ? "yr" : "mo"}
                     </p>
                   )}
+                  {plan.key === "UNLIMITED" && (
+                    <p className="mt-2 text-[13px] font-medium text-[#635bff]">
+                      Fair use &amp; rate limits apply
+                    </p>
+                  )}
+                  {(plan.key === "PRO" || plan.key === "UNLIMITED") &&
+                    interval === "year" && (
+                      <p className="mt-2 text-[13px] font-medium text-[#0e6245]">
+                        2 months free vs monthly
+                      </p>
+                    )}
 
                   <p className="mt-4 min-h-[48px] text-[14px] leading-relaxed text-[#697386]">
                     {plan.description}
@@ -139,7 +142,7 @@ export function Pricing() {
                     href="/register"
                     className={cn(
                       "mt-1 flex h-11 w-full items-center justify-center rounded-lg text-[14px] font-semibold transition-colors",
-                      plan.highlight
+                      plan.highlight || plan.key === "UNLIMITED"
                         ? "bg-[#635bff] text-white hover:bg-[#5851e5]"
                         : "border border-[#e6ebf1] bg-white text-[#0a2540] hover:bg-[#f6f9fc]"
                     )}
@@ -163,10 +166,56 @@ export function Pricing() {
                       </li>
                     ))}
                   </ul>
+                  {plan.key === "UNLIMITED" && (
+                    <p className="mt-4 text-[12px] leading-relaxed text-[#697386]">
+                      *Subject to{" "}
+                      <Link
+                        href={`${LEGAL.terms}#unlimited-fair-use`}
+                        className="font-medium text-[#635bff] hover:underline"
+                      >
+                        fair-use Terms
+                      </Link>{" "}
+                      (rate limits, anti-abuse).
+                    </p>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-[#e8e8e8] bg-[#fafbfc] px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 className="text-[18px] font-semibold tracking-[-0.02em] text-[#0a2540]">
+                {PLANS.FREE.name}
+              </h3>
+              <p className="text-[15px] font-medium text-[#0a2540]">
+                $0{" "}
+                <span className="font-normal text-[#697386]">forever</span>
+              </p>
+            </div>
+            <p className="mt-1 text-[14px] text-[#697386]">
+              {FREE_PLAN_BANNER.description}
+            </p>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+              {FREE_PLAN_BANNER.features.map((item) => (
+                <li
+                  key={item}
+                  className="flex items-center gap-1.5 text-[13px] text-[#425466]"
+                >
+                  <Check className="h-3.5 w-3.5 shrink-0 text-[#0a2540]" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Link
+            href="/register"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-[#e6ebf1] bg-white px-5 text-[13px] font-semibold text-[#0a2540] transition-colors hover:bg-white"
+          >
+            Start free
+          </Link>
         </div>
       </div>
     </section>

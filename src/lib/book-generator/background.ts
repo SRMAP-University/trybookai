@@ -1,15 +1,22 @@
 import { db } from "@/lib/db";
 import { DEFAULT_AI_MODEL, isModelAvailable } from "@/lib/ai-models";
 import { runBookGeneration } from "@/lib/book-generator/streaming";
+import {
+  enqueueCloudflareGeneration,
+  getGenerationRunner,
+} from "@/lib/book-generator/cloudflare-enqueue";
 import { type Plan } from "@/generated/prisma/client";
 
 const MAX_CONCURRENT_GENERATIONS = 2;
 const QUEUE_POLL_MS = 15_000;
+/** Re-queue RUNNING jobs with no heartbeat after this many ms (CF worker). */
+const STALE_RUNNING_MS = 15 * 60 * 1000;
 
 const PLAN_PRIORITY: Record<Plan, number> = {
   FREE: 1,
   PRO: 2,
   ENTERPRISE: 3,
+  UNLIMITED: 4,
 };
 
 const globalQueue = globalThis as unknown as {
@@ -95,14 +102,29 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function requeueStaleRunningJobs(bookId?: string) {
+  const staleBefore = new Date(Date.now() - STALE_RUNNING_MS);
+  await db.generationJob.updateMany({
+    where: {
+      ...(bookId ? { bookId } : {}),
+      status: "RUNNING",
+      updatedAt: { lt: staleBefore },
+    },
+    data: {
+      status: "QUEUED",
+      error: "Stale RUNNING job — re-queued for worker",
+      startedAt: null,
+    },
+  });
+}
+
 /** Queue a generation without interactive transactions (Neon-pooler safe). */
 export async function ensureGenerationRunning(
   bookId: string,
   userId: string,
   resume = false
 ) {
-  const STALE_MS = 10 * 60 * 1000;
-  const staleBefore = new Date(Date.now() - STALE_MS);
+  await requeueStaleRunningJobs(bookId);
 
   const book = await db.book.findUniqueOrThrow({
     where: { id: bookId, userId },
@@ -113,26 +135,27 @@ export async function ensureGenerationRunning(
     return { queued: false, alreadyRunning: false, completed: true };
   }
 
-  await db.generationJob.updateMany({
-    where: {
-      bookId,
-      status: "RUNNING",
-      createdAt: { lt: staleBefore },
-    },
-    data: {
-      status: "FAILED",
-      error: "Stale job",
-      completedAt: new Date(),
-    },
-  });
-
   const activeJob = await db.generationJob.findFirst({
     where: { bookId, status: { in: ["QUEUED", "RUNNING"] } },
     orderBy: { createdAt: "desc" },
   });
 
+  const runner = getGenerationRunner();
+
   if (activeJob) {
-    void processQueue();
+    if (runner === "cloudflare") {
+      try {
+        await enqueueCloudflareGeneration({
+          bookId,
+          userId,
+          jobId: activeJob.id,
+        });
+      } catch (error) {
+        console.error("[generation] re-enqueue to Cloudflare failed:", error);
+      }
+    } else {
+      void processQueue();
+    }
     return { queued: false, alreadyRunning: true, jobId: activeJob.id };
   }
 
@@ -172,7 +195,32 @@ export async function ensureGenerationRunning(
     data: { status: "GENERATING" },
   });
 
-  void processQueue();
+  if (runner === "cloudflare") {
+    try {
+      await enqueueCloudflareGeneration({
+        bookId,
+        userId,
+        jobId: job.id,
+      });
+    } catch (error) {
+      console.error("[generation] enqueue to Cloudflare failed:", error);
+      await db.generationJob.update({
+        where: { id: job.id },
+        data: {
+          status: "FAILED",
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to enqueue Cloudflare worker",
+          completedAt: new Date(),
+        },
+      });
+      throw error;
+    }
+  } else {
+    void processQueue();
+  }
+
   return { queued: true, alreadyRunning: false, jobId: job.id };
 }
 
@@ -198,6 +246,7 @@ async function runQueuedJob(jobId: string, bookId: string, userId: string) {
 }
 
 async function processQueue() {
+  if (getGenerationRunner() === "cloudflare") return;
   if (activeBookIds.size >= MAX_CONCURRENT_GENERATIONS) return;
 
   if (globalQueue.bookaiWorkerPromise) return;
@@ -222,7 +271,6 @@ async function claimNextQueuedJob(): Promise<{
 
       if (!candidate) return null;
 
-      // Skip books already running in this process.
       if (activeBookIds.has(candidate.bookId)) {
         continue;
       }
@@ -263,10 +311,12 @@ async function processQueueInner() {
   }
 }
 
-// One interval across Fast Refresh — stacking setIntervals was exhausting Neon.
-if (globalQueue.bookaiQueueInterval) {
-  clearInterval(globalQueue.bookaiQueueInterval);
+// Local-dev in-process queue only — Cloudflare mode must not start intervals.
+if (getGenerationRunner() === "local") {
+  if (globalQueue.bookaiQueueInterval) {
+    clearInterval(globalQueue.bookaiQueueInterval);
+  }
+  globalQueue.bookaiQueueInterval = setInterval(() => {
+    void processQueue();
+  }, QUEUE_POLL_MS);
 }
-globalQueue.bookaiQueueInterval = setInterval(() => {
-  void processQueue();
-}, QUEUE_POLL_MS);

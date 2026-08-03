@@ -1,12 +1,15 @@
 import NextAuth from "next-auth";
+import type { Session } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
+import { verifyMobileToken } from "@/lib/mobile-auth";
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+const nextAuth = NextAuth({
   adapter: PrismaAdapter(db),
   ...authConfig,
   providers: [
@@ -47,3 +50,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
 });
+
+export const { handlers, signIn, signOut } = nextAuth;
+
+/**
+ * Session helper that accepts cookie sessions OR mobile Bearer JWTs.
+ */
+export async function auth(): Promise<Session | null> {
+  try {
+    const h = await headers();
+    const authHeader = h.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const payload = await verifyMobileToken(authHeader.slice(7));
+      if (payload?.sub) {
+        return {
+          user: {
+            id: payload.sub,
+            email: payload.email,
+            name: payload.name ?? undefined,
+            image: undefined,
+          },
+          expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        };
+      }
+    }
+  } catch {
+    // headers() unavailable outside request scope — fall through
+  }
+
+  return nextAuth.auth() as Promise<Session | null>;
+}

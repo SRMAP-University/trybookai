@@ -4,18 +4,20 @@ export type AiModelConfig = {
   value: string;
   label: string;
   description: string;
-  plans: readonly ("FREE" | "PRO" | "ENTERPRISE")[];
+  plans: readonly ("FREE" | "PRO" | "ENTERPRISE" | "UNLIMITED")[];
   provider: AiProvider;
   /** Cloudflare Workers AI model id, e.g. @cf/deepseek-ai/... */
   cfModel: string;
 };
+
+type PlanGate = "FREE" | "PRO" | "ENTERPRISE" | "UNLIMITED";
 
 export const AI_MODELS: readonly AiModelConfig[] = [
   {
     value: "deepseek-r1",
     label: "DeepSeek R1",
     description: "Cloudflare Workers AI — reasoning & long-form prose",
-    plans: ["FREE", "PRO", "ENTERPRISE"],
+    plans: ["FREE", "PRO", "ENTERPRISE", "UNLIMITED"],
     provider: "cloudflare",
     cfModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
   },
@@ -23,7 +25,7 @@ export const AI_MODELS: readonly AiModelConfig[] = [
     value: "llama-3.3",
     label: "Llama 3.3 70B",
     description: "Cloudflare Workers AI — fast general writing",
-    plans: ["FREE", "PRO", "ENTERPRISE"],
+    plans: ["FREE", "PRO", "ENTERPRISE", "UNLIMITED"],
     provider: "cloudflare",
     cfModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
   },
@@ -31,7 +33,7 @@ export const AI_MODELS: readonly AiModelConfig[] = [
     value: "qwen-32b",
     label: "Qwen2.5 32B",
     description: "Cloudflare Workers AI — strong instruction following",
-    plans: ["PRO", "ENTERPRISE"],
+    plans: ["PRO", "ENTERPRISE", "UNLIMITED"],
     provider: "cloudflare",
     cfModel: "@cf/qwen/qwen2.5-32b-instruct",
   },
@@ -68,11 +70,9 @@ export function requiresProPlan(modelId: string): boolean {
 
 export function isModelAvailable(modelId: string, plan: string): boolean {
   const config = getModelConfig(modelId);
-  return config.plans.includes(plan as "FREE" | "PRO" | "ENTERPRISE");
+  return config.plans.includes(plan as PlanGate);
 }
 
 export function modelsForPlan(plan: string): AiModelConfig[] {
-  return AI_MODELS.filter((m) =>
-    m.plans.includes(plan as "FREE" | "PRO" | "ENTERPRISE")
-  );
+  return AI_MODELS.filter((m) => m.plans.includes(plan as PlanGate));
 }

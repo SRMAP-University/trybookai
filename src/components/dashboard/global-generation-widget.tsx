@@ -39,7 +39,7 @@ type ActiveJobsResponse = {
   audios: ActiveAudioJob[];
 };
 
-const POLL_MS = 10_000;
+const POLL_MS = 4_000;
 
 const AUDIO_META = {
   AUDIOBOOK: { label: "Audiobook", icon: Headphones },

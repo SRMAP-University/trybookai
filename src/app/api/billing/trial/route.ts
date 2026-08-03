@@ -29,6 +29,8 @@ const trialSchema = z.discriminatedUnion("action", [
     action: z.literal("start"),
     interval: z.enum(["month", "year"]).optional(),
     acceptedTerms: legalConsentField,
+    /** Mobile / RevenueCat: skip Stripe Checkout and grant a local trial. */
+    localOnly: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("end"),
@@ -67,7 +69,10 @@ export async function POST(request: Request) {
     const interval = parsed.data.interval === "year" ? "year" : "month";
 
     if (action === "start") {
-      if (isStripeBillingEnabled()) {
+      const localOnly =
+        parsed.data.action === "start" && parsed.data.localOnly === true;
+
+      if (isStripeBillingEnabled() && !localOnly) {
         const priceId = planPriceId("ENTERPRISE", interval);
         if (!priceId) {
           return NextResponse.json(

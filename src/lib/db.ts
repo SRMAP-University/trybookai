@@ -3,9 +3,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { cleanEnv } from "@/lib/env";
 
+/** Bump when Prisma schema enums/models change so HMR picks up a new client. */
+const PRISMA_SCHEMA_VERSION = 2;
+
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   pgPool?: Pool;
+  prismaSchemaVersion?: number;
 };
 
 function getPool() {
@@ -36,10 +40,14 @@ function getPool() {
 }
 
 function getPrismaClient() {
-  if (globalForPrisma.prisma) {
+  if (
+    globalForPrisma.prisma &&
+    globalForPrisma.prismaSchemaVersion === PRISMA_SCHEMA_VERSION
+  ) {
     return globalForPrisma.prisma;
   }
 
+  // Replace stale client after schema changes; keep the shared pool alive.
   const client = new PrismaClient({
     adapter: new PrismaPg(getPool()),
     log:
@@ -47,6 +55,7 @@ function getPrismaClient() {
   });
 
   globalForPrisma.prisma = client;
+  globalForPrisma.prismaSchemaVersion = PRISMA_SCHEMA_VERSION;
   return client;
 }
 

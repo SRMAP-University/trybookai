@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { auth } from "@/lib/auth";
 import {
   ensureGenerationRunning,
@@ -48,12 +47,7 @@ export async function POST(
     });
   }
 
-  after(() => {
-    ensureGenerationRunning(id, session.user.id, false).catch((error) => {
-      if (error instanceof GenerationPausedError) return;
-      console.error("Failed to resume background generation:", error);
-    });
-  });
+  // ensureGenerationRunning above already enqueues Cloudflare (or local queue).
 
   const encoder = new TextEncoder();
 

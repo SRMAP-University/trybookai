@@ -66,7 +66,12 @@ export async function applyCapacityPurchase(
   audioQty: number
 ) {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
-  if (user.plan !== "PRO" && user.plan !== "ENTERPRISE") return;
+  if (
+    user.plan !== "PRO" &&
+    user.plan !== "ENTERPRISE" &&
+    user.plan !== "UNLIMITED"
+  )
+    return;
 
   const added = capacityFromQuantities(pagesQty, audioQty);
   if (added.pagesBonus <= 0 && added.audioMinutesBonus <= 0) return;

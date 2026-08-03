@@ -1,0 +1,7 @@
+mobile/node_modules
+mobile/build
+mobile/.dart_tool
+mobile/.idea
+mobile/android/.gradle
+mobile/ios/Pods
+mobile/ios/.symlinks

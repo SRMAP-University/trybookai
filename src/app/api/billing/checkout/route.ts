@@ -18,7 +18,7 @@ import { getBaseUrl } from "@/lib/url";
 import { z } from "zod";
 
 const checkoutSchema = z.object({
-  plan: z.enum(["PRO", "ENTERPRISE"]),
+  plan: z.enum(["PRO", "ENTERPRISE", "UNLIMITED"]),
   interval: z.enum(["month", "year"]).optional(),
   withTrial: z.boolean().optional(),
   acceptedTerms: legalConsentField,
@@ -68,15 +68,12 @@ export async function POST(request: Request) {
 
     const priceId = planPriceId(paidPlan, interval);
     if (!priceId) {
-      const user = await upgradeUserPlan(session.user.id, paidPlan);
-      return NextResponse.json({
-        upgraded: true,
-        instant: true,
-        plan: user.plan,
-        pagesLimit: user.pagesLimit,
-        audioMinutesLimit: user.audioMinutesLimit,
-        interval,
-      });
+      return NextResponse.json(
+        {
+          error: `Stripe price for ${paidPlan} (${interval}) is not configured. Add STRIPE_${paidPlan === "UNLIMITED" ? "UNLIMITED" : paidPlan === "ENTERPRISE" ? "ENTERPRISE" : "PRO"}_PRICE_ID to the environment.`,
+        },
+        { status: 400 }
+      );
     }
 
     const user = await db.user.findUniqueOrThrow({

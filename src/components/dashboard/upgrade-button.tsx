@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { readJson } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type PaidPlan = "PRO" | "ENTERPRISE";
+type PaidPlan = "PRO" | "ENTERPRISE" | "UNLIMITED";
 type BillingInterval = "month" | "year";
 
 type UpgradeOptions = {

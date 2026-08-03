@@ -105,7 +105,7 @@ export function LandingShowcase() {
 export function LogoMark({ className }: { className?: string }) {
   return (
     <img
-      src="/LOGO.png"
+      src="/logo-mark.png"
       alt="BookAI"
       className={className}
       aria-hidden

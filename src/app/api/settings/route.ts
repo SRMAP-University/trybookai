@@ -26,6 +26,7 @@ const settingsSchema = z.object({
   styleGuide: z.string().max(5000).nullable().optional(),
   autoGenerateOnCreate: z.boolean().optional(),
   emailNotifications: z.boolean().optional(),
+  pushNotifications: z.boolean().optional(),
 });
 
 const settingsSelect = {
@@ -56,6 +57,7 @@ const settingsSelect = {
   styleGuide: true,
   autoGenerateOnCreate: true,
   emailNotifications: true,
+  pushNotifications: true,
 } as const;
 
 export async function GET() {
@@ -83,7 +85,10 @@ export async function GET() {
       user.pagesLimit <= 50 ||
       user.audioMinutesLimit <= 0;
     const looksPaidWithoutProof =
-      (user.plan === "PRO" || user.plan === "ENTERPRISE") && hasStripeLink;
+      (user.plan === "PRO" ||
+        user.plan === "ENTERPRISE" ||
+        user.plan === "UNLIMITED") &&
+      hasStripeLink;
 
     if (
       isStripeBillingEnabled() &&

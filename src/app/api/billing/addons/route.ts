@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     where: { id: session.user.id },
   });
 
-  if (user.plan !== "PRO" && user.plan !== "ENTERPRISE") {
+  if (user.plan !== "PRO" && user.plan !== "ENTERPRISE" && user.plan !== "UNLIMITED") {
     return NextResponse.json(
       { error: "Upgrade to Pro or Premium before buying capacity." },
       { status: 403 }

@@ -11,6 +11,7 @@ enum Plan {
   FREE
   PRO
   ENTERPRISE
+  UNLIMITED
 }
 
 enum BookStatus {
@@ -91,6 +92,8 @@ model User {
   styleGuide           String? @db.Text
   autoGenerateOnCreate Boolean @default(true)
   emailNotifications   Boolean @default(true)
+  /// Mobile push for book generation progress + completion
+  pushNotifications    Boolean @default(true)
 
   // Branding / publisher identity
   brandName            String?
@@ -111,6 +114,21 @@ model User {
   accounts Account[]
   sessions Session[]
   books    Book[]
+  pushTokens DevicePushToken[]
+}
+
+/// FCM device tokens for mobile push notifications
+model DevicePushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // ios | android
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
