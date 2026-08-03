@@ -71,11 +71,38 @@ export async function heartbeatJob(
   `;
 }
 
+/** Keep job lease alive while a long AI call is in flight. */
+async function withAiHeartbeat<T>(
+  sql: Sql,
+  jobId: string,
+  phase: string,
+  meta: Record<string, unknown>,
+  work: () => Promise<T>
+): Promise<T> {
+  const started = Date.now();
+  const timer = setInterval(() => {
+    void heartbeatJob(sql, jobId, {
+      phase,
+      ...meta,
+      heartbeatAt: new Date().toISOString(),
+      elapsedMs: Date.now() - started,
+    }).catch(() => undefined);
+  }, 60_000);
+  try {
+    return await work();
+  } finally {
+    clearInterval(timer);
+  }
+}
+
 export async function claimJob(sql: Sql, jobId: string, bookId: string) {
   await assertNotPaused(sql, bookId);
 
-  const existing = await sql<{ status: string }[]>`
-    SELECT status FROM "GenerationJob" WHERE id = ${jobId} LIMIT 1
+  const existing = await sql<
+    { status: string; attempts: number; maxAttempts: number }[]
+  >`
+    SELECT status, attempts, "maxAttempts"
+    FROM "GenerationJob" WHERE id = ${jobId} LIMIT 1
   `;
   if (!existing[0]) {
     throw new Error(`Job ${jobId} not found`);
@@ -86,6 +113,20 @@ export async function claimJob(sql: Sql, jobId: string, bookId: string) {
   if (existing[0].status === "FAILED") {
     // Cancel sets PAUSED first; assertNotPaused above covers that path.
     throw new Error(`Job ${jobId} already failed`);
+  }
+  if (existing[0].attempts >= existing[0].maxAttempts) {
+    const err = `Generation failed after ${existing[0].attempts} attempts. Please resume to try again.`;
+    await sql`
+      UPDATE "GenerationJob"
+      SET status = 'FAILED', error = ${err}, "completedAt" = NOW(), "updatedAt" = NOW()
+      WHERE id = ${jobId}
+    `;
+    await sql`
+      UPDATE "Book"
+      SET status = 'FAILED', "errorMessage" = ${err}, "updatedAt" = NOW()
+      WHERE id = ${bookId} AND status <> 'PAUSED' AND status <> 'COMPLETED'
+    `;
+    throw new Error(err);
   }
 
   const claimed = await sql`
@@ -186,24 +227,31 @@ export async function generateOutlineStep(
     400 + chapterCount * sectionsPerChapter * 100
   );
 
-  const raw = await runAi(
-    ai,
-    OUTLINE_CF_MODEL,
-    [
-      {
-        role: "system",
-        content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book.`,
-      },
-      {
-        role: "user",
-        content: `Create an outline for a ${book.targetPages}-page ${book.genre ?? "general"} book titled "${book.title}".
+  const raw = await withAiHeartbeat(
+    sql,
+    jobId,
+    "outlining_ai",
+    { chapterCount, sectionsPerChapter },
+    () =>
+      runAi(
+        ai,
+        OUTLINE_CF_MODEL,
+        [
+          {
+            role: "system",
+            content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book.`,
+          },
+          {
+            role: "user",
+            content: `Create an outline for a ${book.targetPages}-page ${book.genre ?? "general"} book titled "${book.title}".
 ${book.description ? `Description: ${book.description}` : ""}
 
 Writing requirements:
 ${styleBlock}`,
-      },
-    ],
-    { max_tokens: outlineTokens, temperature: 0.5 }
+          },
+        ],
+        { max_tokens: outlineTokens, temperature: 0.5 }
+      )
   );
 
   const outline = JSON.parse(extractJsonPayload(raw)) as {
@@ -455,20 +503,26 @@ export async function writeSectionStep(
       : null,
   ].filter(Boolean);
 
-  const raw = await runAi(
-    ai,
-    resolveCfModel(book.model),
-    [
-      {
-        role: "system",
-        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency. Output only the final section prose — no headings, no reasoning, and no thinking notes.
+  const raw = await withAiHeartbeat(
+    sql,
+    jobId,
+    "writing_ai",
+    { currentSectionId: sectionId, sectionTitle: section.title },
+    () =>
+      runAi(
+        ai,
+        resolveCfModel(book.model),
+        [
+          {
+            role: "system",
+            content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency. Output only the final section prose — no headings, no reasoning, and no thinking notes.
 
 Writing requirements:
 ${styleParts.join("\n")}`,
-      },
-      {
-        role: "user",
-        content: `Book synopsis: ${outline?.synopsis ?? book.description ?? ""}
+          },
+          {
+            role: "user",
+            content: `Book synopsis: ${outline?.synopsis ?? book.description ?? ""}
 
 Previous chapters context:
 ${priorChapters.map((c) => `Chapter ${c.title}: ${c.summary ?? ""}`).join("\n")}
@@ -479,12 +533,13 @@ Prior sections in this chapter:
 ${priorSections.map((s) => `### ${s.title}\n${s.content}`).join("\n\n")}
 
 Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
-      },
-    ],
-    {
-      max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
-      temperature: book.creativity ?? 0.7,
-    }
+          },
+        ],
+        {
+          max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
+          temperature: book.creativity ?? 0.7,
+        }
+      )
   );
 
   await assertNotPaused(sql, bookId);

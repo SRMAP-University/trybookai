@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -18,10 +18,11 @@ export async function POST(
   }
 
   const { id } = await params;
+  const resume = new URL(request.url).searchParams.get("resume") === "1";
 
   try {
     // Enqueues to Cloudflare Workflows (or local queue). Does not run prose on Vercel.
-    const result = await ensureGenerationRunning(id, session.user.id);
+    const result = await ensureGenerationRunning(id, session.user.id, resume);
     return NextResponse.json(
       {
         queued: result.queued,

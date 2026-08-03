@@ -64,7 +64,7 @@ const initialForm: FormState = {
   genre: "Fiction",
   tone: "Professional",
   audience: "General readers",
-  targetPages: 100,
+  targetPages: 40,
   pov: "third",
   tense: "past",
   language: "en",

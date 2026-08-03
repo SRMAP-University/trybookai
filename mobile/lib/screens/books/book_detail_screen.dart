@@ -891,11 +891,17 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                         icon: const Icon(Icons.stop_circle_outlined),
                         label: const Text('Stop generation'),
                       )
-                    else if (book.status == 'DRAFT' || book.status == 'FAILED')
+                    else if (book.status == 'DRAFT' ||
+                        book.status == 'FAILED' ||
+                        book.status == 'PAUSED')
                       FilledButton.icon(
                         onPressed: _start,
                         icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Start generation'),
+                        label: Text(
+                          book.status == 'DRAFT'
+                              ? 'Start generation'
+                              : 'Resume generation',
+                        ),
                       )
                     else if (book.status == 'COMPLETED')
                       OutlinedButton.icon(

@@ -4,10 +4,11 @@ Durable book generation for BookAI. Vercel inserts a `GenerationJob` (`QUEUED`) 
 
 ## Architecture
 
-1. Next.js (`GENERATION_RUNNER=cloudflare`) → `POST /enqueue` with `{ bookId, userId, jobId }`
-2. Worker creates a `BookGenerationWorkflow` instance (and optionally queues a backup message)
-3. Steps: `claim` → `outline` → `section:{id}`… → `finalize`
+1. Next.js (`GENERATION_RUNNER=cloudflare`) → `POST /enqueue` with `{ bookId, userId, jobId, force? }`
+2. Worker creates a `BookGenerationWorkflow` instance (and optionally queues a backup message). With `force: true`, terminates a hung instance and starts `job-{id}-r{ts}`.
+3. Steps: `claim` → `outline` → `section:{id}`… → `finalize` (heartbeats during long AI calls)
 4. Progress/SSE stay on Vercel via DB polling (`watchGenerationStream`)
+5. Vercel cron `/api/cron/generation-sweep` every 5m requeues stale jobs and force-restarts hung workflows
 
 Cancel: Vercel sets `Book.status = PAUSED` and fails active jobs; each step calls `assertNotPaused` and stops.
 
@@ -69,8 +70,9 @@ GENERATION_RUNNER=local
 
 1. Check CF dashboard → Workers → `bookai-generation` → Workflows / Logs.
 2. Confirm Vercel has `GENERATION_RUNNER=cloudflare` and the worker URL/secret.
-3. Hit generate/resume on the book (calls `ensureGenerationRunning`, which re-queues RUNNING jobs with `updatedAt` older than 15 minutes and re-POSTs `/enqueue`).
-4. `GET /status?instanceId=job-<jobId>` with the worker secret.
+3. Wait for cron sweep (`*/5 * * * *`) or hit generate/resume — stale RUNNING (>15m) is re-queued with `force: true`.
+4. Jobs that hit `maxAttempts` fail the book; user can Resume to start a fresh job.
+5. `GET /status?instanceId=job-<jobId>` with the worker secret.
 
 ### Cancel not stopping
 

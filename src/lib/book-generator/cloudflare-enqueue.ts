@@ -7,6 +7,8 @@ export type EnqueueGenerationPayload = {
   bookId: string;
   userId: string;
   jobId: string;
+  /** Restart a hung workflow instance for this job. */
+  force?: boolean;
 };
 
 export function getGenerationRunner(): "cloudflare" | "local" {
@@ -16,9 +18,15 @@ export function getGenerationRunner(): "cloudflare" | "local" {
   return "local";
 }
 
+export type EnqueueGenerationResult = {
+  instanceId?: string;
+  restarted?: boolean;
+  alreadyRunning?: boolean;
+};
+
 export async function enqueueCloudflareGeneration(
   payload: EnqueueGenerationPayload
-): Promise<void> {
+): Promise<EnqueueGenerationResult> {
   const base = process.env.GENERATION_WORKER_URL?.replace(/\/$/, "");
   const secret = process.env.GENERATION_WORKER_SECRET;
 
@@ -47,5 +55,11 @@ export async function enqueueCloudflareGeneration(
     throw new Error(
       `Cloudflare generation enqueue failed (${res.status}): ${text.slice(0, 300)}`
     );
+  }
+
+  try {
+    return (await res.json()) as EnqueueGenerationResult;
+  } catch {
+    return {};
   }
 }

@@ -30,5 +30,9 @@ class_name = "BookGenerationWorkflow"
 [vars]
 APP_NOTIFY_URL = "https://www.trybookai.com"
 
+# Stale-job recovery every 5 minutes (Hobby Vercel cannot run sub-daily crons).
+[triggers]
+crons = ["*/5 * * * *"]
+
 # Secrets: wrangler secret put GENERATION_WORKER_SECRET
 #          wrangler secret put DATABASE_URL

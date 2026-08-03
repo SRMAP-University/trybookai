@@ -133,9 +133,11 @@ class BooksProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> startGeneration(String id) async {
+  Future<bool> startGeneration(String id, {bool resume = true}) async {
     try {
-      await _api.dio.post('/api/generate/$id');
+      await _api.dio.post(
+        '/api/generate/$id${resume ? '?resume=1' : ''}',
+      );
       return true;
     } catch (e) {
       error = _api.extractError(e);

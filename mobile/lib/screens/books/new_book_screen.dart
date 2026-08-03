@@ -33,7 +33,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
   final _customInstructions = TextEditingController();
   final _characters = TextEditingController();
   String _genre = 'Fiction';
-  double _pages = 100;
+  double _pages = 40;
   bool _starting = false;
   bool _audiobookAfter = true;
   bool _showAdvanced = false;

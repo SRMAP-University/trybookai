@@ -22,7 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _genre = 'Fiction';
   String _tone = 'Professional';
   double _creativity = 0.7;
-  double _targetPages = 100;
+  double _targetPages = 40;
   bool _autoGenerate = true;
   bool _pushNotifications = true;
 
@@ -45,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _tone = data['defaultTone'] as String? ?? 'Professional';
         _creativity = (data['defaultCreativity'] as num?)?.toDouble() ?? 0.7;
         _targetPages =
-            (data['defaultTargetPages'] as num?)?.toDouble() ?? 100;
+            (data['defaultTargetPages'] as num?)?.toDouble() ?? 40;
         _autoGenerate = data['autoGenerateOnCreate'] as bool? ?? true;
         _pushNotifications = data['pushNotifications'] as bool? ?? true;
         _loading = false;

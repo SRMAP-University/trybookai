@@ -10,7 +10,9 @@ import { type Plan } from "@/generated/prisma/client";
 const MAX_CONCURRENT_GENERATIONS = 2;
 const QUEUE_POLL_MS = 15_000;
 /** Re-queue RUNNING jobs with no heartbeat after this many ms (CF worker). */
-const STALE_RUNNING_MS = 15 * 60 * 1000;
+export const STALE_RUNNING_MS = 15 * 60 * 1000;
+/** Re-enqueue QUEUED jobs that were never claimed. */
+export const STALE_QUEUED_MS = 10 * 60 * 1000;
 
 const PLAN_PRIORITY: Record<Plan, number> = {
   FREE: 1,
@@ -102,20 +104,192 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function requeueStaleRunningJobs(bookId?: string) {
-  const staleBefore = new Date(Date.now() - STALE_RUNNING_MS);
-  await db.generationJob.updateMany({
+async function failJobAndBook(
+  jobId: string,
+  bookId: string,
+  error: string
+) {
+  await db.generationJob.update({
+    where: { id: jobId },
+    data: {
+      status: "FAILED",
+      error: error.slice(0, 2000),
+      completedAt: new Date(),
+    },
+  });
+  await db.book.updateMany({
+    where: {
+      id: bookId,
+      status: { notIn: ["PAUSED", "COMPLETED"] },
+    },
+    data: {
+      status: "FAILED",
+      errorMessage: error.slice(0, 2000),
+    },
+  });
+}
+
+export type GenerationSweepResult = {
+  staleRunningRequeued: number;
+  staleRunningFailed: number;
+  staleQueuedReenqueued: number;
+  orphanBooksFailed: number;
+  forceEnqueued: number;
+  errors: string[];
+};
+
+/**
+ * Recover stale RUNNING/QUEUED jobs and orphan GENERATING books.
+ * Used by ensureGenerationRunning and the generation-sweep cron.
+ */
+export async function recoverStaleGenerationJobs(options?: {
+  bookId?: string;
+  /** When true, force-restart CF workflows for requeued jobs. */
+  forceRestart?: boolean;
+}): Promise<GenerationSweepResult> {
+  const bookId = options?.bookId;
+  const forceRestart = options?.forceRestart ?? true;
+  const runner = getGenerationRunner();
+  const result: GenerationSweepResult = {
+    staleRunningRequeued: 0,
+    staleRunningFailed: 0,
+    staleQueuedReenqueued: 0,
+    orphanBooksFailed: 0,
+    forceEnqueued: 0,
+    errors: [],
+  };
+
+  const staleRunningBefore = new Date(Date.now() - STALE_RUNNING_MS);
+  const staleQueuedBefore = new Date(Date.now() - STALE_QUEUED_MS);
+
+  const staleRunning = await db.generationJob.findMany({
     where: {
       ...(bookId ? { bookId } : {}),
       status: "RUNNING",
-      updatedAt: { lt: staleBefore },
+      updatedAt: { lt: staleRunningBefore },
     },
-    data: {
-      status: "QUEUED",
-      error: "Stale RUNNING job — re-queued for worker",
-      startedAt: null,
-    },
+    include: { book: { select: { userId: true } } },
+    take: 50,
   });
+
+  for (const job of staleRunning) {
+    try {
+      if (job.attempts >= job.maxAttempts) {
+        await failJobAndBook(
+          job.id,
+          job.bookId,
+          `Generation stalled after ${job.attempts} attempts. Please resume to try again.`
+        );
+        result.staleRunningFailed++;
+        continue;
+      }
+
+      await db.generationJob.update({
+        where: { id: job.id },
+        data: {
+          status: "QUEUED",
+          error: "Stale RUNNING job — re-queued for worker",
+          startedAt: null,
+        },
+      });
+      result.staleRunningRequeued++;
+
+      if (runner === "cloudflare") {
+        await enqueueCloudflareGeneration({
+          bookId: job.bookId,
+          userId: job.book.userId,
+          jobId: job.id,
+          force: forceRestart,
+        });
+        result.forceEnqueued++;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      result.errors.push(`staleRunning ${job.id}: ${message.slice(0, 200)}`);
+    }
+  }
+
+  const staleQueued = await db.generationJob.findMany({
+    where: {
+      ...(bookId ? { bookId } : {}),
+      status: "QUEUED",
+      updatedAt: { lt: staleQueuedBefore },
+    },
+    include: { book: { select: { userId: true, status: true } } },
+    take: 50,
+  });
+
+  for (const job of staleQueued) {
+    try {
+      if (job.attempts >= job.maxAttempts) {
+        await failJobAndBook(
+          job.id,
+          job.bookId,
+          `Generation failed after ${job.attempts} attempts. Please resume to try again.`
+        );
+        result.staleRunningFailed++;
+        continue;
+      }
+
+      if (runner === "cloudflare") {
+        await enqueueCloudflareGeneration({
+          bookId: job.bookId,
+          userId: job.book.userId,
+          jobId: job.id,
+          force: forceRestart,
+        });
+        result.staleQueuedReenqueued++;
+        result.forceEnqueued++;
+      } else {
+        void processQueue();
+        result.staleQueuedReenqueued++;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      result.errors.push(`staleQueued ${job.id}: ${message.slice(0, 200)}`);
+    }
+  }
+
+  // Books stuck GENERATING/OUTLINING with no active job.
+  const orphanBooks = await db.book.findMany({
+    where: {
+      ...(bookId ? { id: bookId } : {}),
+      status: { in: ["GENERATING", "OUTLINING"] },
+      generationJobs: {
+        none: { status: { in: ["QUEUED", "RUNNING"] } },
+      },
+    },
+    select: { id: true, userId: true },
+    take: 40,
+  });
+
+  for (const book of orphanBooks) {
+    try {
+      await db.book.update({
+        where: { id: book.id },
+        data: {
+          status: "FAILED",
+          errorMessage:
+            "Generation stopped unexpectedly. Tap Resume to continue.",
+        },
+      });
+      result.orphanBooksFailed++;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      result.errors.push(`orphanBook ${book.id}: ${message.slice(0, 200)}`);
+    }
+  }
+
+  if (runner === "local") {
+    void processQueue();
+  }
+
+  return result;
+}
+
+/** @deprecated Prefer recoverStaleGenerationJobs — kept for call sites. */
+async function requeueStaleRunningJobs(bookId?: string) {
+  await recoverStaleGenerationJobs({ bookId, forceRestart: true });
 }
 
 /** Queue a generation without interactive transactions (Neon-pooler safe). */
@@ -143,38 +317,75 @@ export async function ensureGenerationRunning(
   const runner = getGenerationRunner();
 
   if (activeJob) {
-    if (runner === "cloudflare") {
-      try {
-        await enqueueCloudflareGeneration({
-          bookId,
-          userId,
+    if (activeJob.attempts >= activeJob.maxAttempts) {
+      await failJobAndBook(
+        activeJob.id,
+        bookId,
+        `Generation failed after ${activeJob.attempts} attempts. Please resume to try again.`
+      );
+      // Fall through to create a fresh job when resume=true, else stop.
+      if (!resume && book.status !== "FAILED" && book.status !== "PAUSED") {
+        return {
+          queued: false,
+          alreadyRunning: false,
           jobId: activeJob.id,
-        });
-      } catch (error) {
-        console.error("[generation] re-enqueue to Cloudflare failed:", error);
+          exhausted: true,
+        };
       }
     } else {
-      void processQueue();
+      if (runner === "cloudflare") {
+        try {
+          const staleHint =
+            activeJob.error?.includes("Stale RUNNING") ||
+            (activeJob.status === "QUEUED" &&
+              Date.now() - activeJob.updatedAt.getTime() > STALE_QUEUED_MS);
+          await enqueueCloudflareGeneration({
+            bookId,
+            userId,
+            jobId: activeJob.id,
+            // Never force-restart a healthy RUNNING workflow on normal resume.
+            force: staleHint,
+          });
+        } catch (error) {
+          console.error("[generation] re-enqueue to Cloudflare failed:", error);
+        }
+      } else {
+        void processQueue();
+      }
+      return { queued: false, alreadyRunning: true, jobId: activeJob.id };
     }
-    return { queued: false, alreadyRunning: true, jobId: activeJob.id };
   }
 
-  if (book.status === "PAUSED" && !resume) {
+  // Re-check after possible maxAttempts fail above.
+  const stillActive = await db.generationJob.findFirst({
+    where: { bookId, status: { in: ["QUEUED", "RUNNING"] } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (stillActive) {
+    return { queued: false, alreadyRunning: true, jobId: stillActive.id };
+  }
+
+  const freshBook = await db.book.findUniqueOrThrow({
+    where: { id: bookId, userId },
+    include: { user: true },
+  });
+
+  if (freshBook.status === "PAUSED" && !resume) {
     throw new GenerationPausedError();
   }
 
-  const remaining = book.user.pagesLimit - book.user.pagesUsed;
-  if (book.targetPages > remaining) {
+  const remaining = freshBook.user.pagesLimit - freshBook.user.pagesUsed;
+  if (freshBook.targetPages > remaining) {
     throw new Error(
       `Insufficient page credits. You have ${remaining} pages remaining.`
     );
   }
 
-  if (!isModelAvailable(book.model || DEFAULT_AI_MODEL, book.user.plan)) {
+  if (!isModelAvailable(freshBook.model || DEFAULT_AI_MODEL, freshBook.user.plan)) {
     throw new Error("This model requires a Pro or Enterprise plan.");
   }
 
-  if (book.status === "FAILED" || book.status === "PAUSED") {
+  if (freshBook.status === "FAILED" || freshBook.status === "PAUSED") {
     await db.book.update({
       where: { id: bookId },
       data: { status: "DRAFT", errorMessage: null },
@@ -186,13 +397,13 @@ export async function ensureGenerationRunning(
       bookId,
       type: "FULL_BOOK",
       status: "QUEUED",
-      priority: PLAN_PRIORITY[book.user.plan] ?? 1,
+      priority: PLAN_PRIORITY[freshBook.user.plan] ?? 1,
     },
   });
 
   await db.book.update({
     where: { id: bookId },
-    data: { status: "GENERATING" },
+    data: { status: "GENERATING", errorMessage: null },
   });
 
   if (runner === "cloudflare") {
@@ -204,17 +415,11 @@ export async function ensureGenerationRunning(
       });
     } catch (error) {
       console.error("[generation] enqueue to Cloudflare failed:", error);
-      await db.generationJob.update({
-        where: { id: job.id },
-        data: {
-          status: "FAILED",
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to enqueue Cloudflare worker",
-          completedAt: new Date(),
-        },
-      });
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to enqueue Cloudflare worker";
+      await failJobAndBook(job.id, bookId, message);
       throw error;
     }
   } else {
@@ -237,6 +442,15 @@ async function runQueuedJob(jobId: string, bookId: string, userId: string) {
       .update({
         where: { id: jobId },
         data: { status: "FAILED", error: message, completedAt: new Date() },
+      })
+      .catch(() => undefined);
+    await db.book
+      .updateMany({
+        where: {
+          id: bookId,
+          status: { notIn: ["PAUSED", "COMPLETED"] },
+        },
+        data: { status: "FAILED", errorMessage: message.slice(0, 2000) },
       })
       .catch(() => undefined);
   } finally {
@@ -271,13 +485,26 @@ async function claimNextQueuedJob(): Promise<{
 
       if (!candidate) return null;
 
+      if (candidate.attempts >= candidate.maxAttempts) {
+        await failJobAndBook(
+          candidate.id,
+          candidate.bookId,
+          `Generation failed after ${candidate.attempts} attempts. Please resume to try again.`
+        );
+        continue;
+      }
+
       if (activeBookIds.has(candidate.bookId)) {
         continue;
       }
 
       const claimed = await db.generationJob.updateMany({
         where: { id: candidate.id, status: "QUEUED" },
-        data: { status: "RUNNING", startedAt: new Date() },
+        data: {
+          status: "RUNNING",
+          startedAt: new Date(),
+          attempts: { increment: 1 },
+        },
       });
 
       if (claimed.count === 1) {

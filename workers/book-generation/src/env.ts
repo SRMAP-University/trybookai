@@ -13,4 +13,6 @@ export type GenerationParams = {
   bookId: string;
   userId: string;
   jobId: string;
+  /** Terminate hung workflow and start a fresh instance. */
+  force?: boolean;
 };
