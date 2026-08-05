@@ -46,8 +46,23 @@ function rememberDismiss() {
   }
 }
 
+function useIsPhone() {
+  const [isPhone, setIsPhone] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => setIsPhone(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  return isPhone;
+}
+
 export function AppDownloadDrawer() {
   const pathname = usePathname();
+  const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const downloadHref = apkUrl();
@@ -62,7 +77,7 @@ export function AppDownloadDrawer() {
   }, [pathname]);
 
   useEffect(() => {
-    if (!open || qrDataUrl) return;
+    if (!open || isPhone || qrDataUrl) return;
     let cancelled = false;
     void import("qrcode").then(async (QRCode) => {
       try {
@@ -80,7 +95,7 @@ export function AppDownloadDrawer() {
     return () => {
       cancelled = true;
     };
-  }, [open, downloadHref, qrDataUrl]);
+  }, [open, isPhone, downloadHref, qrDataUrl]);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -105,28 +120,31 @@ export function AppDownloadDrawer() {
             Get BookAI on Android
           </SheetTitle>
           <SheetDescription className="max-w-[340px] text-[14px] leading-relaxed text-[#697386]">
-            Scan the QR code with your phone, or download the APK. Updates can
-            arrive over the air.
+            {isPhone
+              ? "Install the Android app on this phone. Updates can arrive over the air."
+              : "Scan the QR code with your phone, or download the APK. Updates can arrive over the air."}
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-col items-center gap-5 px-6 pt-2">
-          <div className="rounded-2xl border border-[#e6ebf1] bg-[#f6f9fc] p-3">
-            {qrDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={qrDataUrl}
-                alt="QR code to download BookAI Android app"
-                width={180}
-                height={180}
-                className="h-[180px] w-[180px]"
-              />
-            ) : (
-              <div className="flex h-[180px] w-[180px] items-center justify-center text-[13px] text-[#697386]">
-                Loading QR…
-              </div>
-            )}
-          </div>
+          {!isPhone && (
+            <div className="rounded-2xl border border-[#e6ebf1] bg-[#f6f9fc] p-3">
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={qrDataUrl}
+                  alt="QR code to download BookAI Android app"
+                  width={180}
+                  height={180}
+                  className="h-[180px] w-[180px]"
+                />
+              ) : (
+                <div className="flex h-[180px] w-[180px] items-center justify-center text-[13px] text-[#697386]">
+                  Loading QR…
+                </div>
+              )}
+            </div>
+          )}
 
           <p className="text-[12px] text-[#697386]">Version {version}</p>
 
@@ -139,13 +157,24 @@ export function AppDownloadDrawer() {
             >
               Download APK
             </a>
-            <a
-              href="/download"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-[#e6ebf1] bg-white px-5 text-[14px] font-medium text-[#0a2540] transition-colors hover:bg-[#f6f9fc]"
-              onClick={() => rememberDismiss()}
-            >
-              Open download page
-            </a>
+            {!isPhone && (
+              <a
+                href="/download"
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-[#e6ebf1] bg-white px-5 text-[14px] font-medium text-[#0a2540] transition-colors hover:bg-[#f6f9fc]"
+                onClick={() => rememberDismiss()}
+              >
+                Open download page
+              </a>
+            )}
+            {isPhone && (
+              <a
+                href={downloadHref}
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-[#e6ebf1] bg-white px-5 text-[14px] font-medium text-[#0a2540] transition-colors hover:bg-[#f6f9fc]"
+                onClick={() => rememberDismiss()}
+              >
+                Direct install link
+              </a>
+            )}
           </div>
 
           <button

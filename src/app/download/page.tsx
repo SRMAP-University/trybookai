@@ -15,12 +15,12 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Download BookAI for Android",
   description:
-    "Download the BookAI Android app. Scan the QR code or use the direct APK link to install.",
+    "Download the BookAI Android app. Scan the QR code on desktop, or tap Download APK on your phone.",
   alternates: { canonical: `${getAppUrl()}/download` },
   openGraph: {
     title: "Download BookAI for Android",
     description:
-      "Download the BookAI Android app. Scan the QR code or use the direct APK link to install.",
+      "Download the BookAI Android app. Scan the QR code on desktop, or tap Download APK on your phone.",
     url: `${getAppUrl()}/download`,
     type: "website",
   },
@@ -48,12 +48,35 @@ export default async function DownloadPage() {
             <h1 className="landing-heading mt-3 text-center">
               Download BookAI
             </h1>
-            <p className="mx-auto mt-4 max-w-[520px] text-center text-[17px] leading-relaxed text-[#425466]">
-              Scan the QR code with your phone, or tap the download button to
-              install the APK. Updates can ship over-the-air via Shorebird.
+            <p className="mx-auto mt-4 max-w-[520px] text-center text-[17px] leading-relaxed text-[#425466] md:hidden">
+              Tap the button below to install the APK on this phone. Enable
+              “Install unknown apps” if Android asks.
+            </p>
+            <p className="mx-auto mt-4 hidden max-w-[520px] text-center text-[17px] leading-relaxed text-[#425466] md:block">
+              Scan the QR code with your phone, or use the download button.
+              Updates can ship over-the-air via Shorebird.
             </p>
 
-            <div className="mx-auto mt-12 grid max-w-[760px] gap-10 md:grid-cols-[280px_1fr] md:items-center">
+            <div className="mx-auto mt-10 max-w-[420px] space-y-4 md:hidden">
+              <p className="text-center text-[14px] font-medium text-[#0a2540]">
+                Version {ANDROID_APP_VERSION}
+              </p>
+              <a
+                href={apkUrl}
+                className="landing-btn-dark inline-flex w-full items-center justify-center"
+                download="bookai.apk"
+              >
+                Download APK
+              </a>
+              <a
+                href={apkUrl}
+                className="inline-flex w-full items-center justify-center rounded-full border border-[#e8e8e6] bg-white px-5 py-3 text-[15px] font-medium text-[#0a2540]"
+              >
+                Direct install link
+              </a>
+            </div>
+
+            <div className="mx-auto mt-12 hidden max-w-[760px] gap-10 md:grid md:grid-cols-[280px_1fr] md:items-center">
               <div className="mx-auto rounded-2xl border border-[#e8e8e6] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -61,7 +84,7 @@ export default async function DownloadPage() {
                   alt="QR code to download BookAI Android APK"
                   width={280}
                   height={280}
-                  className="h-[240px] w-[240px] sm:h-[280px] sm:w-[280px]"
+                  className="h-[280px] w-[280px]"
                 />
                 <p className="mt-3 text-center text-[13px] text-[#6b6b6b]">
                   Scan to download
@@ -81,7 +104,7 @@ export default async function DownloadPage() {
 
                 <a
                   href={apkUrl}
-                  className="landing-btn-dark inline-flex w-full items-center justify-center sm:w-auto"
+                  className="landing-btn-dark inline-flex w-auto items-center justify-center"
                   download="bookai.apk"
                 >
                   Download APK
@@ -112,7 +135,7 @@ export default async function DownloadPage() {
             </div>
 
             <ol className="mx-auto mt-14 max-w-[560px] list-decimal space-y-3 pl-5 text-[15px] leading-relaxed text-[#425466]">
-              <li>Open the download on your Android phone.</li>
+              <li>Tap Download APK on your Android phone.</li>
               <li>Allow installs from the browser if Android asks.</li>
               <li>Open the APK and tap Install.</li>
               <li>Sign in with the same BookAI account you use on the web.</li>
