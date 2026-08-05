@@ -11,6 +11,7 @@ import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/file_download.dart';
 import 'package:bookai_mobile/services/generation_stream.dart';
+import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/audiobook_player.dart';
 import 'package:bookai_mobile/widgets/common.dart';
@@ -253,6 +254,16 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     final ok =
         await context.read<BooksProvider>().startGeneration(widget.bookId);
     if (!mounted) return;
+    if (ok) {
+      final title = _book?.title ?? 'Your book';
+      unawaited(
+        context.read<PushNotificationService>().showLocal(
+          title: 'Generation started',
+          body: '"$title" is building now.',
+          bookId: widget.bookId,
+        ),
+      );
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(ok ? 'Generation started' : 'Could not start generation'),

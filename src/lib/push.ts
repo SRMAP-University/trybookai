@@ -112,10 +112,21 @@ async function sendFcm(
             title: payload.title,
             body: payload.body,
           },
-          data: payload.data ?? {},
+          // All data values must be strings. Duplicate title/body so the app
+          // can render when Android delivers a data-only foreground message.
+          data: Object.fromEntries(
+            Object.entries({
+              title: payload.title,
+              body: payload.body,
+              ...(payload.data ?? {}),
+            }).map(([k, v]) => [k, String(v ?? "")])
+          ),
           android: {
             priority: "HIGH",
-            notification: { channelId: "bookai_generation" },
+            notification: {
+              channelId: "bookai_generation",
+              notification_priority: "PRIORITY_HIGH",
+            },
           },
           apns: {
             payload: {
@@ -188,9 +199,20 @@ export async function notifyBookProgress(input: {
   bookId: string;
   title: string;
   progress: number;
-  phase: "outline" | "progress" | "completed" | "failed";
+  phase: "started" | "outline" | "progress" | "completed" | "failed";
 }) {
   const pct = Math.round(input.progress);
+  if (input.phase === "started") {
+    return sendPushToUser(input.userId, {
+      title: "Generation started",
+      body: `"${input.title}" is queued — building your outline now.`,
+      data: {
+        type: "book_started",
+        bookId: input.bookId,
+        progress: String(pct || 0),
+      },
+    });
+  }
   if (input.phase === "completed") {
     return sendPushToUser(input.userId, {
       title: "Book ready",

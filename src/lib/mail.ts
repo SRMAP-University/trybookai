@@ -13,13 +13,15 @@ let transporter: Transporter | null = null;
 
 export function isMailConfigured(): boolean {
   return Boolean(
-    cleanEnv(process.env.SMTP_HOST) && cleanEnv(process.env.SMTP_USER)
+    cleanEnv(process.env.SMTP_HOST) &&
+      cleanEnv(process.env.SMTP_USER) &&
+      cleanEnv(process.env.SMTP_PASS)
   );
 }
 
 function getFromAddress(): string {
   return (
-    cleanEnv(process.env.SMTP_FROM) || "BookAI <support@trybookai.com>"
+    cleanEnv(process.env.SMTP_FROM) || "BookAI <welcome@trybookai.com>"
   );
 }
 
@@ -30,19 +32,25 @@ function getTransporter(): Transporter {
   const user = cleanEnv(process.env.SMTP_USER);
   const pass = cleanEnv(process.env.SMTP_PASS);
 
-  if (!host || !user) {
-    throw new Error("SMTP is not configured (SMTP_HOST and SMTP_USER required).");
+  if (!host || !user || !pass) {
+    throw new Error(
+      "SMTP is not configured (SMTP_HOST, SMTP_USER, and SMTP_PASS required)."
+    );
   }
 
-  const port = Number(cleanEnv(process.env.SMTP_PORT) || "587");
+  // Cloudflare Email Service SMTP uses implicit TLS on 465.
+  // Generic providers (SendGrid, etc.) often use 587 + STARTTLS.
+  const port = Number(cleanEnv(process.env.SMTP_PORT) || "465");
   const secure =
-    cleanEnv(process.env.SMTP_SECURE) === "true" || port === 465;
+    cleanEnv(process.env.SMTP_SECURE) === "true" ||
+    cleanEnv(process.env.SMTP_SECURE) === "1" ||
+    port === 465;
 
   transporter = nodemailer.createTransport({
     host,
     port,
     secure,
-    auth: pass ? { user, pass } : { user, pass: "" },
+    auth: { user, pass },
   });
 
   return transporter;

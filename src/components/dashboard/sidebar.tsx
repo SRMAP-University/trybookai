@@ -23,6 +23,19 @@ import {
 import { PREMIUM_TRIAL } from "@/lib/constants";
 import { LogoMark } from "@/components/marketing/landing-showcase";
 
+function AndroidIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.43 11.43 0 0 0-8.94 0L5.65 5.67c-.19-.28-.54-.37-.83-.22-.3.16-.42.54-.26.85l1.84 3.18C4.17 11.03 2.39 14.25 2.39 17.8h19.22c0-3.55-1.78-6.77-3.99-8.32zM7 15.4a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm10 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z" />
+    </svg>
+  );
+}
+
 const navSections = [
   {
     label: "Workspace",
@@ -116,7 +129,22 @@ export function DashboardSidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-[#e6ebf1] p-3">
+      <div className="border-t border-[#e6ebf1] px-3 pt-3">
+        <Link
+          href="/download"
+          className={cn(
+            "mb-2 flex items-center gap-2.5 rounded-md px-3 py-2 text-[14px] transition-colors",
+            isActive(pathname, "/download")
+              ? "bg-[#f0fdf6] font-medium text-[#2bb673]"
+              : "text-[#3ddc84] hover:bg-[#f0fdf6] hover:text-[#2bb673]"
+          )}
+        >
+          <AndroidIcon className="h-4 w-4 shrink-0" />
+          Download for Android
+        </Link>
+      </div>
+
+      <div className="p-3 pt-0">
         <div
           className={cn(
             "rounded-md border px-2.5 py-2",

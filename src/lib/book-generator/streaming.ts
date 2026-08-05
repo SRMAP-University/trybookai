@@ -413,6 +413,17 @@ export async function runBookGeneration(
 
     await throwIfCancelled(bookId);
 
+    // Avoid re-spamming "started" on resume mid-book.
+    if ((book.progress ?? 0) <= 2) {
+      void notifyBookProgress({
+        userId,
+        bookId,
+        title: book.title,
+        progress: book.progress ?? 0,
+        phase: "started",
+      });
+    }
+
     if (!book.outline) {
       publisher({
         type: "phase",

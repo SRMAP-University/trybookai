@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
+import 'package:bookai_mobile/providers/new_book_draft_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
+import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 
@@ -38,9 +42,42 @@ class _NewBookScreenState extends State<NewBookScreen> {
   bool _audiobookAfter = true;
   bool _showAdvanced = false;
   String? _enhancing;
+  bool _restored = false;
+  NewBookDraftProvider? _draft;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _draft = context.read<NewBookDraftProvider>();
+    if (_restored) return;
+    _restored = true;
+    final draft = _draft!;
+    _title.text = draft.title;
+    _description.text = draft.description;
+    _customInstructions.text = draft.customInstructions;
+    _characters.text = draft.characters;
+    _genre = draft.genre;
+    _pages = draft.pages.clamp(20, 500);
+    _audiobookAfter = draft.audiobookAfter;
+    _showAdvanced = draft.showAdvanced;
+  }
+
+  void _persistDraft() {
+    _draft?.save(
+      title: _title.text,
+      description: _description.text,
+      customInstructions: _customInstructions.text,
+      characters: _characters.text,
+      genre: _genre,
+      pages: _pages,
+      audiobookAfter: _audiobookAfter,
+      showAdvanced: _showAdvanced,
+    );
+  }
 
   @override
   void dispose() {
+    _persistDraft();
     _title.dispose();
     _description.dispose();
     _customInstructions.dispose();
@@ -78,6 +115,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
       if (text != null && text.isNotEmpty) {
         controller.text = text;
         controller.selection = TextSelection.collapsed(offset: text.length);
+        _persistDraft();
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -103,6 +141,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
       return;
     }
     setState(() => _starting = true);
+    _persistDraft();
     final books = context.read<BooksProvider>();
     final book = await books.createBook(
       title: _title.text.trim(),
@@ -121,6 +160,15 @@ class _NewBookScreenState extends State<NewBookScreen> {
     if (!mounted) return;
     setState(() => _starting = false);
     if (book != null) {
+      _draft?.clear();
+      // Immediate local banner — server FCM also sends "started" once configured.
+      unawaited(
+        context.read<PushNotificationService>().showLocal(
+          title: 'Generation started',
+          body: '"${book.title}" is building now.',
+          bookId: book.id,
+        ),
+      );
       context.go('/books/${book.id}');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -169,6 +217,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
               hintText: 'The Quiet Algorithm',
             ),
             maxLength: 200,
+            onChanged: (_) => _persistDraft(),
           ),
           const SizedBox(height: 8),
           Row(
@@ -196,6 +245,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
             minLines: 4,
             maxLines: 8,
             maxLength: 5000,
+            onChanged: (_) => _persistDraft(),
           ),
           const SizedBox(height: 20),
           const Text(
@@ -211,7 +261,10 @@ class _NewBookScreenState extends State<NewBookScreen> {
               return ChoiceChip(
                 label: Text(g),
                 selected: selected,
-                onSelected: (_) => setState(() => _genre = g),
+                onSelected: (_) {
+                  setState(() => _genre = g);
+                  _persistDraft();
+                },
                 selectedColor: AppColors.primarySoft,
                 labelStyle: TextStyle(
                   color: selected ? AppColors.primary : AppColors.textBody,
@@ -249,7 +302,10 @@ class _NewBookScreenState extends State<NewBookScreen> {
             max: 500,
             divisions: 48,
             label: '${_pages.round()} pages',
-            onChanged: (v) => setState(() => _pages = v),
+            onChanged: (v) {
+              setState(() => _pages = v);
+              _persistDraft();
+            },
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -260,11 +316,17 @@ class _NewBookScreenState extends State<NewBookScreen> {
             ),
             value: _audiobookAfter,
             activeThumbColor: AppColors.primary,
-            onChanged: (v) => setState(() => _audiobookAfter = v),
+            onChanged: (v) {
+              setState(() => _audiobookAfter = v);
+              _persistDraft();
+            },
           ),
           const SizedBox(height: 8),
           OutlinedButton(
-            onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+            onPressed: () {
+              setState(() => _showAdvanced = !_showAdvanced);
+              _persistDraft();
+            },
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -304,6 +366,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
                     decoration: const InputDecoration(
                       hintText: 'One character per line',
                     ),
+                    onChanged: (_) => _persistDraft(),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -329,6 +392,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
                       hintText:
                           'Pacing, chapter endings, voice notes…',
                     ),
+                    onChanged: (_) => _persistDraft(),
                   ),
                 ],
               ),

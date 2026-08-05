@@ -1,14 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
+import 'package:bookai_mobile/providers/new_book_draft_provider.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/routing/app_page.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/services/revenuecat_service.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/screens/auth/boot_screen.dart';
 import 'package:bookai_mobile/screens/auth/login_screen.dart';
 import 'package:bookai_mobile/screens/auth/register_screen.dart';
 import 'package:bookai_mobile/screens/shell/main_shell.dart';
@@ -30,14 +34,46 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final api = ApiClient();
   final push = PushNotificationService(api);
-  await push.initialize();
   final revenueCat = RevenueCatService();
-  await revenueCat.configure();
   final auth = AuthProvider(api, push: push, revenueCat: revenueCat);
-  await auth.bootstrap();
+
+  // Show UI immediately. Auth / Firebase / RevenueCat must not block the splash.
+  // FCM getToken() and Purchases.configure() can hang without Play Services.
   runApp(
     BookAiApp(api: api, auth: auth, push: push, revenueCat: revenueCat),
   );
+
+  unawaited(() async {
+    try {
+      await auth.bootstrap().timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      debugPrint('[main] auth bootstrap timed out');
+      auth.finishLoading();
+    }
+    try {
+      await revenueCat.configure().timeout(const Duration(seconds: 8));
+      if (auth.isAuthenticated && auth.user != null) {
+        await revenueCat.logIn(auth.user!.id).timeout(const Duration(seconds: 8));
+      }
+    } on TimeoutException {
+      debugPrint('[main] RevenueCat configure timed out');
+    } catch (e) {
+      debugPrint('[main] RevenueCat init failed: $e');
+    }
+    try {
+      await push.initialize();
+      if (auth.isAuthenticated) {
+        await push.registerToken();
+      }
+      // Late auth / slow Play Services — register again shortly after boot.
+      await Future<void>.delayed(const Duration(seconds: 3));
+      if (auth.isAuthenticated) {
+        await push.registerToken();
+      }
+    } catch (e) {
+      debugPrint('[main] post-launch push init failed: $e');
+    }
+  }());
 }
 
 class BookAiApp extends StatefulWidget {
@@ -61,6 +97,7 @@ class BookAiApp extends StatefulWidget {
 class _BookAiAppState extends State<BookAiApp> {
   late final BooksProvider _books = BooksProvider(widget.api);
   late final PublicBooksProvider _public = PublicBooksProvider(widget.api);
+  late final NewBookDraftProvider _newBookDraft = NewBookDraftProvider();
   late final GoRouter _router = _buildRouter(widget.auth);
 
   @override
@@ -82,6 +119,7 @@ class _BookAiAppState extends State<BookAiApp> {
         ChangeNotifierProvider.value(value: widget.auth),
         ChangeNotifierProvider.value(value: _books),
         ChangeNotifierProvider.value(value: _public),
+        ChangeNotifierProvider.value(value: _newBookDraft),
       ],
       child: MaterialApp.router(
         title: 'BookAI',
@@ -98,20 +136,31 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 GoRouter _buildRouter(AuthProvider auth) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/home',
+    initialLocation: '/boot',
     refreshListenable: auth,
     redirect: (context, state) {
-      final loading = auth.loading;
+      final booting = auth.booting;
       final loggedIn = auth.isAuthenticated;
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/register';
+      final isBoot = loc == '/boot';
 
-      if (loading) return null;
+      // Neutral boot screen until the saved session is restored.
+      // Using /login here flashed the login page for logged-in users.
+      if (booting) {
+        return isBoot ? null : '/boot';
+      }
       if (!loggedIn && !isAuthRoute) return '/login';
-      if (loggedIn && isAuthRoute) return '/home';
+      if (loggedIn && (isAuthRoute || isBoot)) return '/home';
+      if (!loggedIn && isBoot) return '/login';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/boot',
+        pageBuilder: (context, state) =>
+            AppPage.none(state, const BootScreen()),
+      ),
       GoRoute(
         path: '/login',
         pageBuilder: (context, state) =>

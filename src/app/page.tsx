@@ -6,6 +6,7 @@ import { HowItWorks } from "@/components/marketing/how-it-works";
 import { Pricing } from "@/components/marketing/pricing";
 import { CTA } from "@/components/marketing/cta";
 import { Footer } from "@/components/marketing/footer";
+import { AppDownloadDrawer } from "@/components/app-download-drawer";
 import { getRecentLandingCovers } from "@/lib/landing-covers";
 import { getAppUrl } from "@/lib/book-public";
 
@@ -38,6 +39,7 @@ export default async function Home() {
         <CTA />
       </main>
       <Footer />
+      <AppDownloadDrawer />
     </div>
   );
 }

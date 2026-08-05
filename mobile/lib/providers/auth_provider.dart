@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/services/api_client.dart';
@@ -21,23 +23,39 @@ class AuthProvider extends ChangeNotifier {
   final RevenueCatService? _revenueCat;
   final GoogleAuthService _google;
   UserModel? user;
-  bool loading = true;
+  /// True only during cold-start session restore (not login/register submits).
+  bool booting = true;
+  /// True during login / register / Google sign-in network calls.
+  bool loading = false;
   String? error;
 
   bool get isAuthenticated => user != null;
 
-  Future<void> _linkRevenueCat(String userId) async {
+  void finishLoading() {
+    if (!booting) return;
+    booting = false;
+    notifyListeners();
+  }
+
+  /// Never await from UI-critical paths — Purchases.configure can hang.
+  void _linkRevenueCat(String userId) {
     final rc = _revenueCat;
     if (rc == null) return;
-    if (!rc.isConfigured) {
-      await rc.configure(appUserId: userId);
-    } else {
-      await rc.logIn(userId);
-    }
+    unawaited(() async {
+      try {
+        if (!rc.isConfigured) {
+          await rc.configure(appUserId: userId).timeout(const Duration(seconds: 8));
+        } else {
+          await rc.logIn(userId).timeout(const Duration(seconds: 8));
+        }
+      } catch (e) {
+        debugPrint('[auth] RevenueCat link failed: $e');
+      }
+    }());
   }
 
   Future<void> bootstrap() async {
-    loading = true;
+    booting = true;
     notifyListeners();
     try {
       if (!await _api.hasToken) {
@@ -46,13 +64,17 @@ class AuthProvider extends ChangeNotifier {
       }
       final res = await _api.dio.get(ApiConfig.me);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
-      await _linkRevenueCat(user!.id);
-      await _push?.registerToken();
+      _linkRevenueCat(user!.id);
+      // Push init may finish after bootstrap — retry registration.
+      unawaited(() async {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        await _push?.registerToken();
+      }());
     } catch (_) {
       await _api.setToken(null);
       user = null;
     } finally {
-      loading = false;
+      booting = false;
       notifyListeners();
     }
   }
@@ -69,8 +91,8 @@ class AuthProvider extends ChangeNotifier {
       final token = res.data['token'] as String;
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
-      await _linkRevenueCat(user!.id);
-      await _push?.registerToken();
+      _linkRevenueCat(user!.id);
+      unawaited(_push?.registerToken() ?? Future.value());
       return true;
     } catch (e) {
       error = _api.extractError(e);
@@ -103,8 +125,8 @@ class AuthProvider extends ChangeNotifier {
       final token = res.data['token'] as String;
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
-      await _linkRevenueCat(user!.id);
-      await _push?.registerToken();
+      _linkRevenueCat(user!.id);
+      unawaited(_push?.registerToken() ?? Future.value());
       return true;
     } catch (e) {
       error = _api.extractError(e);
@@ -132,8 +154,8 @@ class AuthProvider extends ChangeNotifier {
       final token = res.data['token'] as String;
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
-      await _linkRevenueCat(user!.id);
-      await _push?.registerToken();
+      _linkRevenueCat(user!.id);
+      unawaited(_push?.registerToken() ?? Future.value());
       return true;
     } catch (e) {
       error = _friendlyGoogleError(e);

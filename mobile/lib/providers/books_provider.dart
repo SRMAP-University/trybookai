@@ -40,6 +40,9 @@ class BooksProvider extends ChangeNotifier {
 
   Future<void> loadActiveJobs() async {
     try {
+      final prevActiveIds = {
+        for (final b in activeJobs?.books ?? const <BookModel>[]) b.id,
+      };
       final res = await _api.dio.get(ApiConfig.jobsActive);
       activeJobs = ActiveJobs.fromJson(res.data as Map<String, dynamic>);
       if (activeJobs != null) {
@@ -54,6 +57,15 @@ class BooksProvider extends ChangeNotifier {
             targetPages: live.targetPages,
           );
         }).toList();
+
+        // Books that left the active queue — refresh so completion notifies fire.
+        final nextIds = byId.keys.toSet();
+        for (final id in prevActiveIds.difference(nextIds)) {
+          final fresh = await fetchBook(id);
+          if (fresh != null) {
+            books = books.map((b) => b.id == id ? fresh : b).toList();
+          }
+        }
       }
       notifyListeners();
     } catch (_) {}

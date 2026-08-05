@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
+import 'package:bookai_mobile/services/generation_notify_watcher.dart';
+import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/global_generation_widget.dart';
 
@@ -18,6 +20,9 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   Timer? _jobsPoll;
+  Timer? _tokenRetry;
+  GenerationNotifyWatcher? _notifyWatcher;
+  BooksProvider? _books;
 
   static const _mainTabs = <_NavItem>[
     _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
@@ -30,18 +35,40 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final books = context.read<BooksProvider>();
+      final push = context.read<PushNotificationService>();
+      _books = books;
+      _notifyWatcher = GenerationNotifyWatcher(push);
+      books.addListener(_onBooksChanged);
       books.loadActiveJobs();
+      unawaited(push.registerToken());
       _jobsPoll = Timer.periodic(const Duration(seconds: 4), (_) {
         if (!mounted) return;
         context.read<BooksProvider>().loadActiveJobs();
       });
+      // Retry FCM registration a few times — getToken can fail on first launch.
+      var tries = 0;
+      _tokenRetry = Timer.periodic(const Duration(seconds: 20), (t) {
+        tries += 1;
+        unawaited(push.registerToken());
+        if (tries >= 6 || push.token != null) t.cancel();
+      });
     });
+  }
+
+  void _onBooksChanged() {
+    final books = _books;
+    final watcher = _notifyWatcher;
+    if (books == null || watcher == null) return;
+    watcher.observe(books.activeJobs, library: books.books);
   }
 
   @override
   void dispose() {
     _jobsPoll?.cancel();
+    _tokenRetry?.cancel();
+    _books?.removeListener(_onBooksChanged);
     super.dispose();
   }
 

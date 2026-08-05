@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardUserProvider } from "@/components/dashboard/user-context";
 import { GlobalGenerationWidget } from "@/components/dashboard/global-generation-widget";
 import { ExplorationNotice } from "@/components/dashboard/exploration-notice";
+import { AppDownloadDrawer } from "@/components/app-download-drawer";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
@@ -25,6 +26,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
           <MobileDashboardNav />
           <GlobalGenerationWidget />
+          <AppDownloadDrawer />
         </div>
       </DashboardUserProvider>
     </SessionProvider>

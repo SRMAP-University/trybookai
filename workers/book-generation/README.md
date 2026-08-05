@@ -6,9 +6,10 @@ Durable book generation for BookAI. Vercel inserts a `GenerationJob` (`QUEUED`) 
 
 1. Next.js (`GENERATION_RUNNER=cloudflare`) → `POST /enqueue` with `{ bookId, userId, jobId, force? }`
 2. Worker creates a `BookGenerationWorkflow` instance (and optionally queues a backup message). With `force: true`, terminates a hung instance and starts `job-{id}-r{ts}`.
-3. Steps: `claim` → `outline` → `section:{id}`… → `finalize` (heartbeats during long AI calls)
-4. Progress/SSE stay on Vercel via DB polling (`watchGenerationStream`)
-5. Vercel cron `/api/cron/generation-sweep` every 5m requeues stale jobs and force-restarts hung workflows
+3. Steps: `claim` → `outline` → `cover` → `section:{id}`… → `finalize` (heartbeats during long AI calls)
+4. Cover images: worker POSTs `${APP_NOTIFY_URL}/api/internal/cover` (Bearer secret). Vercel runs Workers AI image models + R2 upload. Finalize retries if the cover step failed.
+5. Progress/SSE stay on Vercel via DB polling (`watchGenerationStream`)
+6. Worker cron (`*/5 * * * *`) requeues stale jobs and force-restarts hung workflows. Vercel also runs `/api/cron/generation-sweep` daily (Hobby plan limit).
 
 Cancel: Vercel sets `Book.status = PAUSED` and fails active jobs; each step calls `assertNotPaused` and stops.
 

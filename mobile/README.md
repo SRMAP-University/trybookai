@@ -31,3 +31,28 @@ flutter run --dart-define=API_BASE=http://10.0.2.2:3000
 - Audio studio
 - Billing (Stripe Checkout / portal in browser)
 - Account, usage, writing defaults
+
+## Shorebird (OTA updates)
+
+```bash
+cd mobile
+shorebird init          # once
+shorebird release android --artifact apk --build-name 1.0.1 --build-number 2
+```
+
+Then upload the APK to R2 and refresh the website download page:
+
+```bash
+# from repo root
+node scripts/upload-android-apk.mjs
+```
+
+Stable public URL: `{R2_PUBLIC_BASE_URL}/apps/bookai-android.apk`  
+Website QR / download: https://www.trybookai.com/download
+
+Push a Dart-only OTA patch later (same release version):
+
+```bash
+cd mobile
+shorebird patch android
+```

@@ -14,20 +14,20 @@ type PlanGate = "FREE" | "PRO" | "ENTERPRISE" | "UNLIMITED";
 
 export const AI_MODELS: readonly AiModelConfig[] = [
   {
-    value: "deepseek-r1",
-    label: "DeepSeek R1",
-    description: "Cloudflare Workers AI — reasoning & long-form prose",
-    plans: ["FREE", "PRO", "ENTERPRISE", "UNLIMITED"],
-    provider: "cloudflare",
-    cfModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
-  },
-  {
     value: "llama-3.3",
     label: "Llama 3.3 70B",
-    description: "Cloudflare Workers AI — fast general writing",
+    description: "Fast default — strong long-form writing (recommended)",
     plans: ["FREE", "PRO", "ENTERPRISE", "UNLIMITED"],
     provider: "cloudflare",
     cfModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  },
+  {
+    value: "deepseek-r1",
+    label: "DeepSeek R1",
+    description: "Slower — deep reasoning (higher quality, much longer waits)",
+    plans: ["FREE", "PRO", "ENTERPRISE", "UNLIMITED"],
+    provider: "cloudflare",
+    cfModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
   },
   {
     value: "qwen-32b",
@@ -39,16 +39,17 @@ export const AI_MODELS: readonly AiModelConfig[] = [
   },
 ] as const;
 
-export const DEFAULT_AI_MODEL = "deepseek-r1";
+/** Fast non-reasoning model. R1 is opt-in — its think phase makes books very slow. */
+export const DEFAULT_AI_MODEL = "llama-3.3";
 
 /** Faster model for structured JSON outlines (avoid slow reasoning models). */
 export const OUTLINE_AI_MODEL = "llama-3.3";
 
 /** Legacy OpenAI model ids stored on older books/settings → Cloudflare default */
 const LEGACY_MODEL_MAP: Record<string, string> = {
-  "gpt-4o": "deepseek-r1",
+  "gpt-4o": "llama-3.3",
   "gpt-4o-mini": "llama-3.3",
-  openai: "deepseek-r1",
+  openai: "llama-3.3",
 };
 
 export function normalizeModelId(modelId: string): string {

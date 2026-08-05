@@ -281,7 +281,7 @@ async function buildPodcastEpisodes(book: {
   const episodeCount = Math.min(Math.max(book.chapters.length, 3), 6);
 
   const raw = await createChatCompletion({
-    model: book.model || "deepseek-r1",
+    model: book.model || "llama-3.3",
     temperature: 0.7,
     json: true,
     max_tokens: 4096,

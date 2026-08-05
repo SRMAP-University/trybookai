@@ -85,7 +85,7 @@ model User {
   defaultPov           String  @default("third")
   defaultTense         String  @default("past")
   defaultLanguage      String  @default("en")
-  defaultModel         String  @default("deepseek-r1")
+  defaultModel         String  @default("llama-3.3")
   defaultCreativity    Float   @default(0.7)
   defaultWordsPerPage  Int     @default(300)
   defaultSectionsPerChapter Int @default(4)
@@ -199,7 +199,7 @@ model Book {
   characters          Json?
   themes              Json?
   forbiddenTopics     String? @db.Text
-  model               String  @default("deepseek-r1")
+  model               String  @default("llama-3.3")
   creativity          Float   @default(0.7)
   templateId          String?
   coverImage          String? @db.Text

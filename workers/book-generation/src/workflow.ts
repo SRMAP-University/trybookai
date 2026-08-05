@@ -5,6 +5,7 @@ import {
 } from "cloudflare:workers";
 import type { Env, GenerationParams } from "./env";
 import { withSql } from "./lib/db";
+import { ensureBookCover } from "./lib/cover";
 import {
   claimJob,
   failJob,
@@ -36,7 +37,7 @@ export class BookGenerationWorkflow extends WorkflowEntrypoint<
         { retries: { limit: 3, delay: "5 seconds", backoff: "linear" } },
         async () => {
           await withSql(this.env, async (sql) => {
-            await claimJob(sql, jobId, bookId);
+            await claimJob(sql, this.env, jobId, bookId);
           });
           return { ok: true };
         }
@@ -51,6 +52,18 @@ export class BookGenerationWorkflow extends WorkflowEntrypoint<
           );
         }
       );
+
+      // Cover runs on the Next.js app (R2 + image models). Never throw — a
+      // missing cover must not abort prose; finalize retries if still empty.
+      await step.do("cover", async () => {
+        return withSql(this.env, async (sql) => {
+          const result = await ensureBookCover(sql, this.env, bookId);
+          if (result.error) {
+            console.warn(`[workflow] cover failed for ${bookId}:`, result.error);
+          }
+          return result;
+        });
+      });
 
       const sections = await step.do("list-sections", async () => {
         return withSql(this.env, async (sql) =>

@@ -6,10 +6,13 @@ BookAI sends push notifications when a book is generating and when it finishes.
 
 | Event | Notification |
 |---|---|
+| Job claimed / generation begins | “Generation started” |
 | Outline ready | “Writing started” |
 | Progress ~25% / 50% / 75% | “Book in progress” |
 | Completed | “Book ready” |
 | Failed | “Generation stopped” |
+
+> **Required:** `FIREBASE_SERVICE_ACCOUNT_JSON` on Vercel (Firebase project `bookai-eedf3`). Without it, server pushes are no-ops (`firebase_not_configured`). The app still shows a local “Generation started” banner when you create a book.
 
 Tap opens the book detail screen. Users can disable pushes in **Account → Settings → Push notifications**.
 

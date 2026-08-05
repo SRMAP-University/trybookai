@@ -194,11 +194,13 @@ export async function createChatCompletion(
       )
     : options.messages;
 
-  return runCloudflareAi(runtimeModel, {
+  const raw = await runCloudflareAi(runtimeModel, {
     messages,
     temperature,
     max_tokens,
   });
+  // DeepSeek R1 and similar models may wrap answers in <think>…</think>.
+  return extractModelText(raw);
 }
 
 export async function streamChatCompletion(

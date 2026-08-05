@@ -7,6 +7,7 @@ import {
   runAi,
   stripThinking,
 } from "./ai";
+import { ensureBookCover } from "./cover";
 import { notifyApp } from "./notify";
 import { resolveGenerationShape } from "./shape";
 
@@ -95,7 +96,12 @@ async function withAiHeartbeat<T>(
   }
 }
 
-export async function claimJob(sql: Sql, jobId: string, bookId: string) {
+export async function claimJob(
+  sql: Sql,
+  env: Env,
+  jobId: string,
+  bookId: string
+) {
   await assertNotPaused(sql, bookId);
 
   const existing = await sql<
@@ -129,6 +135,8 @@ export async function claimJob(sql: Sql, jobId: string, bookId: string) {
     throw new Error(err);
   }
 
+  const firstClaim = existing[0].attempts === 0;
+
   const claimed = await sql`
     UPDATE "GenerationJob"
     SET
@@ -149,6 +157,19 @@ export async function claimJob(sql: Sql, jobId: string, bookId: string) {
     WHERE id = ${bookId} AND status <> 'PAUSED' AND status <> 'COMPLETED'
   `;
   await heartbeatJob(sql, jobId, { phase: "claimed", at: new Date().toISOString() });
+
+  if (firstClaim) {
+    const book = await getBook(sql, bookId).catch(() => null);
+    if (book) {
+      void notifyApp(env, {
+        userId: book.userId,
+        bookId,
+        phase: "started",
+        progress: 0,
+        title: book.title,
+      });
+    }
+  }
 }
 
 async function getBook(sql: Sql, bookId: string): Promise<BookRow> {
@@ -661,7 +682,20 @@ export async function finalizeJob(
     title: book.title,
   });
 
-  return { cancelled: false as const, generateAudiobookOnComplete: book.generateAudiobookOnComplete };
+  // Backstop: cover may have failed earlier without blocking writing.
+  const cover = await ensureBookCover(sql, env, bookId).catch((error) => {
+    console.warn(
+      `[finalize] cover backstop failed for ${bookId}:`,
+      error instanceof Error ? error.message : error
+    );
+    return { coverImage: null as string | null };
+  });
+
+  return {
+    cancelled: false as const,
+    generateAudiobookOnComplete: book.generateAudiobookOnComplete,
+    coverImage: cover.coverImage,
+  };
 }
 
 export async function failJob(

@@ -12,7 +12,14 @@ export const runtime = "nodejs";
 const schema = z.object({
   userId: z.string().min(1),
   bookId: z.string().min(1),
-  phase: z.enum(["outline", "progress", "completed", "failed", "custom"]),
+  phase: z.enum([
+    "started",
+    "outline",
+    "progress",
+    "completed",
+    "failed",
+    "custom",
+  ]),
   progress: z.number().min(0).max(100).optional(),
   title: z.string().optional(),
   /** For custom messages */

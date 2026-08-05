@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { DEFAULT_AI_MODEL } from "@/lib/ai-models";
-import { createChatCompletion } from "@/lib/book-generator/llm";
+import { OUTLINE_AI_MODEL } from "@/lib/ai-models";
+import {
+  createChatCompletion,
+  extractModelText,
+} from "@/lib/book-generator/llm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,15 +99,16 @@ export async function POST(request: Request) {
   ].filter(Boolean);
 
   try {
+    // Llama (not DeepSeek R1) — enhance is short-form and must not leak reasoning.
     const enhanced = await createChatCompletion({
-      model: DEFAULT_AI_MODEL,
+      model: OUTLINE_AI_MODEL,
       temperature: 0.75,
       max_tokens: 1200,
       messages: [
         {
           role: "system",
           content: `You are BookAI's prompt enhancer. Improve author inputs for high-quality book generation.
-Output only the enhanced text — no markdown fences, titles, or commentary.`,
+Output only the enhanced text — no markdown fences, titles, commentary, or reasoning.`,
         },
         {
           role: "user",
@@ -123,8 +127,7 @@ Output only the enhanced text — no markdown fences, titles, or commentary.`,
       ],
     });
 
-    const cleaned = enhanced
-      .trim()
+    const cleaned = extractModelText(enhanced)
       .replace(/^```[\w]*\n?/, "")
       .replace(/\n?```$/, "")
       .trim();

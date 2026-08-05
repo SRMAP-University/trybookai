@@ -1,16 +1,16 @@
 const MODEL_MAP: Record<string, string> = {
-  "deepseek-r1": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
   "llama-3.3": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "deepseek-r1": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
   "qwen-32b": "@cf/qwen/qwen2.5-32b-instruct",
-  "gpt-4o": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+  "gpt-4o": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
   "gpt-4o-mini": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 };
 
 export const OUTLINE_CF_MODEL = MODEL_MAP["llama-3.3"];
 
 export function resolveCfModel(modelId: string | null | undefined): string {
-  if (!modelId) return MODEL_MAP["deepseek-r1"];
-  return MODEL_MAP[modelId] ?? MODEL_MAP["deepseek-r1"];
+  if (!modelId) return MODEL_MAP["llama-3.3"];
+  return MODEL_MAP[modelId] ?? MODEL_MAP["llama-3.3"];
 }
 
 export function extractText(result: unknown): string {

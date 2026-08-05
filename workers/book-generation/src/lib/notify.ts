@@ -1,6 +1,11 @@
 import type { Env } from "../env";
 
-export type NotifyPhase = "outline" | "progress" | "completed" | "failed";
+export type NotifyPhase =
+  | "started"
+  | "outline"
+  | "progress"
+  | "completed"
+  | "failed";
 
 export async function notifyApp(
   env: Env,

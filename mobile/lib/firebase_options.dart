@@ -1,25 +1,35 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
-/// Firebase options via `--dart-define` (or FlutterFire).
-///
-/// ```
-/// flutter run \
-///   --dart-define=FIREBASE_API_KEY=... \
-///   --dart-define=FIREBASE_APP_ID=... \
-///   --dart-define=FIREBASE_MESSAGING_SENDER_ID=... \
-///   --dart-define=FIREBASE_PROJECT_ID=... \
-///   --dart-define=FIREBASE_STORAGE_BUCKET=...
-/// ```
+/// Firebase options from `android/app/google-services.json`.
+/// Override any value with `--dart-define=FIREBASE_*=...` if needed.
 class DefaultFirebaseOptions {
-  static const _apiKey = String.fromEnvironment('FIREBASE_API_KEY');
-  static const _appId = String.fromEnvironment('FIREBASE_APP_ID');
-  static const _androidAppId = String.fromEnvironment('FIREBASE_ANDROID_APP_ID');
+  static const _apiKey = String.fromEnvironment(
+    'FIREBASE_API_KEY',
+    defaultValue: 'AIzaSyDSNZDyDlDt0sjlDVYZUQ3_neGbEJ3hXWM',
+  );
+  static const _appId = String.fromEnvironment(
+    'FIREBASE_APP_ID',
+    defaultValue: '1:675692627606:android:823e56eba2670cafe7a4b7',
+  );
+  static const _androidAppId = String.fromEnvironment(
+    'FIREBASE_ANDROID_APP_ID',
+    defaultValue: '1:675692627606:android:823e56eba2670cafe7a4b7',
+  );
   static const _iosAppId = String.fromEnvironment('FIREBASE_IOS_APP_ID');
   static const _iosApiKey = String.fromEnvironment('FIREBASE_IOS_API_KEY');
-  static const _senderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
-  static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
-  static const _storageBucket = String.fromEnvironment('FIREBASE_STORAGE_BUCKET');
+  static const _senderId = String.fromEnvironment(
+    'FIREBASE_MESSAGING_SENDER_ID',
+    defaultValue: '675692627606',
+  );
+  static const _projectId = String.fromEnvironment(
+    'FIREBASE_PROJECT_ID',
+    defaultValue: 'bookai-eedf3',
+  );
+  static const _storageBucket = String.fromEnvironment(
+    'FIREBASE_STORAGE_BUCKET',
+    defaultValue: 'bookai-eedf3.firebasestorage.app',
+  );
 
   static bool get isConfigured =>
       _projectId.isNotEmpty && _apiKey.isNotEmpty && _appId.isNotEmpty;

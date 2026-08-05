@@ -1,4 +1,5 @@
 import type { Env, GenerationParams } from "./env";
+import { sweepStaleJobs } from "./lib/sweep";
 
 export { BookGenerationWorkflow } from "./workflow";
 
@@ -203,6 +204,22 @@ export default {
         console.error("[queue] failed to start workflow:", error);
         msg.retry();
       }
+    }
+  },
+
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    try {
+      const result = await sweepStaleJobs(env, async (e, params) => {
+        const { restarted } = await startWorkflow(e, params);
+        return { restarted };
+      });
+      console.log("[cron/sweep]", JSON.stringify(result));
+    } catch (error) {
+      console.error("[cron/sweep] failed:", error);
     }
   },
 } satisfies ExportedHandler<Env, GenerationParams>;
