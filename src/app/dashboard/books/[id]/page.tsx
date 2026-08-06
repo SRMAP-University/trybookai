@@ -13,6 +13,7 @@ import {
   ImageIcon,
   Loader2,
   Lock,
+  MessageSquareWarning,
   PenLine,
   Play,
   RefreshCw,
@@ -35,6 +36,10 @@ import { useDashboardUser } from "@/components/dashboard/user-context";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
+import {
+  GenerationReviewDialog,
+  wasReviewDismissed,
+} from "@/components/dashboard/generation-review-dialog";
 
 interface Section {
   id: string;
@@ -167,9 +172,36 @@ function BookDetailPageContent() {
   const [audioPhaseMessage, setAudioPhaseMessage] = useState<string | null>(
     null
   );
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewMode, setReviewMode] = useState<
+    "completed" | "failed" | "manual"
+  >("completed");
+  const reviewPromptedRef = useRef(false);
   const audioWatchingRef = useRef(false);
   const liveRef = useRef<HTMLDivElement>(null);
   const { refresh: refreshUser } = useDashboardUser();
+
+  const promptGenerationReview = useCallback(
+    async (mode: "completed" | "failed") => {
+      if (!id || reviewPromptedRef.current) return;
+      if (wasReviewDismissed(id, mode)) return;
+      try {
+        const res = await fetch(`/api/books/${id}/feedback`);
+        if (res.ok) {
+          const data = await res.json();
+          if (mode === "completed" && data.hasCompletedReview) return;
+          if (mode === "failed" && data.hasFailedReview) return;
+        }
+      } catch {
+        /* still prompt */
+      }
+      reviewPromptedRef.current = true;
+      setReviewMode(mode);
+      // Let success/error toasts settle first
+      window.setTimeout(() => setReviewOpen(true), 700);
+    },
+    [id]
+  );
 
   const fetchBook = useCallback(async () => {
     const res = await fetch(`/api/books/${id}`);
@@ -358,6 +390,7 @@ function BookDetailPageContent() {
       } else {
         setDerivativesOpen(true);
       }
+      void promptGenerationReview("completed");
     }
 
     if (evt.type === "error") {
@@ -435,6 +468,9 @@ function BookDetailPageContent() {
           toast.error(message);
         }
         await fetchBook();
+        if (status === "FAILED") {
+          void promptGenerationReview("failed");
+        }
       }
     } finally {
       const status = await getBookStatus();
@@ -463,11 +499,15 @@ function BookDetailPageContent() {
         } else {
           setDerivativesOpen(true);
         }
+        void promptGenerationReview("completed");
+      } else if (status === "FAILED") {
+        void promptGenerationReview("failed");
       }
     }
   }
 
   async function startGeneration() {
+    reviewPromptedRef.current = false;
     setPhaseMessage("Starting…");
     setBook((prev) =>
       prev ? { ...prev, status: "GENERATING", errorMessage: null } : prev
@@ -817,6 +857,14 @@ function BookDetailPageContent() {
           .map((a) => a.type)}
       />
 
+      <GenerationReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        bookId={book.id}
+        bookTitle={book.title}
+        mode={reviewMode}
+      />
+
       <LiveGenerationDock
         open={dockOpen}
         minimized={dockMinimized}
@@ -901,6 +949,17 @@ function BookDetailPageContent() {
               {book.tone && (
                 <span className="text-[#697386]">· {book.tone}</span>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setReviewMode("manual");
+                  setReviewOpen(true);
+                }}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#635bff]"
+              >
+                <MessageSquareWarning className="h-3.5 w-3.5" />
+                Troubleshoot
+              </button>
             </div>
             {book.description && (
               <p className="mt-3 max-w-2xl text-[14px] text-[#425466]">

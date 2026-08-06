@@ -36,12 +36,36 @@ Future<void> main() async {
   final push = PushNotificationService(api);
   final revenueCat = RevenueCatService();
   final auth = AuthProvider(api, push: push, revenueCat: revenueCat);
+  final books = BooksProvider(api);
 
-  // Show UI immediately. Auth / Firebase / RevenueCat must not block the splash.
-  // FCM getToken() and Purchases.configure() can hang without Play Services.
+  // One gate before first frame: token read only (fast). Skip BootScreen → shell
+  // double-load by opening home/login directly and warming library in parallel.
+  var hasToken = false;
+  try {
+    hasToken = await api.hasToken.timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => false,
+    );
+  } catch (_) {
+    hasToken = false;
+  }
+  auth.primeStoredSession(hasToken);
+
   runApp(
-    BookAiApp(api: api, auth: auth, push: push, revenueCat: revenueCat),
+    BookAiApp(
+      api: api,
+      auth: auth,
+      books: books,
+      push: push,
+      revenueCat: revenueCat,
+      initialLocation: hasToken ? '/home' : '/login',
+    ),
   );
+
+  if (hasToken) {
+    unawaited(books.load());
+    unawaited(books.loadActiveJobs());
+  }
 
   unawaited(() async {
     try {
@@ -49,6 +73,10 @@ Future<void> main() async {
     } on TimeoutException {
       debugPrint('[main] auth bootstrap timed out');
       auth.finishLoading();
+    }
+    if (auth.canEnterApp) {
+      unawaited(books.load());
+      unawaited(books.loadActiveJobs());
     }
     try {
       await revenueCat.configure().timeout(const Duration(seconds: 8));
@@ -81,24 +109,30 @@ class BookAiApp extends StatefulWidget {
     super.key,
     required this.api,
     required this.auth,
+    required this.books,
     required this.push,
     required this.revenueCat,
+    required this.initialLocation,
   });
 
   final ApiClient api;
   final AuthProvider auth;
+  final BooksProvider books;
   final PushNotificationService push;
   final RevenueCatService revenueCat;
+  final String initialLocation;
 
   @override
   State<BookAiApp> createState() => _BookAiAppState();
 }
 
 class _BookAiAppState extends State<BookAiApp> {
-  late final BooksProvider _books = BooksProvider(widget.api);
   late final PublicBooksProvider _public = PublicBooksProvider(widget.api);
   late final NewBookDraftProvider _newBookDraft = NewBookDraftProvider();
-  late final GoRouter _router = _buildRouter(widget.auth);
+  late final GoRouter _router = _buildRouter(
+    widget.auth,
+    initialLocation: widget.initialLocation,
+  );
 
   @override
   void initState() {
@@ -117,7 +151,7 @@ class _BookAiAppState extends State<BookAiApp> {
         Provider.value(value: widget.push),
         ChangeNotifierProvider.value(value: widget.revenueCat),
         ChangeNotifierProvider.value(value: widget.auth),
-        ChangeNotifierProvider.value(value: _books),
+        ChangeNotifierProvider.value(value: widget.books),
         ChangeNotifierProvider.value(value: _public),
         ChangeNotifierProvider.value(value: _newBookDraft),
       ],
@@ -133,26 +167,32 @@ class _BookAiAppState extends State<BookAiApp> {
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter _buildRouter(AuthProvider auth) {
+GoRouter _buildRouter(
+  AuthProvider auth, {
+  required String initialLocation,
+}) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/boot',
+    initialLocation: initialLocation,
     refreshListenable: auth,
     redirect: (context, state) {
       final booting = auth.booting;
-      final loggedIn = auth.isAuthenticated;
+      final inApp = auth.canEnterApp;
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/register';
       final isBoot = loc == '/boot';
 
-      // Neutral boot screen until the saved session is restored.
-      // Using /login here flashed the login page for logged-in users.
+      // Token known at launch → open shell immediately (no BootScreen flash).
+      if (booting && auth.hasStoredSession) {
+        if (isBoot || isAuthRoute) return '/home';
+        return null;
+      }
+      // Rare path: still resolving session with no hint yet.
       if (booting) {
         return isBoot ? null : '/boot';
       }
-      if (!loggedIn && !isAuthRoute) return '/login';
-      if (loggedIn && (isAuthRoute || isBoot)) return '/home';
-      if (!loggedIn && isBoot) return '/login';
+      if (!inApp && !isAuthRoute) return '/login';
+      if (inApp && (isAuthRoute || isBoot)) return '/home';
       return null;
     },
     routes: [

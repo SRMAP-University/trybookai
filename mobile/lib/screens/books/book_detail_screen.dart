@@ -37,6 +37,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   bool _offeredAudio = false;
   bool _downloadingBook = false;
   bool _downloadingAudio = false;
+  bool _offeredReview = false;
   List<Map<String, dynamic>> _audios = [];
 
   @override
@@ -79,6 +80,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     final wasGenerating = _book?.isGenerating == true;
     final justCompleted =
         wasGenerating && book.status == 'COMPLETED';
+    final justFailed = wasGenerating && book.status == 'FAILED';
     final audioRunning = _audios.any(
       (a) => a['status'] == 'GENERATING' || a['status'] == 'PENDING',
     );
@@ -92,10 +94,172 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     if (justCompleted) {
       await _loadAudios();
       _maybeOfferAudiobook();
+      _maybeOfferReview(trigger: 'completed');
+    } else if (justFailed) {
+      _maybeOfferReview(trigger: 'failed');
     } else if (book.status == 'COMPLETED' && audioRunning) {
       // Pick up completed tracks without leaving the screen.
       await _loadAudios();
     }
+  }
+
+  void _maybeOfferReview({required String trigger}) {
+    if (_offeredReview || !mounted) return;
+    _offeredReview = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showReviewSheet(trigger: trigger);
+    });
+  }
+
+  Future<void> _showReviewSheet({required String trigger}) async {
+    String? sentiment;
+    final commentCtrl = TextEditingController();
+    final isFailed = trigger == 'failed';
+    final isManual = trigger == 'manual';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            8,
+            20,
+            28 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: StatefulBuilder(
+            builder: (ctx, setModal) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    isManual
+                        ? 'Report an issue'
+                        : isFailed
+                            ? 'Generation failed — how bad was it?'
+                            : 'How was this generation?',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isManual
+                        ? 'Tell us what’s wrong so we can fix it.'
+                        : 'Quick feedback helps us improve BookAI.',
+                    style: const TextStyle(color: AppColors.textMuted, height: 1.4),
+                  ),
+                  if (!isManual) ...[
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final opt in (isFailed
+                            ? const [
+                                ('disappointed', 'Frustrating'),
+                                ('ok', 'Annoying'),
+                                ('complaint', 'Broken'),
+                              ]
+                            : const [
+                                ('happy', 'Loved it'),
+                                ('ok', 'Okay'),
+                                ('disappointed', 'Disappointed'),
+                              ]))
+                          ChoiceChip(
+                            label: Text(opt.$2),
+                            selected: sentiment == opt.$1,
+                            onSelected: (_) =>
+                                setModal(() => sentiment = opt.$1),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: commentCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: isFailed || isManual
+                          ? 'What went wrong?'
+                          : 'Optional — what should we improve?',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton(
+                    onPressed: () async {
+                      final s = isManual ? 'complaint' : sentiment;
+                      if (s == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Pick how it went')),
+                        );
+                        return;
+                      }
+                      if ((s == 'complaint' || isManual) &&
+                          commentCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please describe the issue'),
+                          ),
+                        );
+                        return;
+                      }
+                      try {
+                        final api = context.read<ApiClient>();
+                        await api.dio.post(
+                          '${ApiConfig.books}/${widget.bookId}/feedback',
+                          data: {
+                            'sentiment': s,
+                            'trigger': isManual ? 'manual' : trigger,
+                            'rating': s == 'happy'
+                                ? 5
+                                : s == 'ok'
+                                    ? 3
+                                    : 1,
+                            'comment': commentCtrl.text.trim().isEmpty
+                                ? null
+                                : commentCtrl.text.trim(),
+                          },
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Thanks for the feedback')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          final msg = context.read<ApiClient>().extractError(e);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                msg.isNotEmpty ? msg : 'Could not send feedback',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Send feedback'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Not now'),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+    commentCtrl.dispose();
   }
 
   void _maybeOfferAudiobook() {
@@ -525,6 +689,11 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
               tooltip: 'Share',
             ),
           IconButton(
+            onPressed: () => _showReviewSheet(trigger: 'manual'),
+            icon: const Icon(Icons.report_problem_outlined),
+            tooltip: 'Troubleshoot',
+          ),
+          IconButton(
             onPressed: _openExport,
             icon: const Icon(Icons.open_in_new_rounded),
             tooltip: 'Open in web',
@@ -556,6 +725,18 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                             style: const TextStyle(
                               color: AppColors.textMuted,
                               fontSize: 13,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () =>
+                                _showReviewSheet(trigger: 'manual'),
+                            icon: const Icon(Icons.report_problem_outlined,
+                                size: 16),
+                            label: const Text('Troubleshoot'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
                             ),
                           ),
                           if (book.description != null &&

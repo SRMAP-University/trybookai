@@ -32,6 +32,15 @@ class RevenueCatService extends ChangeNotifier {
       return;
     }
 
+    if (!RevenueCatConfig.canConfigure) {
+      // Avoid fatal: Test Store keys crash release builds by design.
+      _lastError =
+          'RevenueCat skipped: set REVENUECAT_API_KEY to a goog_/appl_ public key for release builds.';
+      debugPrint('[RevenueCat] $_lastError');
+      notifyListeners();
+      return;
+    }
+
     try {
       await Purchases.setLogLevel(
         kDebugMode ? LogLevel.debug : LogLevel.info,

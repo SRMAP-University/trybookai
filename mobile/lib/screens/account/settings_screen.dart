@@ -196,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       Slider(
                         value: _targetPages,
-                        min: 20,
+                        min: 5,
                         max: 500,
                         divisions: 48,
                         onChanged: (v) => setState(() => _targetPages = v),

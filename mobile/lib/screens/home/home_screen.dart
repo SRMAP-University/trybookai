@@ -122,7 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
             if (books.loading && books.books.isEmpty)
-              const Center(child: CircularProgressIndicator())
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: LinearProgressIndicator(minHeight: 2),
+              )
             else if ((books.activeJobs?.books.isEmpty ?? true) &&
                 books.generating.isEmpty)
               StripeCard(

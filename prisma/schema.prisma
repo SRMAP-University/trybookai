@@ -115,6 +115,7 @@ model User {
   sessions Session[]
   books    Book[]
   pushTokens DevicePushToken[]
+  bookFeedbacks BookFeedback[]
 }
 
 /// FCM device tokens for mobile push notifications
@@ -221,11 +222,35 @@ model Book {
   chapters        Chapter[]
   generationJobs  GenerationJob[]
   audios          BookAudio[]
+  feedbacks       BookFeedback[]
 
   @@index([userId])
   @@index([status])
   @@index([isPublic])
   @@index([parentBookId])
+}
+
+/// User review / complaint after generation (or manual report from book page)
+model BookFeedback {
+  id        String   @id @default(cuid())
+  bookId    String
+  userId    String
+  /// 1–5 stars; null when it's a complaint-only report
+  rating    Int?
+  /// happy | ok | disappointed | complaint
+  sentiment String
+  /// completed | failed | manual
+  trigger   String
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([bookId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([sentiment])
 }
 
 model BookAudio {

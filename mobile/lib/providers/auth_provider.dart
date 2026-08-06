@@ -25,11 +25,22 @@ class AuthProvider extends ChangeNotifier {
   UserModel? user;
   /// True only during cold-start session restore (not login/register submits).
   bool booting = true;
+  /// Token found in secure storage — enough to open the app shell without BootScreen.
+  bool hasStoredSession = false;
   /// True during login / register / Google sign-in network calls.
   bool loading = false;
   String? error;
 
   bool get isAuthenticated => user != null;
+
+  /// Shell / router: allow app while `/me` is still in flight if a token exists.
+  bool get canEnterApp => user != null || hasStoredSession;
+
+  void primeStoredSession(bool value) {
+    hasStoredSession = value;
+    // No token → skip BootScreen entirely and open login on first frame.
+    if (!value) booting = false;
+  }
 
   void finishLoading() {
     if (!booting) return;
@@ -55,15 +66,16 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> bootstrap() async {
-    booting = true;
-    notifyListeners();
     try {
       if (!await _api.hasToken) {
         user = null;
+        hasStoredSession = false;
         return;
       }
+      hasStoredSession = true;
       final res = await _api.dio.get(ApiConfig.me);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
+      hasStoredSession = true;
       _linkRevenueCat(user!.id);
       // Push init may finish after bootstrap — retry registration.
       unawaited(() async {
@@ -73,6 +85,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {
       await _api.setToken(null);
       user = null;
+      hasStoredSession = false;
     } finally {
       booting = false;
       notifyListeners();
@@ -91,6 +104,7 @@ class AuthProvider extends ChangeNotifier {
       final token = res.data['token'] as String;
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
+      hasStoredSession = true;
       _linkRevenueCat(user!.id);
       unawaited(_push?.registerToken() ?? Future.value());
       return true;
@@ -125,6 +139,7 @@ class AuthProvider extends ChangeNotifier {
       final token = res.data['token'] as String;
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
+      hasStoredSession = true;
       _linkRevenueCat(user!.id);
       unawaited(_push?.registerToken() ?? Future.value());
       return true;
@@ -154,6 +169,7 @@ class AuthProvider extends ChangeNotifier {
       final token = res.data['token'] as String;
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
+      hasStoredSession = true;
       _linkRevenueCat(user!.id);
       unawaited(_push?.registerToken() ?? Future.value());
       return true;
@@ -196,6 +212,7 @@ class AuthProvider extends ChangeNotifier {
     await _google.signOut();
     await _api.setToken(null);
     user = null;
+    hasStoredSession = false;
     notifyListeners();
   }
 }

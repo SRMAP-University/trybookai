@@ -57,7 +57,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
     _customInstructions.text = draft.customInstructions;
     _characters.text = draft.characters;
     _genre = draft.genre;
-    _pages = draft.pages.clamp(20, 500);
+    _pages = draft.pages.clamp(5, 500);
     _audiobookAfter = draft.audiobookAfter;
     _showAdvanced = draft.showAdvanced;
   }
@@ -298,7 +298,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
           ),
           Slider(
             value: _pages,
-            min: 20,
+            min: 5,
             max: 500,
             divisions: 48,
             label: '${_pages.round()} pages',

@@ -30,7 +30,10 @@ class _BooksScreenState extends State<BooksScreen> {
       body: RefreshIndicator(
         onRefresh: books.load,
         child: books.loading && books.books.isEmpty
-            ? const Center(child: CircularProgressIndicator())
+            ? const Padding(
+                padding: EdgeInsets.all(24),
+                child: LinearProgressIndicator(minHeight: 2),
+              )
             : books.books.isEmpty
                 ? ListView(
                     children: const [
