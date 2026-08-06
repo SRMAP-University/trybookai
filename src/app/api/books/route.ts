@@ -5,6 +5,7 @@ import { createBookSlug } from "@/lib/book-public";
 import { DEFAULT_AI_MODEL, isModelAvailable } from "@/lib/ai-models";
 import { ensureGenerationRunning } from "@/lib/book-generator/background";
 import { maxBookPagesForUser, syncUserTrialState } from "@/lib/billing";
+import { getAppVersion, resolveClientSource } from "@/lib/client-source";
 import { z } from "zod";
 
 const createBookSchema = z.object({
@@ -94,6 +95,9 @@ export async function POST(request: Request) {
     ...bookData
   } = parsed.data;
 
+  const client = resolveClientSource(request);
+  const appVersion = getAppVersion(request);
+
   let book;
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -104,6 +108,7 @@ export async function POST(request: Request) {
           slug: createBookSlug(bookData.title),
           isPublic: true,
           ...bookData,
+          createdVia: client,
           generateAudiobookOnComplete: Boolean(generateAudiobookOnComplete),
           characters: characters ?? undefined,
           themes: themes ?? undefined,
@@ -134,7 +139,10 @@ export async function POST(request: Request) {
 
   if (shouldStart || user.autoGenerateOnCreate) {
     try {
-      await ensureGenerationRunning(book.id, session.user.id);
+      await ensureGenerationRunning(book.id, session.user.id, false, {
+        client,
+        appVersion,
+      });
     } catch (error) {
       console.error("Failed to start background generation:", error);
     }

@@ -50,6 +50,7 @@ export async function loadAdminOverview() {
           updatedAt: true,
           completedAt: true,
           createdAt: true,
+          createdVia: true,
           generateAudiobookOnComplete: true,
           genre: true,
           _count: { select: { chapters: true, generationJobs: true } },
@@ -66,6 +67,7 @@ export async function loadAdminOverview() {
           createdAt: true,
           completedAt: true,
           error: true,
+          payload: true,
         },
       }),
       db.book.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -220,16 +222,36 @@ export async function loadAdminOverview() {
     ).length;
     const dayBooks = books.filter(
       (b) => b.createdAt >= day && b.createdAt < next
+    );
+    const dayBooksApp = dayBooks.filter((b) =>
+      isAppCreatedVia(b.createdVia)
     ).length;
+    const dayBooksWeb = dayBooks.filter((b) => b.createdVia === "web").length;
     return {
       date: day.toISOString().slice(0, 10),
       jobs: dayJobs.length,
       completed: dayJobs.filter((j) => j.status === "COMPLETED").length,
       failed: dayJobs.filter((j) => j.status === "FAILED").length,
       signups: daySignups,
-      books: dayBooks,
+      books: dayBooks.length,
+      booksApp: dayBooksApp,
+      booksWeb: dayBooksWeb,
     };
   });
+
+  const createdViaAll = countCreatedVia(books.map((b) => b.createdVia));
+  const createdVia7d = countCreatedVia(
+    books.filter((b) => b.createdAt >= weekAgo).map((b) => b.createdVia)
+  );
+  const jobsByClient7d = countJobClients(recentJobs);
+  const appBooks = createdViaAll.ios + createdViaAll.android + createdViaAll.unknown;
+  const webBooks = createdViaAll.web;
+  const appBooks7d =
+    createdVia7d.ios + createdVia7d.android + createdVia7d.unknown;
+  const webBooks7d = createdVia7d.web;
+  const appJobs7d =
+    jobsByClient7d.ios + jobsByClient7d.android + jobsByClient7d.unknown;
+  const webJobs7d = jobsByClient7d.web;
 
   const atRisk = [...insights]
     .filter((i) => i.label === "frustrated" || i.label === "churning" || i.stuck)
@@ -260,6 +282,17 @@ export async function loadAdminOverview() {
             insights.reduce((s, i) => s + i.score, 0) / insights.length
           )
         : 0,
+      appBooks,
+      webBooks,
+      appBooks7d,
+      webBooks7d,
+      appJobs7d,
+      webJobs7d,
+    },
+    clients: {
+      booksAll: createdViaAll,
+      books7d: createdVia7d,
+      jobs7d: jobsByClient7d,
     },
     sentiment,
     gaps,
@@ -275,6 +308,51 @@ export async function loadAdminOverview() {
     champions,
     topImprovements: topImprovements(insights, gaps),
   };
+}
+
+type ClientCounts = {
+  ios: number;
+  android: number;
+  web: number;
+  unknown: number;
+};
+
+function emptyClientCounts(): ClientCounts {
+  return { ios: 0, android: 0, web: 0, unknown: 0 };
+}
+
+function isAppCreatedVia(via: string | null | undefined): boolean {
+  return via === "ios" || via === "android" || via === "unknown";
+}
+
+function countCreatedVia(values: Array<string | null | undefined>): ClientCounts {
+  const counts = emptyClientCounts();
+  for (const v of values) {
+    if (v === "ios") counts.ios += 1;
+    else if (v === "android") counts.android += 1;
+    else if (v === "unknown") counts.unknown += 1;
+    else counts.web += 1;
+  }
+  return counts;
+}
+
+function countJobClients(
+  jobs: Array<{ payload: unknown }>
+): ClientCounts {
+  const counts = emptyClientCounts();
+  for (const job of jobs) {
+    const payload =
+      job.payload && typeof job.payload === "object"
+        ? (job.payload as Record<string, unknown>)
+        : null;
+    const client = typeof payload?.client === "string" ? payload.client : null;
+    if (client === "ios") counts.ios += 1;
+    else if (client === "android") counts.android += 1;
+    else if (client === "unknown") counts.unknown += 1;
+    else if (client === "web") counts.web += 1;
+    else counts.web += 1; // legacy jobs without client → treat as web
+  }
+  return counts;
 }
 
 function topImprovements(insights: UserInsight[], gaps: ImprovementGap[]) {

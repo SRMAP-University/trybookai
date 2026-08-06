@@ -7,6 +7,13 @@ import { BarChart, StackedSentiment, StatCard } from "@/components/admin/charts"
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+type ClientCounts = {
+  ios: number;
+  android: number;
+  web: number;
+  unknown: number;
+};
+
 type Overview = {
   summary: {
     users: number;
@@ -19,6 +26,17 @@ type Overview = {
     completionRate: number;
     failRate: number;
     avgScore: number;
+    appBooks: number;
+    webBooks: number;
+    appBooks7d: number;
+    webBooks7d: number;
+    appJobs7d: number;
+    webJobs7d: number;
+  };
+  clients: {
+    booksAll: ClientCounts;
+    books7d: ClientCounts;
+    jobs7d: ClientCounts;
   };
   sentiment: Record<string, number>;
   gaps: Array<{
@@ -34,6 +52,8 @@ type Overview = {
     failed: number;
     signups: number;
     books: number;
+    booksApp: number;
+    booksWeb: number;
   }>;
   bookStatus: Record<string, number>;
   plans: Record<string, number>;
@@ -136,6 +156,53 @@ export default function AdarshOverviewPage() {
           hint="Higher = happier users"
         />
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="App books"
+          value={s.appBooks}
+          hint={`${s.appBooks7d} created in last 7d`}
+        />
+        <StatCard
+          label="Web books"
+          value={s.webBooks}
+          hint={`${s.webBooks7d} created in last 7d`}
+        />
+        <StatCard
+          label="App jobs (7d)"
+          value={s.appJobs7d}
+          hint="Generation starts from mobile"
+        />
+        <StatCard
+          label="Web jobs (7d)"
+          value={s.webJobs7d}
+          hint="Generation starts from web"
+        />
+      </div>
+
+      <section className="rounded-xl border border-[#e6ebf1] bg-white p-4 sm:p-5">
+        <h2 className="text-[14px] font-semibold">Clients</h2>
+        <p className="mb-4 text-[12px] text-[#697386]">
+          Books by create origin · jobs by who started generation (last 7 days)
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <ClientBreakdown
+            title="Books (all time)"
+            counts={data.clients.booksAll}
+          />
+          <ClientBreakdown
+            title="Books (7d)"
+            counts={data.clients.books7d}
+          />
+          <ClientBreakdown title="Jobs (7d)" counts={data.clients.jobs7d} />
+        </div>
+        <div className="mt-5">
+          <h3 className="mb-2 text-[12px] font-medium uppercase tracking-wider text-[#a3acb9]">
+            App book creates (14d)
+          </h3>
+          <BarChart data={data.daily} valueKey="booksApp" color="#0a2540" />
+        </div>
+      </section>
 
       <section className="rounded-xl border border-[#e6ebf1] bg-white p-4 sm:p-5">
         <h2 className="text-[14px] font-semibold">Where users feel</h2>
@@ -286,6 +353,50 @@ export default function AdarshOverviewPage() {
           </ul>
         </section>
       </div>
+    </div>
+  );
+}
+
+function ClientBreakdown({
+  title,
+  counts,
+}: {
+  title: string;
+  counts: ClientCounts;
+}) {
+  const rows: Array<{ key: keyof ClientCounts; label: string }> = [
+    { key: "ios", label: "iOS" },
+    { key: "android", label: "Android" },
+    { key: "web", label: "Web" },
+    { key: "unknown", label: "App (unspecified)" },
+  ];
+  const total = Math.max(
+    1,
+    counts.ios + counts.android + counts.web + counts.unknown
+  );
+
+  return (
+    <div className="rounded-lg border border-[#e6ebf1] px-3 py-2.5">
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#a3acb9]">
+        {title}
+      </p>
+      <ul className="space-y-1.5 text-[13px]">
+        {rows.map(({ key, label }) => {
+          const n = counts[key];
+          if (!n && key === "unknown") return null;
+          return (
+            <li key={key} className="flex items-center justify-between gap-2">
+              <span className="text-[#697386]">{label}</span>
+              <span className="tabular-nums font-medium text-[#0a2540]">
+                {n}
+                <span className="ml-1.5 text-[11px] font-normal text-[#a3acb9]">
+                  {Math.round((100 * n) / total)}%
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

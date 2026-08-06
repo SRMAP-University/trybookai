@@ -6,6 +6,12 @@ import {
   getGenerationRunner,
 } from "@/lib/book-generator/cloudflare-enqueue";
 import { type Plan } from "@/generated/prisma/client";
+import type { ClientSource } from "@/lib/client-source";
+
+export type EnsureGenerationOptions = {
+  client?: ClientSource;
+  appVersion?: string | null;
+};
 
 const MAX_CONCURRENT_GENERATIONS = 2;
 const QUEUE_POLL_MS = 15_000;
@@ -296,7 +302,8 @@ async function requeueStaleRunningJobs(bookId?: string) {
 export async function ensureGenerationRunning(
   bookId: string,
   userId: string,
-  resume = false
+  resume = false,
+  options: EnsureGenerationOptions = {}
 ) {
   await requeueStaleRunningJobs(bookId);
 
@@ -392,12 +399,19 @@ export async function ensureGenerationRunning(
     });
   }
 
+  const client = options.client ?? "web";
   const job = await db.generationJob.create({
     data: {
       bookId,
       type: "FULL_BOOK",
       status: "QUEUED",
       priority: PLAN_PRIORITY[freshBook.user.plan] ?? 1,
+      payload: {
+        client,
+        ...(options.appVersion ? { appVersion: options.appVersion } : {}),
+        startedAt: new Date().toISOString(),
+        resume: Boolean(resume),
+      },
     },
   });
 

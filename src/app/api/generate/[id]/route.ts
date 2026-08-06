@@ -4,6 +4,7 @@ import {
   ensureGenerationRunning,
   GenerationPausedError,
 } from "@/lib/book-generator/background";
+import { getAppVersion, resolveClientSource } from "@/lib/client-source";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,10 +20,15 @@ export async function POST(
 
   const { id } = await params;
   const resume = new URL(request.url).searchParams.get("resume") === "1";
+  const client = resolveClientSource(request);
+  const appVersion = getAppVersion(request);
 
   try {
     // Enqueues to Cloudflare Workflows (or local queue). Does not run prose on Vercel.
-    const result = await ensureGenerationRunning(id, session.user.id, resume);
+    const result = await ensureGenerationRunning(id, session.user.id, resume, {
+      client,
+      appVersion,
+    });
     return NextResponse.json(
       {
         queued: result.queued,

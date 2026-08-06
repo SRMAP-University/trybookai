@@ -5,6 +5,7 @@ import {
 } from "@/lib/book-generator/background";
 import { type StreamEvent } from "@/lib/book-generator/streaming";
 import { watchGenerationStream } from "@/lib/book-generator/watch";
+import { getAppVersion, resolveClientSource } from "@/lib/client-source";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,9 +30,14 @@ export async function POST(
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const resume = searchParams.get("resume") === "1";
+  const client = resolveClientSource(request);
+  const appVersion = getAppVersion(request);
 
   try {
-    await ensureGenerationRunning(id, session.user.id, resume);
+    await ensureGenerationRunning(id, session.user.id, resume, {
+      client,
+      appVersion,
+    });
   } catch (error) {
     if (error instanceof GenerationPausedError) {
       return new Response(JSON.stringify({ error: error.message, paused: true }), {

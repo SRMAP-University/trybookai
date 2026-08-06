@@ -7,6 +7,12 @@ class ApiConfig {
     defaultValue: 'https://www.trybookai.com',
   );
 
+  /// Must match `version:` in pubspec.yaml (name part before +build).
+  static const String appVersion = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '1.0.1',
+  );
+
   static const String login = '/api/mobile/auth/login';
   static const String register = '/api/mobile/auth/register';
   static const String google = '/api/mobile/auth/google';

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:bookai_mobile/config/api_config.dart';
@@ -12,6 +14,8 @@ class ApiClient {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'X-BookAI-Client': _clientPlatform,
+          'X-BookAI-App-Version': ApiConfig.appVersion,
         },
       ),
     );
@@ -23,6 +27,9 @@ class ApiClient {
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          // Ensure client headers survive any per-request overrides.
+          options.headers['X-BookAI-Client'] ??= _clientPlatform;
+          options.headers['X-BookAI-App-Version'] ??= ApiConfig.appVersion;
           handler.next(options);
         },
         onError: (error, handler) {
@@ -30,6 +37,12 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  static String get _clientPlatform {
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isAndroid) return 'android';
+    return 'unknown';
   }
 
   static const _tokenKey = 'bookai_mobile_token';
