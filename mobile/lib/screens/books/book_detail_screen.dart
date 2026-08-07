@@ -742,8 +742,9 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                           if (book.description != null &&
                               book.description!.isNotEmpty) ...[
                             const SizedBox(height: 12),
-                            Text(
+                            ExpandableText(
                               book.description!,
+                              maxLines: 3,
                               style: const TextStyle(
                                 color: AppColors.textBody,
                                 height: 1.45,

@@ -35,6 +35,7 @@ import {
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ExpandableDescription } from "@/components/ui/expandable-description";
 import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 import {
   GenerationReviewDialog,
@@ -962,9 +963,10 @@ function BookDetailPageContent() {
               </button>
             </div>
             {book.description && (
-              <p className="mt-3 max-w-2xl text-[14px] text-[#425466]">
-                {book.description}
-              </p>
+              <ExpandableDescription
+                text={book.description}
+                className="mt-3 text-[14px] text-[#425466]"
+              />
             )}
             </div>
           </div>

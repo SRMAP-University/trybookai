@@ -8,6 +8,7 @@ import { getAppUrl } from "@/lib/book-public";
 import { BookCover } from "@/components/dashboard/book-cover";
 import { BookAudioPanel } from "@/components/dashboard/book-audio-panel";
 import type { BookAudioItem } from "@/components/dashboard/book-audio-panel";
+import { ExpandableDescription } from "@/components/ui/expandable-description";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -177,9 +178,10 @@ export default async function PublicBookPage({ params }: Props) {
               {` · ${book.currentPages} pages`}
             </p>
             {book.description && (
-              <p className="mt-6 text-[16px] leading-relaxed text-[#425466]">
-                {book.description}
-              </p>
+              <ExpandableDescription
+                text={book.description}
+                className="mt-6 text-[16px] leading-relaxed text-[#425466]"
+              />
             )}
             </div>
           </header>

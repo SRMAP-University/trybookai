@@ -267,3 +267,81 @@ class CompactUsageStats extends StatelessWidget {
     );
   }
 }
+
+/// Collapsed preview of long text; tap to expand / collapse.
+class ExpandableText extends StatefulWidget {
+  const ExpandableText(
+    this.text, {
+    super.key,
+    this.maxLines = 3,
+    this.collapseChars = 160,
+    this.style,
+    this.expandLabel = 'Read more',
+    this.collapseLabel = 'Show less',
+  });
+
+  final String text;
+  final int maxLines;
+  /// Always treat as expandable when longer than this (reliable without layout).
+  final int collapseChars;
+  final TextStyle? style;
+  final String expandLabel;
+  final String collapseLabel;
+
+  @override
+  State<ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<ExpandableText> {
+  bool _expanded = false;
+
+  bool get _long {
+    final t = widget.text.trim();
+    return t.length > widget.collapseChars ||
+        '\n'.allMatches(t).length >= widget.maxLines;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = widget.style ??
+        const TextStyle(
+          color: AppColors.textBody,
+          height: 1.45,
+        );
+    final long = _long;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: long ? () => setState(() => _expanded = !_expanded) : null,
+          behavior: HitTestBehavior.opaque,
+          child: Text(
+            widget.text,
+            style: style,
+            maxLines: (!long || _expanded) ? null : widget.maxLines,
+            overflow: (!long || _expanded)
+                ? TextOverflow.visible
+                : TextOverflow.ellipsis,
+          ),
+        ),
+        if (long)
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                _expanded ? widget.collapseLabel : widget.expandLabel,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
