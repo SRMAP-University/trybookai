@@ -6,7 +6,8 @@ const nextConfig: NextConfig = {
     // Parent folder has another package-lock.json; pin the app root.
     root: path.join(__dirname),
   },
-  serverExternalPackages: ["pdf-parse"],
+  // pdfkit loads AFM font metrics from disk via __dirname; bundling breaks that path.
+  serverExternalPackages: ["pdf-parse", "pdfkit", "epub-gen-memory"],
   // Prefer www as canonical — apex is often misconfigured at DNS/CDN.
   redirects: async () => [
     {

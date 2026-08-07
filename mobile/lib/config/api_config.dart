@@ -32,7 +32,8 @@ class ApiConfig {
   static const String audio = '/api/audio';
   static const String publicBooks = '/api/public/books';
 
-  static String bookExport(String bookId) => '/api/books/$bookId/export';
+  static String bookExport(String bookId, {String format = 'md'}) =>
+      '/api/books/$bookId/export?format=$format';
 
   static String coverUrl(String? coverImage, String? slug) {
     if (coverImage != null &&

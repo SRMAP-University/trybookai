@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  ChevronDown,
   CopyPlus,
   Download,
   ExternalLink,
@@ -22,6 +23,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { BookCover } from "@/components/dashboard/book-cover";
 import { LiveGenerationDock } from "@/components/dashboard/live-generation-dock";
 import {
@@ -1055,16 +1062,35 @@ function BookDetailPageContent() {
                 Audio studio
               </Button>
             )}
-            <Button
-              variant="outline"
-              className="h-9 border-[#e6ebf1] text-[13px]"
-              asChild
-            >
-              <a href={`/api/books/${book.id}/export`}>
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-                Export Markdown
-              </a>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-9 border-[#e6ebf1] text-[13px]"
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  Export
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuItem asChild>
+                  <a href={`/api/books/${book.id}/export?format=pdf`}>
+                    PDF (.pdf)
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`/api/books/${book.id}/export?format=epub`}>
+                    EPUB (.epub)
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`/api/books/${book.id}/export?format=md`}>
+                    Markdown (.md)
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

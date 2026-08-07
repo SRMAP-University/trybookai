@@ -495,18 +495,67 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     );
   }
 
+  Future<String?> _pickExportFormat() async {
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+                child: Text(
+                  'Export book',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: const Text('PDF'),
+                subtitle: const Text('Printable document (.pdf)'),
+                onTap: () => Navigator.pop(ctx, 'pdf'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text('EPUB'),
+                subtitle: const Text('E-reader format (.epub)'),
+                onTap: () => Navigator.pop(ctx, 'epub'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('Markdown'),
+                subtitle: const Text('Plain manuscript (.md)'),
+                onTap: () => Navigator.pop(ctx, 'md'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _downloadBook() async {
     final book = _book;
     if (book == null || _downloadingBook) return;
+    final format = await _pickExportFormat();
+    if (format == null || !mounted) return;
+
     setState(() => _downloadingBook = true);
     final dl = FileDownloadService(context.read<ApiClient>());
     try {
       final filename = FileDownloadService.safeFilename(
         book.title,
-        extension: 'md',
+        extension: format,
       );
       await dl.downloadApiAndShare(
-        path: ApiConfig.bookExport(widget.bookId),
+        path: ApiConfig.bookExport(widget.bookId, format: format),
         filename: filename,
         subject: book.title,
       );
@@ -959,7 +1008,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                     label: Text(
                                       _downloadingBook
                                           ? 'Downloading…'
-                                          : 'Book (.md)',
+                                          : 'Export book',
                                     ),
                                   ),
                                 ),

@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import {
+  buildExportBuffer,
+  exportContentType,
+  exportFilename,
+  parseExportFormat,
+} from "@/lib/book-export";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -12,6 +21,15 @@ export async function GET(
   }
 
   const { id } = await params;
+  const format = parseExportFormat(
+    new URL(request.url).searchParams.get("format")
+  );
+  if (!format) {
+    return NextResponse.json(
+      { error: "Invalid format. Use md, pdf, or epub." },
+      { status: 400 }
+    );
+  }
 
   const book = await db.book.findFirst({
     where: { id, userId: session.user.id },
@@ -43,66 +61,15 @@ export async function GET(
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
 
-  const { user } = book;
-  const lines: string[] = [];
+  const body = await buildExportBuffer(book, format);
+  const filename = exportFilename(book.title, format);
+  const bytes =
+    typeof body === "string" ? Buffer.from(body, "utf8") : body;
 
-  if (user.includeBrandInExport) {
-    const imprint = user.imprintName || user.brandName;
-    if (imprint) {
-      lines.push(`*${imprint}*`, "");
-    }
-  }
-
-  lines.push(`# ${book.title}`, "");
-
-  if (user.includeBrandInExport && user.authorName) {
-    lines.push(`**by ${user.authorName}**`, "");
-  }
-
-  if (user.includeBrandInExport && user.brandTagline) {
-    lines.push(`> ${user.brandTagline}`, "");
-  }
-
-  if (book.description) {
-    lines.push(book.description, "");
-  }
-
-  if (user.includeBrandInExport && user.dedicationDefault) {
-    lines.push("---", "", `*${user.dedicationDefault}*`, "");
-  }
-
-  lines.push("---", "");
-
-  for (const chapter of book.chapters) {
-    lines.push(`## Chapter ${chapter.number}: ${chapter.title}`, "");
-    if (chapter.summary) {
-      lines.push(`*${chapter.summary}*`, "");
-    }
-
-    for (const section of chapter.sections) {
-      lines.push(`### ${section.title}`, "");
-      lines.push(section.content ?? "_Not generated yet._", "");
-    }
-  }
-
-  if (user.includeBrandInExport) {
-    lines.push("---", "");
-    if (user.copyrightNotice) {
-      lines.push(user.copyrightNotice, "");
-    } else {
-      const name = user.brandName || user.authorName || user.name || "BookAI";
-      lines.push(`© ${new Date().getFullYear()} ${name}. All rights reserved.`, "");
-    }
-    if (user.exportFooter) lines.push(user.exportFooter, "");
-    if (user.websiteUrl) lines.push(user.websiteUrl, "");
-  }
-
-  const markdown = lines.join("\n");
-
-  return new NextResponse(markdown, {
+  return new NextResponse(new Uint8Array(bytes), {
     headers: {
-      "Content-Type": "text/markdown; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${book.title.replace(/[^a-z0-9-_ ]/gi, "").trim() || "book"}.md"`,
+      "Content-Type": exportContentType(format),
+      "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
 }
