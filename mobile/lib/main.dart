@@ -250,6 +250,8 @@ GoRouter _buildRouter(
                       state,
                       BookDetailScreen(
                         bookId: state.pathParameters['id']!,
+                        promptGenerate:
+                            state.uri.queryParameters['generate'] == '1',
                       ),
                     ),
                   ),

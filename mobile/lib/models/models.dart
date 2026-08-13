@@ -47,6 +47,11 @@ class UserModel {
   double get pagesPercent =>
       pagesLimit <= 0 ? 0 : (pagesUsed / pagesLimit).clamp(0, 1);
 
+  bool get isPaid =>
+      plan == 'PRO' || plan == 'ENTERPRISE' || plan == 'UNLIMITED';
+
+  int get pagesRemaining => (pagesLimit - pagesUsed).clamp(0, pagesLimit);
+
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as String,

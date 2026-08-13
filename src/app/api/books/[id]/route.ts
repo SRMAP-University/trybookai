@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
 import { canMakePrivate } from "@/lib/book-public";
 import { getEditionRootId } from "@/lib/book-editions";
 import { z } from "zod";
@@ -16,56 +16,72 @@ export async function GET(
 
   const { id } = await params;
 
-  const book = await db.book.findFirst({
-    where: { id, userId: session.user.id },
-    include: {
-      chapters: {
-        orderBy: { number: "asc" },
+  try {
+    const book = await withDbRetry("book.get", () =>
+      db.book.findFirst({
+        where: { id, userId: session.user.id },
         include: {
-          sections: { orderBy: { number: "asc" } },
+          chapters: {
+            orderBy: { number: "asc" },
+            include: {
+              sections: { orderBy: { number: "asc" } },
+            },
+          },
+          generationJobs: {
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
+          audios: {
+            orderBy: { createdAt: "desc" },
+            include: {
+              tracks: { orderBy: { number: "asc" } },
+            },
+          },
+          user: { select: { plan: true } },
         },
-      },
-      generationJobs: {
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-      audios: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          tracks: { orderBy: { number: "asc" } },
-        },
-      },
-      user: { select: { plan: true } },
-    },
-  });
+      })
+    );
 
-  if (!book) {
-    return NextResponse.json({ error: "Book not found" }, { status: 404 });
+    if (!book) {
+      return NextResponse.json({ error: "Book not found" }, { status: 404 });
+    }
+
+    const rootId = getEditionRootId(book);
+    const editions = await withDbRetry("book.editions", () =>
+      db.book.findMany({
+        where: {
+          userId: session.user.id,
+          OR: [{ id: rootId }, { parentBookId: rootId }],
+        },
+        orderBy: [{ edition: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          title: true,
+          edition: true,
+          status: true,
+          coverImage: true,
+          slug: true,
+          createdAt: true,
+        },
+      })
+    );
+
+    return NextResponse.json({
+      ...book,
+      canMakePrivate: canMakePrivate(book.user.plan),
+      editions,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("[books GET]", message);
+    if (/timeout|terminated|too many clients|ECONNRESET/i.test(message)) {
+      return NextResponse.json(
+        { error: "Database busy — retrying shortly", retry: true },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: "Failed to load book" }, { status: 500 });
   }
-
-  const rootId = getEditionRootId(book);
-  const editions = await db.book.findMany({
-    where: {
-      userId: session.user.id,
-      OR: [{ id: rootId }, { parentBookId: rootId }],
-    },
-    orderBy: [{ edition: "asc" }, { createdAt: "asc" }],
-    select: {
-      id: true,
-      title: true,
-      edition: true,
-      status: true,
-      coverImage: true,
-      slug: true,
-      createdAt: true,
-    },
-  });
-
-  return NextResponse.json({
-    ...book,
-    canMakePrivate: canMakePrivate(book.user.plan),
-    editions,
-  });
 }
 
 const updateBookSchema = z.object({

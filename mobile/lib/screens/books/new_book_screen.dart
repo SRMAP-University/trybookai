@@ -1,15 +1,14 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/providers/new_book_draft_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
-import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
+import 'package:bookai_mobile/widgets/premium_upgrade_sheet.dart';
 
 const _genres = [
   'Fiction',
@@ -140,6 +139,21 @@ class _NewBookScreenState extends State<NewBookScreen> {
       );
       return;
     }
+
+    final auth = context.read<AuthProvider>();
+    await auth.refreshUser();
+    if (!mounted) return;
+    final remaining = auth.user?.pagesRemaining;
+    final target = _pages.round();
+    if (remaining != null && target > remaining) {
+      await showPremiumUpgradeSheet(
+        context,
+        featureLabel:
+            'Insufficient page credits — you have $remaining pages remaining, but this book needs $target. Upgrade for more monthly pages.',
+      );
+      return;
+    }
+
     setState(() => _starting = true);
     _persistDraft();
     final books = context.read<BooksProvider>();
@@ -147,7 +161,8 @@ class _NewBookScreenState extends State<NewBookScreen> {
       title: _title.text.trim(),
       description: _description.text.trim(),
       genre: _genre,
-      targetPages: _pages.round(),
+      targetPages: target,
+      // API defers enqueue; book detail shows Normal / Super Fast first.
       startGeneration: true,
       generateAudiobookOnComplete: _audiobookAfter,
       customInstructions: _customInstructions.text.trim().isEmpty
@@ -161,19 +176,19 @@ class _NewBookScreenState extends State<NewBookScreen> {
     setState(() => _starting = false);
     if (book != null) {
       _draft?.clear();
-      // Immediate local banner — server FCM also sends "started" once configured.
-      unawaited(
-        context.read<PushNotificationService>().showLocal(
-          title: 'Generation started',
-          body: '"${book.title}" is building now.',
-          bookId: book.id,
-        ),
-      );
-      context.go('/books/${book.id}');
+      context.go('/books/${book.id}?generate=1');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(books.error ?? 'Could not create book')),
-      );
+      final err = books.error ?? 'Could not create book';
+      if (RegExp(
+        r'insufficient page credits|pages remaining|allows up to .* pages',
+        caseSensitive: false,
+      ).hasMatch(err)) {
+        await showPremiumUpgradeSheet(context, featureLabel: err);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err)),
+        );
+      }
     }
   }
 

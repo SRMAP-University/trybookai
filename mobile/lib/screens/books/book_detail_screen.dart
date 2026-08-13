@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/models/models.dart';
+import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/file_download.dart';
@@ -15,11 +16,18 @@ import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/audiobook_player.dart';
 import 'package:bookai_mobile/widgets/common.dart';
+import 'package:bookai_mobile/widgets/generation_speed_sheet.dart';
+import 'package:bookai_mobile/widgets/premium_upgrade_sheet.dart';
 
 class BookDetailScreen extends StatefulWidget {
-  const BookDetailScreen({super.key, required this.bookId});
+  const BookDetailScreen({
+    super.key,
+    required this.bookId,
+    this.promptGenerate = false,
+  });
 
   final String bookId;
+  final bool promptGenerate;
 
   @override
   State<BookDetailScreen> createState() => _BookDetailScreenState();
@@ -38,6 +46,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   bool _downloadingBook = false;
   bool _downloadingAudio = false;
   bool _offeredReview = false;
+  bool _promptedGenerate = false;
   List<Map<String, dynamic>> _audios = [];
 
   @override
@@ -46,8 +55,9 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     _load().then((_) {
       if (_book?.isGenerating == true) _connectStream();
       if (_book?.status == 'COMPLETED') _loadAudios();
+      _maybePromptGenerate();
     });
-    _poll = Timer.periodic(const Duration(seconds: 4), (_) => _refreshQuiet());
+    _poll = Timer.periodic(const Duration(seconds: 8), (_) => _refreshQuiet());
   }
 
   @override
@@ -414,12 +424,51 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     );
   }
 
+  void _maybePromptGenerate() {
+    if (_promptedGenerate || !widget.promptGenerate) return;
+    final status = _book?.status;
+    if (status != 'DRAFT' && status != 'FAILED' && status != 'PAUSED') return;
+    if (_book?.isGenerating == true) return;
+    _promptedGenerate = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_start());
+    });
+  }
+
   Future<void> _start() async {
-    final ok =
-        await context.read<BooksProvider>().startGeneration(widget.bookId);
+    final book = _book;
+    if (book == null) return;
+
+    final auth = context.read<AuthProvider>();
+    await auth.refreshUser();
+    if (!mounted) return;
+    final user = auth.user;
+    final remaining = user?.pagesRemaining;
+    if (remaining != null && book.targetPages > remaining) {
+      await showPremiumUpgradeSheet(
+        context,
+        featureLabel:
+            'Insufficient page credits — you have $remaining pages remaining, but this book needs ${book.targetPages}. Upgrade for more monthly pages.',
+      );
+      return;
+    }
+
+    final resume = book.status == 'PAUSED' || book.status == 'FAILED';
+    final speed = await showGenerationSpeedSheet(
+      context,
+      canUseSuperFast: user?.isPaid == true,
+      resume: resume,
+    );
+    if (!mounted || speed == null) return;
+
+    final ok = await context.read<BooksProvider>().startGeneration(
+          widget.bookId,
+          resume: resume,
+          speed: speed == GenerationSpeed.superFast ? 'super_fast' : 'normal',
+        );
     if (!mounted) return;
     if (ok) {
-      final title = _book?.title ?? 'Your book';
+      final title = book.title;
       unawaited(
         context.read<PushNotificationService>().showLocal(
           title: 'Generation started',
@@ -430,7 +479,14 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Generation started' : 'Could not start generation'),
+        content: Text(
+          ok
+              ? (speed == GenerationSpeed.superFast
+                  ? 'Super Fast generation started'
+                  : 'Generation started')
+              : (context.read<BooksProvider>().error ??
+                  'Could not start generation'),
+        ),
       ),
     );
     await _load();
@@ -466,13 +522,31 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   }
 
   Future<void> _togglePublic(bool value) async {
+    final book = _book;
+    if (book == null) return;
+    if (!value && !book.canMakePrivate) {
+      await showPremiumUpgradeSheet(
+        context,
+        featureLabel:
+            'Private books are included on Pro and Premium. Free plans stay public.',
+      );
+      return;
+    }
     final books = context.read<BooksProvider>();
     final updated = await books.setPublic(widget.bookId, value);
     if (!mounted) return;
     if (updated == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(books.error ?? 'Could not update visibility')),
-      );
+      final err = books.error ?? 'Could not update visibility';
+      if (RegExp(
+        r'private|upgrade|pro|premium',
+        caseSensitive: false,
+      ).hasMatch(err)) {
+        await showPremiumUpgradeSheet(context, featureLabel: err);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err)),
+        );
+      }
       return;
     }
     setState(() => _book = updated);
@@ -932,10 +1006,20 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                             ),
                             value: book.isPublic,
                             activeThumbColor: AppColors.primary,
-                            onChanged: (!book.isPublic || book.canMakePrivate)
-                                ? _togglePublic
-                                : null,
+                            onChanged: _togglePublic,
                           ),
+                          if (book.isPublic && !book.canMakePrivate)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                onPressed: () => showPremiumUpgradeSheet(
+                                  context,
+                                  featureLabel:
+                                      'Private books are included on Pro and Premium.',
+                                ),
+                                child: const Text('Upgrade to make private'),
+                              ),
+                            ),
                           if (book.isPublic && book.publicUrl != null)
                             Row(
                               children: [

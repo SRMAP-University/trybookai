@@ -145,7 +145,7 @@ export function AnimatedGeneratingList({ books }: { books: GeneratingBook[] }) {
     void poll();
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void poll();
-    }, 4_000);
+    }, 8_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);

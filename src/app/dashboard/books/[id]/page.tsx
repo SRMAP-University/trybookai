@@ -40,7 +40,6 @@ import {
   type BookAudioItem,
 } from "@/components/dashboard/book-audio-panel";
 import { useDashboardUser } from "@/components/dashboard/user-context";
-import { isPaidPlan } from "@/lib/billing";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
@@ -50,6 +49,7 @@ import {
   wasReviewDismissed,
 } from "@/components/dashboard/generation-review-dialog";
 import { GenerationSpeedDialog } from "@/components/dashboard/generation-speed-dialog";
+import { PremiumUpgradeDialog } from "@/components/dashboard/premium-upgrade-dialog";
 import type { GenerationSpeed } from "@/lib/ai-models";
 
 interface Section {
@@ -188,6 +188,10 @@ function BookDetailPageContent() {
     "completed" | "failed" | "manual"
   >("completed");
   const [speedDialogOpen, setSpeedDialogOpen] = useState(false);
+  const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false);
+  const [premiumFeatureLabel, setPremiumFeatureLabel] = useState(
+    "This feature is included on Pro and Premium."
+  );
   const reviewPromptedRef = useRef(false);
   const audioWatchingRef = useRef(false);
   const liveRef = useRef<HTMLDivElement>(null);
@@ -240,11 +244,14 @@ function BookDetailPageContent() {
     ) {
       return;
     }
-    if (book.status === "DRAFT" || book.status === "FAILED") {
+    // Wait for DRAFT so create API can defer enqueue until speed is chosen.
+    if (book.status === "DRAFT" || book.status === "FAILED" || book.status === "PAUSED") {
       autoStarted.current = true;
-      void startGeneration();
+      setSpeedDialogOpen(true);
+      // Drop ?generate=1 so refresh doesn't re-open forever.
+      router.replace(`/dashboard/books/${book.id}`, { scroll: false });
     }
-  }, [loading, book, searchParams]);
+  }, [loading, book, searchParams, router]);
 
   useEffect(() => {
     if (loading || watchingRef.current || !book) return;
@@ -458,11 +465,31 @@ function BookDetailPageContent() {
           setDockMinimized(false);
           return;
         }
-        throw new Error(
-          (data as { error?: string }).error ?? "Generation failed"
-        );
+        const errMsg =
+          (data as { error?: string }).error ?? "Generation failed";
+        if (/insufficient page credits|pages remaining/i.test(errMsg)) {
+          watchingRef.current = false;
+          setGenerating(false);
+          setPhaseMessage(null);
+          setDockOpen(false);
+          setDockMinimized(false);
+          setBook((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status:
+                    prev.status === "GENERATING" || prev.status === "OUTLINING"
+                      ? "DRAFT"
+                      : prev.status,
+                }
+              : prev
+          );
+          setPremiumFeatureLabel(errMsg);
+          setPremiumUpgradeOpen(true);
+          return;
+        }
+        throw new Error(errMsg);
       }
-
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -486,7 +513,12 @@ function BookDetailPageContent() {
         const message =
           error instanceof Error ? error.message : "Generation failed";
         if (status !== "PAUSED") {
-          toast.error(message);
+          if (/insufficient page credits|pages remaining/i.test(message)) {
+            setPremiumFeatureLabel(message);
+            setPremiumUpgradeOpen(true);
+          } else {
+            toast.error(message);
+          }
         }
         await fetchBook();
         if (status === "FAILED") {
@@ -532,6 +564,21 @@ function BookDetailPageContent() {
       setSpeedDialogOpen(true);
       return;
     }
+
+    const pagesRemaining =
+      user != null ? Math.max(0, user.pagesLimit - user.pagesUsed) : null;
+    if (
+      book &&
+      pagesRemaining != null &&
+      book.targetPages > pagesRemaining
+    ) {
+      setPremiumFeatureLabel(
+        `Insufficient page credits — you have ${pagesRemaining} pages remaining, but this book needs ${book.targetPages}. Upgrade for more monthly pages.`
+      );
+      setPremiumUpgradeOpen(true);
+      return;
+    }
+
     setSpeedDialogOpen(false);
     reviewPromptedRef.current = false;
     setPhaseMessage(
@@ -797,7 +844,10 @@ function BookDetailPageContent() {
     if (!book) return;
     const nextPublic = !book.isPublic;
     if (!nextPublic && !book.canMakePrivate) {
-      toast.error("Private books require Pro or Enterprise");
+      setPremiumFeatureLabel(
+        "Private books are included on Pro ($20) and Premium ($30)."
+      );
+      setPremiumUpgradeOpen(true);
       return;
     }
     setTogglingVisibility(true);
@@ -891,12 +941,21 @@ function BookDetailPageContent() {
           .map((a) => a.type)}
       />
 
+      <PremiumUpgradeDialog
+        open={premiumUpgradeOpen}
+        onOpenChange={setPremiumUpgradeOpen}
+        featureLabel={premiumFeatureLabel}
+      />
       <GenerationSpeedDialog
         open={speedDialogOpen}
         onOpenChange={setSpeedDialogOpen}
         busy={generating}
         resume={book?.status === "FAILED" || book?.status === "PAUSED"}
-        canUseSuperFast={Boolean(user?.plan && isPaidPlan(user.plan))}
+        canUseSuperFast={
+          user?.plan === "PRO" ||
+          user?.plan === "ENTERPRISE" ||
+          user?.plan === "UNLIMITED"
+        }
         onChoose={(speed) => {
           void startGeneration(speed);
         }}
@@ -1243,9 +1302,7 @@ function BookDetailPageContent() {
           <div className="flex flex-col items-end gap-2">
             <Button
               variant="outline"
-              disabled={
-                togglingVisibility || (book.isPublic && !book.canMakePrivate)
-              }
+              disabled={togglingVisibility}
               onClick={toggleVisibility}
               className="h-9 border-[#e6ebf1] text-[13px]"
             >
@@ -1259,12 +1316,18 @@ function BookDetailPageContent() {
               {book.isPublic ? "Make private" : "Make public"}
             </Button>
             {book.isPublic && !book.canMakePrivate && (
-              <Link
-                href="/dashboard/billing"
+              <button
+                type="button"
+                onClick={() => {
+                  setPremiumFeatureLabel(
+                    "Private books are included on Pro ($20) and Premium ($30)."
+                  );
+                  setPremiumUpgradeOpen(true);
+                }}
                 className="text-[12px] text-[#697386] hover:text-[#635bff]"
               >
                 Upgrade to make private →
-              </Link>
+              </button>
             )}
           </div>
         </div>

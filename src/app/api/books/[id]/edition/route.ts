@@ -7,8 +7,7 @@ import {
   getEditionBaseTitle,
   getEditionRootId,
 } from "@/lib/book-editions";
-import { ensureGenerationRunning } from "@/lib/book-generator/background";
-import { getAppVersion, resolveClientSource } from "@/lib/client-source";
+import { resolveClientSource } from "@/lib/client-source";
 import { z } from "zod";
 
 const editionSchema = z.object({
@@ -59,7 +58,6 @@ export async function POST(
 
   let book;
   const client = resolveClientSource(request);
-  const appVersion = getAppVersion(request);
 
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -112,14 +110,7 @@ export async function POST(
   }
 
   if (parsed.data.startGeneration) {
-    try {
-      await ensureGenerationRunning(book.id, session.user.id, false, {
-        client,
-        appVersion,
-      });
-    } catch (error) {
-      console.error("Failed to start edition generation:", error);
-    }
+    // Defer enqueue so clients can show Normal / Super Fast first.
     return NextResponse.json({ ...book, startStream: true }, { status: 201 });
   }
 

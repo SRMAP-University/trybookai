@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { UpgradeLink } from "@/components/dashboard/upgrade-button";
+import { PremiumUpgradeDialog } from "@/components/dashboard/premium-upgrade-dialog";
 
 type FormState = {
   title: string;
@@ -97,6 +98,10 @@ export function NewBookForm() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [defaultsLoaded, setDefaultsLoaded] = useState(false);
   const [enhancing, setEnhancing] = useState<string | null>(null);
+  const [premiumUpgradeOpen, setPremiumUpgradeOpen] = useState(false);
+  const [premiumFeatureLabel, setPremiumFeatureLabel] = useState(
+    "Upgrade for more monthly page credits."
+  );
 
   async function enhanceField(
     field:
@@ -254,9 +259,18 @@ export function NewBookForm() {
 
     if (!res.ok) {
       const data = await res.json();
-      toast.error(
-        typeof data.error === "string" ? data.error : "Failed to create book"
-      );
+      const err =
+        typeof data.error === "string" ? data.error : "Failed to create book";
+      if (
+        /insufficient page credits|pages remaining|allows up to .* pages/i.test(
+          err
+        )
+      ) {
+        setPremiumFeatureLabel(err);
+        setPremiumUpgradeOpen(true);
+      } else {
+        toast.error(err);
+      }
       return;
     }
 
@@ -766,6 +780,12 @@ export function NewBookForm() {
           </div>
         </aside>
       </div>
+
+      <PremiumUpgradeDialog
+        open={premiumUpgradeOpen}
+        onOpenChange={setPremiumUpgradeOpen}
+        featureLabel={premiumFeatureLabel}
+      />
     </div>
   );
 }
