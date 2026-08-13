@@ -10,6 +10,13 @@ import {
 import { ensureBookCover } from "./cover";
 import { notifyApp } from "./notify";
 import { resolveGenerationShape } from "./shape";
+import { assembleSectionContext } from "./context-assembler";
+import { seedBibleFromOutline } from "./context-seed";
+import {
+  extractAndUpdateCanon,
+  hasIncompleteSections,
+  refreshChapterCanon,
+} from "./context-extract";
 
 export class GenerationPausedError extends Error {
   constructor(message = "Generation cancelled") {
@@ -275,7 +282,7 @@ ${styleBlock}`,
       )
   );
 
-  const outline = JSON.parse(extractJsonPayload(raw)) as {
+  let outline: {
     title?: string;
     synopsis?: string;
     chapters: Array<{
@@ -285,6 +292,27 @@ ${styleBlock}`,
       sections?: Array<{ number?: number; title?: string; summary?: string }>;
     }>;
   };
+  try {
+    outline = JSON.parse(extractJsonPayload(raw)) as typeof outline;
+  } catch {
+    const retry = await runAi(
+      ai,
+      OUTLINE_CF_MODEL,
+      [
+        {
+          role: "system",
+          content:
+            "Return ONLY valid JSON for a book outline. No prose before or after. Schema: {title, synopsis, chapters:[{number,title,summary,sections:[{number,title,summary}]}]}",
+        },
+        {
+          role: "user",
+          content: `Fix this into valid JSON outline with exactly ${chapterCount} chapters and ${sectionsPerChapter} sections each:\n${raw.slice(0, 6000)}`,
+        },
+      ],
+      { max_tokens: outlineTokens, temperature: 0.2 }
+    );
+    outline = JSON.parse(extractJsonPayload(retry)) as typeof outline;
+  }
 
   const normalizedChapters = (outline.chapters ?? []).map(
     (chapter, chapterIndex) => ({
@@ -355,6 +383,15 @@ ${styleBlock}`,
     chapterCount: normalizedChapters.length,
     lastPushMilestone: 0,
   });
+
+  try {
+    await seedBibleFromOutline(sql, bookId);
+  } catch (error) {
+    console.warn(
+      `[outline] seed bible failed for ${bookId}:`,
+      error instanceof Error ? error.message : error
+    );
+  }
 
   void notifyApp(env, {
     userId: book.userId,
@@ -497,23 +534,18 @@ export async function writeSectionStep(
     sectionTitle: section.title,
   });
 
-  const priorSections = await sql<{ title: string; content: string }[]>`
-    SELECT title, content FROM "Section"
-    WHERE "chapterId" = ${section.chapterId}
-      AND number < ${section.number}
-      AND content IS NOT NULL
-    ORDER BY number ASC
-  `;
-  const priorChapters = await sql<{ title: string; summary: string | null }[]>`
-    SELECT title, summary FROM "Chapter"
-    WHERE "bookId" = ${bookId}
-      AND number < ${section.chapterNumber}
-      AND status = 'COMPLETED'
-    ORDER BY number ASC
-  `;
+  let assembled;
+  try {
+    assembled = await assembleSectionContext(sql, bookId, sectionId);
+  } catch (error) {
+    console.warn(
+      `[section] context assemble failed, using fallback:`,
+      error instanceof Error ? error.message : error
+    );
+    assembled = null;
+  }
 
-  const outline = book.outline as { synopsis?: string } | null;
-  const styleParts = [
+  const fallbackStyle = [
     `Point of view: ${book.pov}`,
     `Tense: ${book.tense}`,
     `Language: ${book.language}`,
@@ -522,9 +554,24 @@ export async function writeSectionStep(
     book.customInstructions
       ? `Custom instructions: ${book.customInstructions}`
       : null,
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const raw = await withAiHeartbeat(
+  const systemContent = `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Output only the final section prose — no headings, no reasoning, and no thinking notes.
+
+Writing requirements:
+${assembled?.systemStyle ?? fallbackStyle}`;
+
+  const userContent =
+    assembled?.userPrompt ??
+    `Book synopsis: ${(book.outline as { synopsis?: string } | null)?.synopsis ?? book.description ?? ""}
+
+Current chapter: "${section.chapterTitle}" - ${section.chapterSummary ?? ""}
+
+Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`;
+
+  let raw = await withAiHeartbeat(
     sql,
     jobId,
     "writing_ai",
@@ -534,27 +581,8 @@ export async function writeSectionStep(
         ai,
         resolveCfModel(book.model),
         [
-          {
-            role: "system",
-            content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency. Output only the final section prose — no headings, no reasoning, and no thinking notes.
-
-Writing requirements:
-${styleParts.join("\n")}`,
-          },
-          {
-            role: "user",
-            content: `Book synopsis: ${outline?.synopsis ?? book.description ?? ""}
-
-Previous chapters context:
-${priorChapters.map((c) => `Chapter ${c.title}: ${c.summary ?? ""}`).join("\n")}
-
-Current chapter: "${section.chapterTitle}" - ${section.chapterSummary ?? ""}
-
-Prior sections in this chapter:
-${priorSections.map((s) => `### ${s.title}\n${s.content}`).join("\n\n")}
-
-Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
-          },
+          { role: "system", content: systemContent },
+          { role: "user", content: userContent },
         ],
         {
           max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
@@ -565,7 +593,67 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
 
   await assertNotPaused(sql, bookId);
 
-  const content = stripThinking(raw);
+  let content = stripThinking(raw);
+  let extractResult: Awaited<ReturnType<typeof extractAndUpdateCanon>> | null =
+    null;
+  try {
+    extractResult = await extractAndUpdateCanon(sql, ai, {
+      bookId,
+      chapterId: section.chapterId,
+      sectionId,
+      sectionTitle: section.title,
+      content,
+      existingFactsBrief: assembled?.factsBrief,
+    });
+  } catch (error) {
+    console.warn(
+      `[section] extract canon failed:`,
+      error instanceof Error ? error.message : error
+    );
+  }
+
+  // One-shot consistency revise if contradictions found.
+  if (extractResult?.contradictions?.length) {
+    const note = extractResult.contradictions.join("; ");
+    try {
+      raw = await runAi(
+        ai,
+        resolveCfModel(book.model),
+        [
+          { role: "system", content: systemContent },
+          {
+            role: "user",
+            content: `${userContent}
+
+CONSISTENCY FIX REQUIRED — revise the scene to resolve:
+${note}
+
+Previous draft:
+${content.slice(0, 4000)}`,
+          },
+        ],
+        {
+          max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
+          temperature: Math.min(0.5, book.creativity ?? 0.5),
+        }
+      );
+      content = stripThinking(raw);
+      await extractAndUpdateCanon(sql, ai, {
+        bookId,
+        chapterId: section.chapterId,
+        sectionId,
+        sectionTitle: section.title,
+        content,
+        existingFactsBrief: assembled?.factsBrief,
+      }).catch(() => undefined);
+    } catch (error) {
+      console.warn(
+        `[section] consistency revise failed:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+
   const wordCount = content.split(/\s+/).filter(Boolean).length;
   const pageCount = Math.min(
     pagesPerSection,
@@ -597,6 +685,12 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
         "updatedAt" = NOW()
       WHERE id = ${section.chapterId}
     `;
+    await refreshChapterCanon(sql, bookId, section.chapterId).catch((error) => {
+      console.warn(
+        `[section] refresh chapter canon failed:`,
+        error instanceof Error ? error.message : error
+      );
+    });
   }
 
   await sql`
@@ -663,6 +757,29 @@ export async function finalizeJob(
   }
 
   await applyProgress(sql, bookId);
+
+  if (await hasIncompleteSections(sql, bookId)) {
+    const msg =
+      "Generation finished early with incomplete sections. Tap Resume to continue.";
+    await sql`
+      UPDATE "GenerationJob"
+      SET status = 'FAILED', error = ${msg}, "completedAt" = NOW(), "updatedAt" = NOW()
+      WHERE id = ${jobId}
+    `;
+    await sql`
+      UPDATE "Book"
+      SET status = 'FAILED', "errorMessage" = ${msg}, "updatedAt" = NOW()
+      WHERE id = ${bookId} AND status <> 'PAUSED'
+    `;
+    void notifyApp(env, {
+      userId: book.userId,
+      bookId,
+      phase: "failed",
+      title: book.title,
+    });
+    return { cancelled: false as const, incomplete: true as const };
+  }
+
   await sql`
     UPDATE "Book"
     SET status = 'COMPLETED', progress = 100, "completedAt" = COALESCE("completedAt", NOW()), "updatedAt" = NOW()

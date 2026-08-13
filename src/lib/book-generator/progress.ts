@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { hasIncompleteSections } from "@/lib/book-context";
 
 export type BookProgressOptions = {
   activeSectionId?: string;
@@ -135,23 +136,27 @@ export async function applyBookProgress(
   const progress = Math.max(result.progress, book.progress ?? 0);
   const currentPages = Math.max(result.currentPages, book.currentPages ?? 0);
 
+  // Do not mark COMPLETED while any section still lacks real prose.
+  const markComplete =
+    result.allDone && !(await hasIncompleteSections(bookId));
+
   await db.book.update({
     where: { id: bookId },
     data: {
       currentPages,
-      progress,
-      status: result.allDone
+      progress: markComplete ? 100 : progress,
+      status: markComplete
         ? "COMPLETED"
         : book.status === "PAUSED"
           ? "PAUSED"
           : book.status === "OUTLINING"
             ? "OUTLINING"
             : "GENERATING",
-      completedAt: result.allDone ? new Date() : null,
+      completedAt: markComplete ? new Date() : null,
     },
   });
 
-  return { ...result, progress, currentPages };
+  return { ...result, allDone: markComplete, progress, currentPages };
 }
 
 export async function creditSectionPages(userId: string, pageCount: number) {

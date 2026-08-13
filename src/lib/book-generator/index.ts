@@ -11,7 +11,13 @@ import {
   creditSectionPages,
 } from "@/lib/book-generator/progress";
 import { resolveGenerationShape } from "@/lib/book-generator/shape";
-
+import {
+  assembleSectionContext,
+  extractAndUpdateCanon,
+  hasIncompleteSections,
+  refreshChapterCanon,
+  seedBibleFromOutline,
+} from "@/lib/book-context";
 interface BookOutline {
   title: string;
   synopsis: string;
@@ -186,6 +192,13 @@ ${styleBlock}`,
     });
   });
 
+  await seedBibleFromOutline(bookId).catch((error) => {
+    console.warn(
+      "[outline] seed bible failed:",
+      error instanceof Error ? error.message : error
+    );
+  });
+
   return outline;
 }
 
@@ -217,27 +230,16 @@ export async function generateSection(sectionId: string) {
     data: { status: "GENERATING" },
   });
 
-  const priorSections = chapter.sections
-    .filter((s) => s.number < section.number && s.content)
-    .map((s) => `### ${s.title}\n${s.content}`)
-    .join("\n\n");
-
-  const priorChapters = await db.chapter.findMany({
-    where: {
-      bookId: book.id,
-      number: { lt: chapter.number },
-      status: "COMPLETED",
-    },
-    select: { title: true, summary: true },
-    orderBy: { number: "asc" },
-  });
-
-  const contextSummary = priorChapters
-    .map((c) => `Chapter ${c.title}: ${c.summary}`)
-    .join("\n");
-
   const targetWords = wordsForPages(pagesPerSection, wordsPerPage);
-  const outline = book.outline as unknown as BookOutline | null;
+  const assembled = await assembleSectionContext(book.id, sectionId).catch(
+    (error) => {
+      console.warn(
+        "[section] assemble failed:",
+        error instanceof Error ? error.message : error
+      );
+      return null;
+    }
+  );
   const styleBlock = buildStyleBlock(book);
 
   const raw = await createChatCompletion({
@@ -247,24 +249,16 @@ export async function generateSection(sectionId: string) {
     messages: [
       {
         role: "system",
-        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency. Output only the section content, no headings.
+        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the provided CORE/CURRENT/RETRIEVED context. Output only the section content, no headings.
 
 Writing requirements:
-${styleBlock}`,
+${assembled?.systemStyle ?? styleBlock}`,
       },
       {
         role: "user",
-        content: `Book synopsis: ${outline?.synopsis ?? book.description ?? ""}
-
-Previous chapters context:
-${contextSummary}
-
-Current chapter: "${chapter.title}" - ${chapter.summary}
-
-Prior sections in this chapter:
-${priorSections}
-
-Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
+        content:
+          assembled?.userPrompt ??
+          `Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
       },
     ],
   });
@@ -279,6 +273,19 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
   await db.section.update({
     where: { id: sectionId },
     data: { content, wordCount, pageCount },
+  });
+
+  await extractAndUpdateCanon({
+    bookId: book.id,
+    chapterId: chapter.id,
+    sectionId,
+    sectionTitle: section.title,
+    content,
+  }).catch((error) => {
+    console.warn(
+      "[section] extract canon failed:",
+      error instanceof Error ? error.message : error
+    );
   });
 
   const allSections = await db.section.findMany({
@@ -307,6 +314,7 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
         status: "COMPLETED",
       },
     });
+    await refreshChapterCanon(book.id, chapter.id).catch(() => undefined);
   }
 
   await creditSectionPages(book.userId, pageCount);
@@ -374,6 +382,25 @@ export async function processBookGeneration(bookId: string) {
       }
     }
   }
+
+  if (await hasIncompleteSections(bookId)) {
+    const msg =
+      "Generation finished early with incomplete sections. Tap Resume to continue.";
+    await db.book.update({
+      where: { id: bookId },
+      data: { status: "FAILED", errorMessage: msg },
+    });
+    throw new Error(msg);
+  }
+
+  await db.book.update({
+    where: { id: bookId },
+    data: {
+      status: "COMPLETED",
+      progress: 100,
+      completedAt: new Date(),
+    },
+  });
 
   return db.book.findUniqueOrThrow({ where: { id: bookId } });
 }

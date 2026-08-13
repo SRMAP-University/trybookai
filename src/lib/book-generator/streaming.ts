@@ -25,6 +25,12 @@ import {
   nextPushMilestone,
   notifyBookProgress,
 } from "@/lib/push";
+import {
+  assembleSectionContext,
+  extractAndUpdateCanon,
+  hasIncompleteSections,
+  refreshChapterCanon,
+} from "@/lib/book-context";
 
 async function throwIfCancelled(bookId: string) {
   const requested = isGenerationCancellationRequested(bookId);
@@ -166,29 +172,16 @@ async function streamGenerateSection(
     status: "GENERATING",
   });
 
-  const priorSections = chapter.sections
-    .filter((s) => s.number < section.number && s.content)
-    .map((s) => `### ${s.title}\n${s.content}`)
-    .join("\n\n");
-
-  const priorChapters = await db.chapter.findMany({
-    where: {
-      bookId: book.id,
-      number: { lt: chapter.number },
-      status: "COMPLETED",
-    },
-    select: { title: true, summary: true },
-    orderBy: { number: "asc" },
-  });
-
-  const contextSummary = priorChapters
-    .map((c) => `Chapter ${c.title}: ${c.summary}`)
-    .join("\n");
-
   const targetWords = pagesPerSection * wordsPerPage;
-  const outline = book.outline as {
-    synopsis?: string;
-  } | null;
+  const assembled = await assembleSectionContext(book.id, section.id).catch(
+    (error) => {
+      console.warn(
+        "[stream] assemble failed:",
+        error instanceof Error ? error.message : error
+      );
+      return null;
+    }
+  );
 
   const styleParts = [
     `Point of view: ${book.pov}`,
@@ -273,24 +266,16 @@ async function streamGenerateSection(
     messages: [
       {
         role: "system",
-        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency. Output only the final section prose — no headings, no reasoning, and no thinking notes.
+        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Output only the final section prose — no headings, no reasoning, and no thinking notes.
 
 Writing requirements:
-${styleParts.join("\n")}`,
+${assembled?.systemStyle ?? styleParts.join("\n")}`,
       },
       {
         role: "user",
-        content: `Book synopsis: ${outline?.synopsis ?? book.description ?? ""}
-
-Previous chapters context:
-${contextSummary}
-
-Current chapter: "${chapter.title}" - ${chapter.summary}
-
-Prior sections in this chapter:
-${priorSections}
-
-Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
+        content:
+          assembled?.userPrompt ??
+          `Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
       },
     ],
   });
@@ -312,6 +297,19 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
   await updateJobProgress(jobId, {
     currentSectionId: section.id,
     partialContent: content,
+  });
+
+  await extractAndUpdateCanon({
+    bookId: book.id,
+    chapterId: chapter.id,
+    sectionId,
+    sectionTitle: section.title,
+    content,
+  }).catch((error) => {
+    console.warn(
+      "[stream] extract canon failed:",
+      error instanceof Error ? error.message : error
+    );
   });
 
   const allSections = await db.section.findMany({
@@ -338,6 +336,7 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
         status: "COMPLETED",
       },
     });
+    await refreshChapterCanon(book.id, chapter.id).catch(() => undefined);
   }
 
   await creditSectionPages(book.userId, pageCount);
@@ -530,12 +529,50 @@ export async function runBookGeneration(
       if (reachedTarget) break;
     }
 
+    if (await hasIncompleteSections(bookId)) {
+      const msg =
+        "Generation finished early with incomplete sections. Tap Resume to continue.";
+      await db.generationJob.update({
+        where: { id: job.id },
+        data: {
+          status: "FAILED",
+          error: msg,
+          completedAt: new Date(),
+          payload: {},
+        },
+      });
+      await db.book.update({
+        where: { id: bookId },
+        data: {
+          status: "FAILED",
+          errorMessage: msg,
+        },
+      });
+      publisher({ type: "error", message: msg });
+      void notifyBookProgress({
+        userId,
+        bookId,
+        title: refreshed.title,
+        progress: refreshed.progress ?? 0,
+        phase: "failed",
+      });
+      return;
+    }
+
     await db.generationJob.update({
       where: { id: job.id },
       data: {
         status: "COMPLETED",
         completedAt: new Date(),
         payload: {},
+      },
+    });
+    await db.book.update({
+      where: { id: bookId },
+      data: {
+        status: "COMPLETED",
+        progress: 100,
+        completedAt: new Date(),
       },
     });
     publisher({ type: "done" });

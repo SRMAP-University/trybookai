@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { assembleSectionContext } from "@/lib/book-context";
 
 type BookOutline = {
   title: string;
@@ -82,36 +83,38 @@ export async function loadSectionEditorContext(sectionId: string, userId: string
 
   const { chapter } = section;
   const { book } = chapter;
-
-  const priorSections = chapter.sections
-    .filter((s) => s.number < section.number && s.content)
-    .map((s) => `### ${s.title}\n${s.content}`)
-    .join("\n\n");
-
-  const priorChapters = await db.chapter.findMany({
-    where: {
-      bookId: book.id,
-      number: { lt: chapter.number },
-      status: "COMPLETED",
-    },
-    select: { title: true, summary: true },
-    orderBy: { number: "asc" },
-  });
-
-  const priorContext = [
-    priorChapters.map((c) => `Chapter "${c.title}": ${c.summary}`).join("\n"),
-    priorSections,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
   const outline = book.outline as unknown as BookOutline | null;
+
+  const assembled = await assembleSectionContext(book.id, section.id).catch(
+    () => null
+  );
+
+  const priorContext =
+    assembled?.userPrompt ??
+    [
+      ...(
+        await db.chapter.findMany({
+          where: {
+            bookId: book.id,
+            number: { lt: chapter.number },
+            status: "COMPLETED",
+          },
+          select: { title: true, summary: true },
+          orderBy: { number: "asc" },
+        })
+      ).map((c) => `Chapter "${c.title}": ${c.summary}`),
+      ...chapter.sections
+        .filter((s) => s.number < section.number && s.content)
+        .map((s) => `### ${s.title}\n${s.content}`),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
   return {
     book,
     chapter,
     section,
-    styleBlock: buildStyleBlock(book),
+    styleBlock: assembled?.systemStyle ?? buildStyleBlock(book),
     synopsis: outline?.synopsis ?? book.description ?? "",
     priorContext,
   };

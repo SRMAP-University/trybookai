@@ -226,12 +226,133 @@ model Book {
   generationJobs  GenerationJob[]
   audios          BookAudio[]
   feedbacks       BookFeedback[]
+  bible           BookBible?
+  storyState      StoryState?
+  canonFacts      CanonFact[]
 
   @@index([userId])
   @@index([status])
   @@index([isPublic])
   @@index([parentBookId])
   @@index([createdVia])
+}
+
+/// Permanent canon layer (Book Bible) — authoritative vs manuscript prose.
+model BookBible {
+  id          String   @id @default(cuid())
+  bookId      String   @unique
+  /// Narrative style / voice notes
+  styleNotes  String?  @db.Text
+  /// World / magic / tech rules
+  worldRules  String?  @db.Text
+  themes      Json?
+  /// Unresolved mysteries / open lore
+  mysteries   Json?
+  /// Extra structured canon bag
+  meta        Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  book        Book             @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  characters  BibleCharacter[]
+  locations   BibleLocation[]
+  factions    BibleFaction[]
+  objects     BibleObject[]
+}
+
+model BibleCharacter {
+  id            String   @id @default(cuid())
+  bibleId       String
+  name          String
+  aliases       Json?
+  profile       String?  @db.Text
+  relationships Json?
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bible BookBible @relation(fields: [bibleId], references: [id], onDelete: Cascade)
+
+  @@index([bibleId])
+  @@index([bibleId, name])
+}
+
+model BibleLocation {
+  id          String   @id @default(cuid())
+  bibleId     String
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bible BookBible @relation(fields: [bibleId], references: [id], onDelete: Cascade)
+
+  @@index([bibleId])
+  @@index([bibleId, name])
+}
+
+model BibleFaction {
+  id          String   @id @default(cuid())
+  bibleId     String
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bible BookBible @relation(fields: [bibleId], references: [id], onDelete: Cascade)
+
+  @@index([bibleId])
+}
+
+model BibleObject {
+  id          String   @id @default(cuid())
+  bibleId     String
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bible BookBible @relation(fields: [bibleId], references: [id], onDelete: Cascade)
+
+  @@index([bibleId])
+}
+
+/// Live plot / arc state for the whole book.
+model StoryState {
+  id             String   @id @default(cuid())
+  bookId         String   @unique
+  plotPhase      String?
+  timelineCursor String?
+  openThreads    Json?
+  arcs           Json?
+  partSummary    String?  @db.Text
+  bookSummary    String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+}
+
+/// Explicit canon facts for consistency checking.
+model CanonFact {
+  id              String   @id @default(cuid())
+  bookId          String
+  subject         String
+  predicate       String
+  object          String   @db.Text
+  /// CANON | PROVISIONAL | RETCONNED
+  status          String   @default("CANON")
+  sourceChapterId String?
+  sourceSectionId String?
+  confidence      Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId])
+  @@index([bookId, subject])
+  @@index([bookId, status])
 }
 
 /// User review / complaint after generation (or manual report from book page)
@@ -314,9 +435,26 @@ model Chapter {
 
   book        Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
   sections    Section[]
+  state       ChapterState?
 
   @@unique([bookId, number])
   @@index([bookId])
+}
+
+/// Compact chapter state for hierarchical context (~300–800 tokens).
+model ChapterState {
+  id                 String   @id @default(cuid())
+  chapterId          String   @unique
+  summary            String?  @db.Text
+  charactersPresent  Json?
+  location           String?
+  events             Json?
+  newFacts           Json?
+  openThreads        Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 }
 
 model Section {
@@ -330,10 +468,24 @@ model Section {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  chapter     Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  state       SectionState?
 
   @@unique([chapterId, number])
   @@index([chapterId])
+}
+
+/// Compact scene/section state for hierarchical context (~100–200 tokens).
+model SectionState {
+  id                String   @id @default(cuid())
+  sectionId         String   @unique
+  summary           String?  @db.Text
+  objective         String?  @db.Text
+  charactersPresent Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 }
 
 model GenerationJob {
