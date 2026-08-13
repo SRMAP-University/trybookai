@@ -5,6 +5,7 @@ import {
 } from "@/lib/book-generator/background";
 import {
   applyGenerationSpeed,
+  enforceGenerationSpeedForPlan,
   parseGenerationSpeed,
 } from "@/lib/book-generator/generation-speed";
 import { type StreamEvent } from "@/lib/book-generator/streaming";
@@ -46,6 +47,8 @@ export async function POST(
   try {
     if (speed) {
       await applyGenerationSpeed(id, session.user.id, speed);
+    } else {
+      await enforceGenerationSpeedForPlan(id, session.user.id);
     }
     await ensureGenerationRunning(id, session.user.id, resume, {
       client,

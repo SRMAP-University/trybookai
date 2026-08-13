@@ -40,6 +40,7 @@ import {
   type BookAudioItem,
 } from "@/components/dashboard/book-audio-panel";
 import { useDashboardUser } from "@/components/dashboard/user-context";
+import { isPaidPlan } from "@/lib/billing";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
@@ -190,7 +191,7 @@ function BookDetailPageContent() {
   const reviewPromptedRef = useRef(false);
   const audioWatchingRef = useRef(false);
   const liveRef = useRef<HTMLDivElement>(null);
-  const { refresh: refreshUser } = useDashboardUser();
+  const { user, refresh: refreshUser } = useDashboardUser();
 
   const promptGenerationReview = useCallback(
     async (mode: "completed" | "failed") => {
@@ -284,7 +285,7 @@ function BookDetailPageContent() {
 
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void pollProgress();
-    }, 4_000);
+    }, 8_000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -895,11 +896,11 @@ function BookDetailPageContent() {
         onOpenChange={setSpeedDialogOpen}
         busy={generating}
         resume={book?.status === "FAILED" || book?.status === "PAUSED"}
+        canUseSuperFast={Boolean(user?.plan && isPaidPlan(user.plan))}
         onChoose={(speed) => {
           void startGeneration(speed);
         }}
-      />
-      <GenerationReviewDialog
+      />      <GenerationReviewDialog
         open={reviewOpen}
         onOpenChange={setReviewOpen}
         bookId={book.id}

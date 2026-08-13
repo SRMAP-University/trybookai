@@ -27,7 +27,7 @@ export const AI_MODELS: readonly AiModelConfig[] = [
     value: "groq-llama-3.3",
     label: "Super Fast (Groq)",
     description: "Highest speed via Groq Llama 3.3 — best for quick drafts",
-    plans: ["FREE", "PRO", "ENTERPRISE", "UNLIMITED"],
+    plans: ["PRO", "ENTERPRISE", "UNLIMITED"],
     provider: "groq",
     groqModel: "llama-3.3-70b-versatile",
   },
