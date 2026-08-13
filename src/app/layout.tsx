@@ -3,6 +3,12 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
 import { getAppUrl } from "@/lib/book-public";
+import {
+  DEFAULT_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_NAME,
+  getDefaultOgImage,
+} from "@/lib/seo";
 import "./globals.css";
 
 const inter = Inter({
@@ -18,16 +24,62 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "BookAI — AI Book Generator",
-    template: "%s — BookAI",
-  },
-  description:
-    "Generate full-length books up to 1,000 pages with AI. Outline, write, and export publication-ready manuscripts.",
   metadataBase: new URL(getAppUrl()),
+  title: {
+    default: `${SITE_NAME} — AI Book Generator`,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description: DEFAULT_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: SITE_KEYWORDS,
+  authors: [{ name: SITE_NAME, url: getAppUrl() }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "productivity",
+  alternates: {
+    canonical: getAppUrl(),
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: getAppUrl(),
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — AI Book Generator`,
+    description: DEFAULT_DESCRIPTION,
+    images: [
+      {
+        url: getDefaultOgImage(),
+        width: 192,
+        height: 192,
+        alt: SITE_NAME,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — AI Book Generator`,
+    description: DEFAULT_DESCRIPTION,
+    images: [getDefaultOgImage()],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   icons: {
     icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
   },
 };
 

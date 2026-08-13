@@ -6,7 +6,7 @@ import { getAppUrl } from "@/lib/book-public";
 import { BLOG_POSTS } from "@/lib/blogs";
 
 export const metadata: Metadata = {
-  title: "Blog — BookAI",
+  title: "Blog",
   description:
     "Tips, guides, and strategies for writing and publishing books with AI. Browse the BookAI blog.",
   alternates: { canonical: `${getAppUrl()}/blog` },
@@ -17,6 +17,13 @@ export const metadata: Metadata = {
     url: `${getAppUrl()}/blog`,
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Blog — BookAI",
+    description:
+      "Tips, guides, and strategies for writing and publishing books with AI.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function BlogPage() {

@@ -7,17 +7,24 @@ import { getAppUrl } from "@/lib/book-public";
 import { BookCover } from "@/components/dashboard/book-cover";
 
 export const metadata: Metadata = {
-  title: "Public books — BookAI",
+  title: "Public AI books library",
   description:
-    "Browse AI-generated books published on BookAI. Read outlines, chapters, and full manuscripts.",
+    "Browse free AI-generated books on BookAI. Read outlines, chapters, and full manuscripts from authors using AI.",
   alternates: { canonical: `${getAppUrl()}/books` },
   openGraph: {
-    title: "Public books — BookAI",
+    title: "Public AI books library — BookAI",
     description:
-      "Browse AI-generated books published on BookAI. Read outlines, chapters, and full manuscripts.",
+      "Browse free AI-generated books on BookAI. Read outlines, chapters, and full manuscripts.",
     url: `${getAppUrl()}/books`,
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Public AI books library — BookAI",
+    description:
+      "Browse free AI-generated books on BookAI. Read outlines, chapters, and full manuscripts.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default async function PublicBooksPage() {

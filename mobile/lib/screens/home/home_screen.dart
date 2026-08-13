@@ -112,42 +112,67 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-            const SizedBox(height: 24),
-            SectionHeader(
-              'Generating now',
-              action: TextButton(
-                onPressed: () => context.go('/books'),
-                child: const Text('All books'),
-              ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Generating now',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.navy,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => context.go('/books'),
+                  child: const Text('All books', style: TextStyle(fontSize: 12)),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             if (books.loading && books.books.isEmpty)
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
+                padding: EdgeInsets.symmetric(vertical: 10),
                 child: LinearProgressIndicator(minHeight: 2),
               )
             else if ((books.activeJobs?.books.isEmpty ?? true) &&
                 books.generating.isEmpty)
               StripeCard(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: Column(
                   children: [
                     const Icon(Icons.auto_stories_outlined,
-                        color: AppColors.primary, size: 28),
-                    const SizedBox(height: 10),
+                        color: AppColors.primary, size: 22),
+                    const SizedBox(height: 6),
                     const Text(
                       'No books generating',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     const Text(
                       'Start a new book to see live progress here.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                      style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                     ),
-                    const SizedBox(height: 14),
-                    FilledButton(
-                      onPressed: () => context.push('/books/new'),
-                      child: const Text('New book'),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 32,
+                      child: FilledButton(
+                        onPressed: () => context.push('/books/new'),
+                        child: const Text('New book', style: TextStyle(fontSize: 12)),
+                      ),
                     ),
                   ],
                 ),
@@ -158,8 +183,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       : books.generating)
                   .map(
                 (b) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: StripeCard(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                     onTap: () => context.push('/books/${b.id}'),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,9 +195,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             Expanded(
                               child: Text(
                                 b.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 15,
+                                  fontSize: 12,
                                 ),
                               ),
                             ),
@@ -180,24 +208,25 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: const TextStyle(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w600,
+                                fontSize: 11,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           '${b.status.toLowerCase()} · ${b.currentPages}/${b.targetPages} pages',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 10,
                             color: AppColors.textMuted,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 6),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(99),
                           child: LinearProgressIndicator(
                             value: (b.progress / 100).clamp(0, 1),
-                            minHeight: 6,
+                            minHeight: 3,
                           ),
                         ),
                       ],

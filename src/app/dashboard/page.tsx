@@ -196,13 +196,13 @@ export default async function DashboardPage() {
 
       {generating.length > 0 && (
         <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15px] font-medium text-[#0a2540]">
+          <div className="mb-1.5 flex items-center justify-between">
+            <h2 className="text-[13px] font-medium text-[#0a2540]">
               Generating now
             </h2>
             <Link
               href="/dashboard/tracking"
-              className="text-[13px] text-[#635bff] hover:underline"
+              className="text-[12px] text-[#635bff] hover:underline"
             >
               Open tracking
             </Link>

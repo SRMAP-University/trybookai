@@ -5,6 +5,7 @@ import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { getAppUrl } from "@/lib/book-public";
 import { getAllBlogSlugs, getBlogPost } from "@/lib/blogs";
+import { blogPostingJsonLd, getDefaultOgImage } from "@/lib/seo";
 
 export function generateStaticParams() {
   return getAllBlogSlugs().map((slug) => ({ slug }));
@@ -17,12 +18,14 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const post = getBlogPost(slug);
-  if (!post) return {};
+  if (!post) return { robots: { index: false } };
 
   const url = `${getAppUrl()}/blog/${slug}`;
+  const image = getDefaultOgImage();
   return {
-    title: `${post.title} — BookAI`,
+    title: post.title,
     description: post.description,
+    authors: [{ name: post.author }],
     alternates: { canonical: url },
     openGraph: {
       title: post.title,
@@ -33,7 +36,15 @@ export async function generateMetadata({
       modifiedTime: post.updatedAt ?? post.publishedAt,
       authors: [post.author],
       tags: post.tags,
+      images: [{ url: image, alt: post.title }],
     },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.description,
+      images: [image],
+    },
+    robots: { index: true, follow: true },
   };
 }
 
@@ -46,10 +57,24 @@ export default async function BlogPostPage({
   const post = getBlogPost(slug);
   if (!post) notFound();
 
+  const url = `${getAppUrl()}/blog/${slug}`;
   const paragraphs = post.content.split("\n\n");
+  const jsonLd = blogPostingJsonLd({
+    title: post.title,
+    description: post.description,
+    url,
+    author: post.author,
+    publishedAt: post.publishedAt,
+    updatedAt: post.updatedAt,
+    tags: post.tags,
+  });
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Navbar />
       <main className="min-h-screen bg-white pt-[72px]">
         <article className="mx-auto max-w-[720px] px-6 py-14">

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Features — BookAI",
+  title: "Features",
   description:
     "Explore BookAI's AI book writing features: long-form manuscript generation, audiobooks, custom branding, exports, and public book pages.",
   alternates: { canonical: `${getAppUrl()}/features` },
@@ -26,6 +26,13 @@ export const metadata: Metadata = {
     url: `${getAppUrl()}/features`,
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Features — BookAI",
+    description:
+      "Explore BookAI's AI book writing features: long-form manuscript generation, audiobooks, custom branding, exports, and public book pages.",
+  },
+  robots: { index: true, follow: true },
 };
 
 const features = [

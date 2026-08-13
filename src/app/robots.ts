@@ -7,10 +7,21 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/books", "/books/", "/blog", "/blog/", "/features", "/about", "/privacy", "/terms"],
-        disallow: ["/dashboard", "/api/", "/login", "/register", "/editor"],
+        allow: "/",
+        disallow: [
+          "/dashboard",
+          "/dashboard/",
+          "/api/",
+          "/editor",
+          "/editor/",
+          "/adarsh",
+          "/adarsh/",
+          "/login",
+          "/register",
+        ],
       },
     ],
     sitemap: `${base}/sitemap.xml`,
+    host: base,
   };
 }

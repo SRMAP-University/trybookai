@@ -154,7 +154,7 @@ export function AnimatedGeneratingList({ books }: { books: GeneratingBook[] }) {
 
   return (
     <motion.div
-      className="grid gap-3 sm:grid-cols-2"
+      className="grid gap-1.5 sm:grid-cols-2"
       variants={list}
       initial="hidden"
       animate="show"
@@ -163,27 +163,27 @@ export function AnimatedGeneratingList({ books }: { books: GeneratingBook[] }) {
         <motion.div key={book.id} variants={item}>
           <Link
             href={`/dashboard/books/${book.id}`}
-            className="block overflow-hidden rounded-lg border border-[#e6ebf1] bg-white p-4 transition-colors hover:border-[#635bff]/40"
+            className="block overflow-hidden rounded-md border border-[#e6ebf1] bg-white px-2.5 py-2 transition-colors hover:border-[#635bff]/40"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[14px] font-medium text-[#0a2540]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-medium leading-tight text-[#0a2540]">
                   {book.title}
                 </p>
-                <p className="text-[12px] capitalize text-[#697386]">
+                <p className="mt-0.5 text-[10px] capitalize leading-tight text-[#697386]">
                   {book.status.toLowerCase()} · {book.currentPages}/
                   {book.targetPages} pages
                 </p>
               </div>
               <motion.span
-                className="text-[13px] font-medium text-[#635bff]"
+                className="shrink-0 text-[11px] font-medium tabular-nums text-[#635bff]"
                 animate={{ opacity: [1, 0.45, 1] }}
                 transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
               >
                 {Math.round(book.progress)}%
               </motion.span>
             </div>
-            <Progress value={book.progress} className="mt-3 h-1.5" />
+            <Progress value={book.progress} className="mt-1.5 h-1" />
           </Link>
         </motion.div>
       ))}
