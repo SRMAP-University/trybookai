@@ -58,8 +58,7 @@ export function GenerationSpeedDialog({
                 Normal
               </div>
               <p className="mt-1 text-[12.5px] leading-snug text-[#62748e]">
-                Cloudflare Workers AI — reliable long-form writing at standard
-                speed.
+                Reliable long-form writing at standard speed.
               </p>
             </button>
 
@@ -90,8 +89,8 @@ export function GenerationSpeedDialog({
               </div>
               <p className="mt-1 text-[12.5px] leading-snug text-[#62748e]">
                 {canUseSuperFast
-                  ? "Groq Llama 3.3 — much quicker drafts. Great when you want results now."
-                  : "Groq-powered drafts — tap to see Pro ($20) and Premium ($30) plans."}
+                  ? "Much quicker drafts when you want results now."
+                  : "Faster drafts — tap to see Pro ($20) and Premium ($30) plans."}
               </p>
             </button>
           </div>
@@ -113,7 +112,7 @@ export function GenerationSpeedDialog({
       <PremiumUpgradeDialog
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
-        featureLabel="Super Fast generation uses Groq and is included on Pro and Premium."
+        featureLabel="Super Fast generation is included on Pro and Premium."
       />
     </>
   );

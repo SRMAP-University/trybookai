@@ -47,7 +47,7 @@ class _PremiumUpgradeSheetState extends State<_PremiumUpgradeSheet> {
         '1 hour of audiobook narration',
         'Up to 500 pages per book',
         'Private books',
-        'Super Fast (Groq) generation',
+        'Super Fast generation',
       ],
     ),
     (

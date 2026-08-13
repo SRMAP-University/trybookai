@@ -130,8 +130,8 @@ type AiEnv = {
 };
 
 /**
- * Run outline/prose against Groq when Book.model is a Groq id; otherwise Workers AI.
- * Extract/canon can keep calling runAi(ai, OUTLINE_CF_MODEL, ...) directly.
+ * Run outline/prose with Super Fast when Book.model is a Groq id; otherwise Workers AI.
+ * On Super Fast failure (or missing key), fall back to Normal (Workers AI).
  */
 export async function runGenerationAi(
   env: AiEnv,
@@ -140,15 +140,31 @@ export async function runGenerationAi(
   options: { max_tokens?: number; temperature?: number } = {},
   purpose: "outline" | "prose" = "prose"
 ): Promise<string> {
-  if (isGroqBookModel(bookModel)) {
-    const key = env.GROQ_API_KEY?.trim();
-    if (!key) {
-      throw new Error("GROQ_API_KEY is not configured on the generation worker");
-    }
-    return runGroqAi(key, GROQ_MODEL_MAP[bookModel!], messages, options);
-  }
-
   const cfModel =
     purpose === "prose" ? resolveCfModel(bookModel) : OUTLINE_CF_MODEL;
+
+  if (isGroqBookModel(bookModel)) {
+    try {
+      const key = env.GROQ_API_KEY?.trim();
+      if (!key) {
+        throw new Error("GROQ_API_KEY is not configured");
+      }
+      const text = await runGroqAi(
+        key,
+        GROQ_MODEL_MAP[bookModel!],
+        messages,
+        options
+      );
+      if (text.trim()) return text;
+      throw new Error("empty response");
+    } catch (error) {
+      console.warn(
+        "[ai] Super Fast failed; falling back to Normal:",
+        error instanceof Error ? error.message : error
+      );
+      return runAi(env.AI, CF_MODEL_MAP["llama-3.3"], messages, options);
+    }
+  }
+
   return runAi(env.AI, cfModel, messages, options);
 }

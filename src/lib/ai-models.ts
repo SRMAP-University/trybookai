@@ -25,8 +25,8 @@ export const AI_MODELS: readonly AiModelConfig[] = [
   },
   {
     value: "groq-llama-3.3",
-    label: "Super Fast (Groq)",
-    description: "Highest speed via Groq Llama 3.3 — best for quick drafts",
+    label: "Super Fast",
+    description: "Highest speed — best for quick drafts",
     plans: ["PRO", "ENTERPRISE", "UNLIMITED"],
     provider: "groq",
     groqModel: "llama-3.3-70b-versatile",
@@ -42,7 +42,7 @@ export const AI_MODELS: readonly AiModelConfig[] = [
   {
     value: "qwen-32b",
     label: "Qwen2.5 32B",
-    description: "Cloudflare Workers AI — strong instruction following",
+    description: "Strong instruction following",
     plans: ["PRO", "ENTERPRISE", "UNLIMITED"],
     provider: "cloudflare",
     cfModel: "@cf/qwen/qwen2.5-32b-instruct",

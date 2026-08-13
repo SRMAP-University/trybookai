@@ -181,6 +181,27 @@ function resolveProvider(modelId: string): {
   };
 }
 
+function defaultCloudflareRuntimeModel(): string {
+  return getModelConfig(DEFAULT_AI_MODEL).cfModel ?? "";
+}
+
+async function runWithGroqFallback(
+  runGroq: () => Promise<string>,
+  runNormal: () => Promise<string>
+): Promise<string> {
+  try {
+    const text = await runGroq();
+    if (text.trim()) return text;
+    throw new Error("empty response");
+  } catch (error) {
+    console.warn(
+      "[llm] Super Fast failed; falling back to Normal:",
+      error instanceof Error ? error.message : error
+    );
+    return runNormal();
+  }
+}
+
 async function runGroqAi(
   model: string,
   options: {
@@ -308,7 +329,15 @@ export async function createChatCompletion(
 
   const raw =
     provider === "groq"
-      ? await runGroqAi(runtimeModel, { messages, temperature, max_tokens })
+      ? await runWithGroqFallback(
+          () => runGroqAi(runtimeModel, { messages, temperature, max_tokens }),
+          () =>
+            runCloudflareAi(defaultCloudflareRuntimeModel(), {
+              messages,
+              temperature,
+              max_tokens,
+            })
+        )
       : await runCloudflareAi(runtimeModel, {
           messages,
           temperature,
@@ -344,12 +373,26 @@ export async function streamChatCompletion(
   };
 
   if (provider === "groq") {
-    await runGroqAiStream(runtimeModel, {
-      messages,
-      temperature,
-      max_tokens,
-      onToken: onVisible,
-    });
+    try {
+      await runGroqAiStream(runtimeModel, {
+        messages,
+        temperature,
+        max_tokens,
+        onToken: onVisible,
+      });
+    } catch (error) {
+      if (filter.getVisible().trim()) throw error;
+      console.warn(
+        "[llm] Super Fast stream failed; falling back to Normal:",
+        error instanceof Error ? error.message : error
+      );
+      await runCloudflareAiStream(defaultCloudflareRuntimeModel(), {
+        messages,
+        temperature,
+        max_tokens,
+        onToken: onVisible,
+      });
+    }
   } else {
     await runCloudflareAiStream(runtimeModel, {
       messages,

@@ -46,7 +46,7 @@ export const PRICING_FEATURES: Record<string, string[]> = {
     "1 hour of audiobook narration",
     "Up to 500 pages per book",
     "Private books",
-    "Priority generation",
+    "Super Fast generation",
     "PDF & EPUB export",
   ],
   ENTERPRISE: [
@@ -54,6 +54,7 @@ export const PRICING_FEATURES: Record<string, string[]> = {
     "3 hours of audiobook narration",
     "Up to 1,000 pages per book",
     "Unlimited books",
+    "Super Fast generation",
     "Priority support",
   ],
   UNLIMITED: [

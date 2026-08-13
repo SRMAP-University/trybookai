@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Short reason shown under the title, e.g. "Super Fast uses Groq." */
+  /** Short reason shown under the title, e.g. "Super Fast is included on Pro." */
   featureLabel?: string;
 };
 

@@ -583,7 +583,7 @@ function BookDetailPageContent() {
     reviewPromptedRef.current = false;
     setPhaseMessage(
       speed === "super_fast"
-        ? "Starting Super Fast (Groq)…"
+        ? "Starting Super Fast…"
         : "Starting…"
     );
     setBook((prev) =>

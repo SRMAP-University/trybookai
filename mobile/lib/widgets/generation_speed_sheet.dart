@@ -36,7 +36,7 @@ Future<GenerationSpeed?> showGenerationSpeedSheet(
               _SpeedTile(
                 title: 'Normal',
                 subtitle:
-                    'Cloudflare Workers AI — reliable long-form writing at standard speed.',
+                    'Reliable long-form writing at standard speed.',
                 icon: Icons.auto_stories_outlined,
                 onTap: () => Navigator.of(ctx).pop(GenerationSpeed.normal),
               ),
@@ -44,8 +44,8 @@ Future<GenerationSpeed?> showGenerationSpeedSheet(
               _SpeedTile(
                 title: canUseSuperFast ? 'Super Fast' : 'Super Fast · Pro',
                 subtitle: canUseSuperFast
-                    ? 'Groq Llama 3.3 — much quicker drafts.'
-                    : 'Groq-powered drafts — tap to see Pro (\$20) and Premium (\$30).',
+                    ? 'Much quicker drafts when you want results now.'
+                    : 'Faster drafts — tap to see Pro (\$20) and Premium (\$30).',
                 icon: canUseSuperFast ? Icons.bolt_rounded : Icons.lock_outline,
                 highlight: true,
                 onTap: () async {
@@ -56,7 +56,7 @@ Future<GenerationSpeed?> showGenerationSpeedSheet(
                   final upgraded = await showPremiumUpgradeSheet(
                     ctx,
                     featureLabel:
-                        'Super Fast generation uses Groq and is included on Pro and Premium.',
+                        'Super Fast generation is included on Pro and Premium.',
                   );
                   if (!ctx.mounted) return;
                   if (upgraded) {
