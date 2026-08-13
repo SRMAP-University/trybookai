@@ -2,9 +2,7 @@ import type { Env } from "../env";
 import type { Sql } from "./db";
 import {
   extractJsonPayload,
-  OUTLINE_CF_MODEL,
-  resolveCfModel,
-  runAi,
+  runGenerationAi,
   stripThinking,
 } from "./ai";
 import { ensureBookCover } from "./cover";
@@ -261,9 +259,9 @@ export async function generateOutlineStep(
     "outlining_ai",
     { chapterCount, sectionsPerChapter },
     () =>
-      runAi(
-        ai,
-        OUTLINE_CF_MODEL,
+      runGenerationAi(
+        env,
+        book.model,
         [
           {
             role: "system",
@@ -278,7 +276,8 @@ Writing requirements:
 ${styleBlock}`,
           },
         ],
-        { max_tokens: outlineTokens, temperature: 0.5 }
+        { max_tokens: outlineTokens, temperature: 0.5 },
+        "outline"
       )
   );
 
@@ -295,9 +294,9 @@ ${styleBlock}`,
   try {
     outline = JSON.parse(extractJsonPayload(raw)) as typeof outline;
   } catch {
-    const retry = await runAi(
-      ai,
-      OUTLINE_CF_MODEL,
+    const retry = await runGenerationAi(
+      env,
+      book.model,
       [
         {
           role: "system",
@@ -309,7 +308,8 @@ ${styleBlock}`,
           content: `Fix this into valid JSON outline with exactly ${chapterCount} chapters and ${sectionsPerChapter} sections each:\n${raw.slice(0, 6000)}`,
         },
       ],
-      { max_tokens: outlineTokens, temperature: 0.2 }
+      { max_tokens: outlineTokens, temperature: 0.2 },
+      "outline"
     );
     outline = JSON.parse(extractJsonPayload(retry)) as typeof outline;
   }
@@ -577,9 +577,9 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
     "writing_ai",
     { currentSectionId: sectionId, sectionTitle: section.title },
     () =>
-      runAi(
-        ai,
-        resolveCfModel(book.model),
+      runGenerationAi(
+        env,
+        book.model,
         [
           { role: "system", content: systemContent },
           { role: "user", content: userContent },
@@ -587,7 +587,8 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
         {
           max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
           temperature: book.creativity ?? 0.7,
-        }
+        },
+        "prose"
       )
   );
 
@@ -616,9 +617,9 @@ Write section "${section.title}" (Section ${section.number} of ${sectionsPerChap
   if (extractResult?.contradictions?.length) {
     const note = extractResult.contradictions.join("; ");
     try {
-      raw = await runAi(
-        ai,
-        resolveCfModel(book.model),
+      raw = await runGenerationAi(
+        env,
+        book.model,
         [
           { role: "system", content: systemContent },
           {
@@ -635,7 +636,8 @@ ${content.slice(0, 4000)}`,
         {
           max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
           temperature: Math.min(0.5, book.creativity ?? 0.5),
-        }
+        },
+        "prose"
       );
       content = stripThinking(raw);
       await extractAndUpdateCanon(sql, ai, {

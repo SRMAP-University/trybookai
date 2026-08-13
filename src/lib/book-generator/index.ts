@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { dbTransaction } from "@/lib/db-transaction";
-import { DEFAULT_AI_MODEL, OUTLINE_AI_MODEL, isModelAvailable } from "@/lib/ai-models";
+import { DEFAULT_AI_MODEL, OUTLINE_AI_MODEL, isGroqModel, isModelAvailable } from "@/lib/ai-models";
 import {
   createChatCompletion,
   extractJsonPayload,
@@ -122,7 +122,7 @@ export async function generateOutline(
   onProgress?.("Generating outline with AI…");
 
   const raw = await createChatCompletion({
-    model: OUTLINE_AI_MODEL,
+    model: isGroqModel(book.model) ? book.model : OUTLINE_AI_MODEL,
     temperature: 0.5,
     json: true,
     max_tokens: outlineTokens,

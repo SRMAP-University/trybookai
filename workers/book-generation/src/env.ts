@@ -7,6 +7,8 @@ export type Env = {
   GENERATION_WORKER_SECRET: string;
   /** Vercel app origin for push callbacks, e.g. https://www.trybookai.com */
   APP_NOTIFY_URL?: string;
+  /** Groq API key for Super Fast generation */
+  GROQ_API_KEY?: string;
 };
 
 export type GenerationParams = {

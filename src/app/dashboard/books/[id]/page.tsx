@@ -48,6 +48,8 @@ import {
   GenerationReviewDialog,
   wasReviewDismissed,
 } from "@/components/dashboard/generation-review-dialog";
+import { GenerationSpeedDialog } from "@/components/dashboard/generation-speed-dialog";
+import type { GenerationSpeed } from "@/lib/ai-models";
 
 interface Section {
   id: string;
@@ -184,6 +186,7 @@ function BookDetailPageContent() {
   const [reviewMode, setReviewMode] = useState<
     "completed" | "failed" | "manual"
   >("completed");
+  const [speedDialogOpen, setSpeedDialogOpen] = useState(false);
   const reviewPromptedRef = useRef(false);
   const audioWatchingRef = useRef(false);
   const liveRef = useRef<HTMLDivElement>(null);
@@ -417,6 +420,7 @@ function BookDetailPageContent() {
   async function subscribeToGeneration(options?: {
     resetLive?: boolean;
     resume?: boolean;
+    speed?: GenerationSpeed;
   }) {
     if (watchingRef.current) return;
     watchingRef.current = true;
@@ -434,7 +438,15 @@ function BookDetailPageContent() {
       const url = `/api/generate/${id}/stream${
         options?.resume ? "?resume=1" : ""
       }`;
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(url, {
+        method: "POST",
+        headers: options?.speed
+          ? { "Content-Type": "application/json" }
+          : undefined,
+        body: options?.speed
+          ? JSON.stringify({ speed: options.speed })
+          : undefined,
+      });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
         if ((data as { paused?: boolean }).paused) {
@@ -514,14 +526,27 @@ function BookDetailPageContent() {
     }
   }
 
-  async function startGeneration() {
+  async function startGeneration(speed?: GenerationSpeed) {
+    if (!speed) {
+      setSpeedDialogOpen(true);
+      return;
+    }
+    setSpeedDialogOpen(false);
     reviewPromptedRef.current = false;
-    setPhaseMessage("Starting…");
+    setPhaseMessage(
+      speed === "super_fast"
+        ? "Starting Super Fast (Groq)…"
+        : "Starting…"
+    );
     setBook((prev) =>
       prev ? { ...prev, status: "GENERATING", errorMessage: null } : prev
     );
     const needsResume = book?.status === "PAUSED" || book?.status === "FAILED";
-    await subscribeToGeneration({ resetLive: true, resume: needsResume });
+    await subscribeToGeneration({
+      resetLive: true,
+      resume: needsResume,
+      speed,
+    });
   }
 
   async function stopGeneration() {
@@ -865,6 +890,15 @@ function BookDetailPageContent() {
           .map((a) => a.type)}
       />
 
+      <GenerationSpeedDialog
+        open={speedDialogOpen}
+        onOpenChange={setSpeedDialogOpen}
+        busy={generating}
+        resume={book?.status === "FAILED" || book?.status === "PAUSED"}
+        onChoose={(speed) => {
+          void startGeneration(speed);
+        }}
+      />
       <GenerationReviewDialog
         open={reviewOpen}
         onOpenChange={setReviewOpen}
@@ -1013,7 +1047,7 @@ function BookDetailPageContent() {
               book.status === "PAUSED") &&
               !generating && (
                 <Button
-                  onClick={startGeneration}
+                  onClick={() => void startGeneration()}
                   disabled={generating}
                   className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
                 >

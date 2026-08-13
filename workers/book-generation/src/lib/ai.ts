@@ -1,4 +1,4 @@
-const MODEL_MAP: Record<string, string> = {
+const CF_MODEL_MAP: Record<string, string> = {
   "llama-3.3": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
   "deepseek-r1": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
   "qwen-32b": "@cf/qwen/qwen2.5-32b-instruct",
@@ -6,11 +6,20 @@ const MODEL_MAP: Record<string, string> = {
   "gpt-4o-mini": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 };
 
-export const OUTLINE_CF_MODEL = MODEL_MAP["llama-3.3"];
+const GROQ_MODEL_MAP: Record<string, string> = {
+  "groq-llama-3.3": "llama-3.3-70b-versatile",
+};
+
+export const OUTLINE_CF_MODEL = CF_MODEL_MAP["llama-3.3"];
+
+export function isGroqBookModel(modelId: string | null | undefined): boolean {
+  return Boolean(modelId && GROQ_MODEL_MAP[modelId]);
+}
 
 export function resolveCfModel(modelId: string | null | undefined): string {
-  if (!modelId) return MODEL_MAP["llama-3.3"];
-  return MODEL_MAP[modelId] ?? MODEL_MAP["llama-3.3"];
+  if (!modelId) return CF_MODEL_MAP["llama-3.3"];
+  if (isGroqBookModel(modelId)) return CF_MODEL_MAP["llama-3.3"];
+  return CF_MODEL_MAP[modelId] ?? CF_MODEL_MAP["llama-3.3"];
 }
 
 export function extractText(result: unknown): string {
@@ -82,4 +91,64 @@ export async function runAi(
     temperature: options.temperature ?? 0.7,
   });
   return stripThinking(extractText(result));
+}
+
+async function runGroqAi(
+  apiKey: string,
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  options: { max_tokens?: number; temperature?: number } = {}
+): Promise<string> {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: options.max_tokens ?? 4096,
+      temperature: options.temperature ?? 0.7,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Groq API error ${res.status}: ${body.slice(0, 300) || res.statusText}`
+    );
+  }
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  return stripThinking(data.choices?.[0]?.message?.content ?? "");
+}
+
+type AiEnv = {
+  AI: Ai;
+  GROQ_API_KEY?: string;
+};
+
+/**
+ * Run outline/prose against Groq when Book.model is a Groq id; otherwise Workers AI.
+ * Extract/canon can keep calling runAi(ai, OUTLINE_CF_MODEL, ...) directly.
+ */
+export async function runGenerationAi(
+  env: AiEnv,
+  bookModel: string | null | undefined,
+  messages: Array<{ role: string; content: string }>,
+  options: { max_tokens?: number; temperature?: number } = {},
+  purpose: "outline" | "prose" = "prose"
+): Promise<string> {
+  if (isGroqBookModel(bookModel)) {
+    const key = env.GROQ_API_KEY?.trim();
+    if (!key) {
+      throw new Error("GROQ_API_KEY is not configured on the generation worker");
+    }
+    return runGroqAi(key, GROQ_MODEL_MAP[bookModel!], messages, options);
+  }
+
+  const cfModel =
+    purpose === "prose" ? resolveCfModel(bookModel) : OUTLINE_CF_MODEL;
+  return runAi(env.AI, cfModel, messages, options);
 }

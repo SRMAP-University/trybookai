@@ -3,6 +3,10 @@ import {
   ensureGenerationRunning,
   GenerationPausedError,
 } from "@/lib/book-generator/background";
+import {
+  applyGenerationSpeed,
+  parseGenerationSpeed,
+} from "@/lib/book-generator/generation-speed";
 import { type StreamEvent } from "@/lib/book-generator/streaming";
 import { watchGenerationStream } from "@/lib/book-generator/watch";
 import { getAppVersion, resolveClientSource } from "@/lib/client-source";
@@ -33,17 +37,29 @@ export async function POST(
   const client = resolveClientSource(request);
   const appVersion = getAppVersion(request);
 
+  let speed = parseGenerationSpeed(searchParams.get("speed"));
+  const body = (await request.json().catch(() => null)) as {
+    speed?: unknown;
+  } | null;
+  speed = parseGenerationSpeed(body?.speed) ?? speed;
+
   try {
+    if (speed) {
+      await applyGenerationSpeed(id, session.user.id, speed);
+    }
     await ensureGenerationRunning(id, session.user.id, resume, {
       client,
       appVersion,
     });
   } catch (error) {
     if (error instanceof GenerationPausedError) {
-      return new Response(JSON.stringify({ error: error.message, paused: true }), {
-        status: 409,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: error.message, paused: true }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
     const message =
       error instanceof Error ? error.message : "Generation failed";
@@ -52,8 +68,6 @@ export async function POST(
       headers: { "Content-Type": "application/json" },
     });
   }
-
-  // ensureGenerationRunning above already enqueues Cloudflare (or local queue).
 
   const encoder = new TextEncoder();
 

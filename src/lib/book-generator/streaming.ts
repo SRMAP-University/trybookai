@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
 import { DEFAULT_AI_MODEL } from "@/lib/ai-models";
 import {
   extractModelText,
@@ -209,7 +209,7 @@ async function streamGenerateSection(
         const snapshot = pendingPersist;
         pendingPersist = null;
         const now = Date.now();
-        if (!force && now - lastPersist < 3000) {
+        if (!force && now - lastPersist < 8000) {
           break;
         }
         lastPersist = now;
@@ -259,7 +259,7 @@ async function streamGenerateSection(
       draftContent += text;
       emit({ type: "token", sectionId: section.id, text });
 
-      if (Date.now() - lastPersist >= 3000) {
+      if (Date.now() - lastPersist >= 8000) {
         void persistDraft(draftContent);
       }
     },
@@ -290,10 +290,12 @@ ${assembled?.systemStyle ?? styleParts.join("\n")}`,
   // Wait for any in-flight throttle, then write the final section once.
   await (persistInFlight as Promise<void> | null)?.catch(() => undefined);
 
-  await db.section.update({
-    where: { id: sectionId },
-    data: { content, wordCount, pageCount },
-  });
+  await withDbRetry("section.update", () =>
+    db.section.update({
+      where: { id: sectionId },
+      data: { content, wordCount, pageCount },
+    })
+  );
   await updateJobProgress(jobId, {
     currentSectionId: section.id,
     partialContent: content,

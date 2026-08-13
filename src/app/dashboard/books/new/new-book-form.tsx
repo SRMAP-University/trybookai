@@ -633,7 +633,7 @@ export function NewBookForm() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {AI_MODELS.map((m) => (
+                    {AI_MODELS.filter((m) => m.provider === "cloudflare").map((m) => (
                       <SelectItem key={m.value} value={m.value}>
                         {m.label}
                       </SelectItem>

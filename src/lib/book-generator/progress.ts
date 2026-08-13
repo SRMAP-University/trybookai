@@ -107,8 +107,11 @@ export async function computeBookProgress(
   );
 
   const allDone =
-    completedSections === sections.length ||
-    (book.targetPages > 0 && currentPages >= book.targetPages);
+    // Never treat mid-stream draft estimates as completion — that triggers
+    // extra incomplete-section queries and can race the Neon pool.
+    !options.activeSectionId &&
+    (completedSections === sections.length ||
+      (book.targetPages > 0 && currentPages >= book.targetPages));
 
   return {
     progress: allDone ? 100 : progress,
@@ -136,15 +139,17 @@ export async function applyBookProgress(
   const progress = Math.max(result.progress, book.progress ?? 0);
   const currentPages = Math.max(result.currentPages, book.currentPages ?? 0);
 
-  // Do not mark COMPLETED while any section still lacks real prose.
+  // Skip expensive incomplete scan during draft ticks; finalize paths check it.
   const markComplete =
-    result.allDone && !(await hasIncompleteSections(bookId));
+    result.allDone &&
+    !options.activeSectionId &&
+    !(await hasIncompleteSections(bookId));
 
   await db.book.update({
     where: { id: bookId },
     data: {
       currentPages,
-      progress: markComplete ? 100 : progress,
+      progress: markComplete ? 100 : Math.min(progress, 99),
       status: markComplete
         ? "COMPLETED"
         : book.status === "PAUSED"

@@ -37,3 +37,4 @@ crons = ["*/5 * * * *"]
 
 # Secrets: wrangler secret put GENERATION_WORKER_SECRET
 #          wrangler secret put DATABASE_URL
+#          wrangler secret put GROQ_API_KEY

@@ -4,6 +4,10 @@ import {
   ensureGenerationRunning,
   GenerationPausedError,
 } from "@/lib/book-generator/background";
+import {
+  applyGenerationSpeed,
+  parseGenerationSpeed,
+} from "@/lib/book-generator/generation-speed";
 import { getAppVersion, resolveClientSource } from "@/lib/client-source";
 
 export const runtime = "nodejs";
@@ -23,7 +27,15 @@ export async function POST(
   const client = resolveClientSource(request);
   const appVersion = getAppVersion(request);
 
+  const body = (await request.json().catch(() => null)) as {
+    speed?: unknown;
+  } | null;
+  const speed = parseGenerationSpeed(body?.speed);
+
   try {
+    if (speed) {
+      await applyGenerationSpeed(id, session.user.id, speed);
+    }
     // Enqueues to Cloudflare Workflows (or local queue). Does not run prose on Vercel.
     const result = await ensureGenerationRunning(id, session.user.id, resume, {
       client,
