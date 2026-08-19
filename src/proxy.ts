@@ -45,37 +45,6 @@ export default async function proxy(req: NextRequest) {
   return (auth as unknown as (request: NextRequest) => Promise<Response>)(req);
 }
 
-const { auth } = NextAuth(authConfig);
-
-function isApiProtected(path: string) {
-  return (
-    path.startsWith("/api/books") ||
-    path.startsWith("/api/billing") ||
-    path.startsWith("/api/generate") ||
-    path.startsWith("/api/audio") ||
-    path.startsWith("/api/settings") ||
-    path.startsWith("/api/branding") ||
-    path.startsWith("/api/analytics") ||
-    path.startsWith("/api/studio") ||
-    path.startsWith("/api/jobs")
-  );
-}
-
-export default async function proxy(req: NextRequest) {
-  const path = req.nextUrl.pathname;
-  const bearer = req.headers.get("authorization");
-
-  if (bearer?.startsWith("Bearer ") && isApiProtected(path)) {
-    const payload = await verifyMobileToken(bearer.slice(7));
-    if (payload?.sub) {
-      return NextResponse.next();
-    }
-  }
-
-  // NextAuth edge helper accepts NextRequest at runtime; overloads are strict.
-  return (auth as unknown as (request: NextRequest) => Promise<Response>)(req);
-}
-
 export const config = {
   matcher: [
     "/dashboard/:path*",

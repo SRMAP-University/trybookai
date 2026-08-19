@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 
 /// Outlined "Continue with Google" control matching the web auth button.
@@ -78,6 +80,73 @@ class AuthOrDivider extends StatelessWidget {
         ),
         Expanded(child: Divider(color: AppColors.border)),
       ],
+    );
+  }
+}
+
+/// Tappable Terms / Privacy / Refund — shown on login and register.
+class AuthLegalNotice extends StatelessWidget {
+  const AuthLegalNotice({
+    super.key,
+    this.actionLabel = 'By continuing',
+  });
+
+  final String actionLabel;
+
+  static Future<void> _open(String path) {
+    return launchUrl(
+      Uri.parse('${ApiConfig.baseUrl}$path'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  Widget _link(String label, String path) {
+    return GestureDetector(
+      onTap: () => _open(path),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          height: 1.4,
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const muted = TextStyle(
+      fontSize: 12,
+      height: 1.4,
+      color: AppColors.textMuted,
+    );
+    return Text.rich(
+      TextSpan(
+        style: muted,
+        children: [
+          TextSpan(text: '$actionLabel, you agree to our '),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: _link('Terms', '/terms'),
+          ),
+          const TextSpan(text: ', '),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: _link('Privacy Policy', '/privacy'),
+          ),
+          const TextSpan(text: ', and '),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: _link('Refund Policy', '/refund'),
+          ),
+          const TextSpan(text: '.'),
+        ],
+      ),
     );
   }
 }

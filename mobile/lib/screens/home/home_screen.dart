@@ -80,24 +80,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         Text(
-                          user.onTrial ? 'Free trial' : user.planLabel,
+                          user.displayPlanLabel,
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: AppColors.primary,
                             letterSpacing: 0.4,
                           ),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          onPressed: () => context.push('/billing'),
-                          child: const Text('Manage'),
                         ),
                       ],
                     ),

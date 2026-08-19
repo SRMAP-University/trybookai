@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/premium_upgrade_sheet.dart';
 
@@ -29,7 +30,9 @@ Future<GenerationSpeed?> showGenerationSpeedSheet(
               ),
               const SizedBox(height: 6),
               Text(
-                'Choose how fast to write. You can change this next time.',
+                AppBilling.iapEnabled
+                    ? 'Choose how fast to write. You can change this next time.'
+                    : 'The Android app currently includes Normal generation only.',
                 style: TextStyle(color: Colors.grey.shade700, height: 1.35),
               ),
               const SizedBox(height: 16),
@@ -40,30 +43,33 @@ Future<GenerationSpeed?> showGenerationSpeedSheet(
                 icon: Icons.auto_stories_outlined,
                 onTap: () => Navigator.of(ctx).pop(GenerationSpeed.normal),
               ),
-              const SizedBox(height: 10),
-              _SpeedTile(
-                title: canUseSuperFast ? 'Super Fast' : 'Super Fast · Pro',
-                subtitle: canUseSuperFast
-                    ? 'Much quicker drafts when you want results now.'
-                    : 'Faster drafts — tap to see Pro (\$20) and Premium (\$30).',
-                icon: canUseSuperFast ? Icons.bolt_rounded : Icons.lock_outline,
-                highlight: true,
-                onTap: () async {
-                  if (canUseSuperFast) {
-                    Navigator.of(ctx).pop(GenerationSpeed.superFast);
-                    return;
-                  }
-                  final upgraded = await showPremiumUpgradeSheet(
-                    ctx,
-                    featureLabel:
-                        'Super Fast generation is included on Pro and Premium.',
-                  );
-                  if (!ctx.mounted) return;
-                  if (upgraded) {
-                    Navigator.of(ctx).pop(GenerationSpeed.superFast);
-                  }
-                },
-              ),
+              if (AppBilling.iapEnabled) ...[
+                const SizedBox(height: 10),
+                _SpeedTile(
+                  title: canUseSuperFast ? 'Super Fast' : 'Super Fast · Pro',
+                  subtitle: canUseSuperFast
+                      ? 'Much quicker drafts when you want results now.'
+                      : 'Faster drafts — included on paid plans.',
+                  icon:
+                      canUseSuperFast ? Icons.bolt_rounded : Icons.lock_outline,
+                  highlight: true,
+                  onTap: () async {
+                    if (canUseSuperFast) {
+                      Navigator.of(ctx).pop(GenerationSpeed.superFast);
+                      return;
+                    }
+                    final upgraded = await showPremiumUpgradeSheet(
+                      ctx,
+                      featureLabel:
+                          'Super Fast generation is included on Pro and Premium.',
+                    );
+                    if (!ctx.mounted) return;
+                    if (upgraded) {
+                      Navigator.of(ctx).pop(GenerationSpeed.superFast);
+                    }
+                  },
+                ),
+              ],
             ],
           ),
         ),

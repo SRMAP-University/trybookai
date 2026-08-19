@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
@@ -282,6 +283,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   }
 
   void _maybeOfferAudiobook() {
+    if (!AppBilling.iapEnabled) return;
     if (_offeredAudio || !mounted) return;
     final book = _book;
     if (book == null || book.status != 'COMPLETED') return;
@@ -498,7 +500,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     final resume = book.status == 'PAUSED' || book.status == 'FAILED';
     final speed = await showGenerationSpeedSheet(
       context,
-      canUseSuperFast: user?.isPaid == true,
+      canUseSuperFast: AppBilling.iapEnabled && user?.isPaid == true,
       resume: resume,
     );
     if (!mounted || speed == null) return;
@@ -548,6 +550,13 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   }
 
   Future<void> _startAudiobook({bool regenerate = false}) async {
+    if (!AppBilling.iapEnabled) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppBilling.freeAppMessage)),
+      );
+      return;
+    }
     setState(() => _audioBusy = true);
     final books = context.read<BooksProvider>();
     final id = await books.startAudiobook(
@@ -1046,7 +1055,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                   ? 'Anyone with the link can read it'
                                   : book.canMakePrivate
                                       ? 'Only you can see this book'
-                                      : 'Upgrade to make books private',
+                                      : 'Private books are not available in the free Android app',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textMuted,
@@ -1056,7 +1065,9 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                             activeThumbColor: AppColors.primary,
                             onChanged: _togglePublic,
                           ),
-                          if (book.isPublic && !book.canMakePrivate)
+                          if (AppBilling.iapEnabled &&
+                              book.isPublic &&
+                              !book.canMakePrivate)
                             Align(
                               alignment: Alignment.centerLeft,
                               child: TextButton(
@@ -1195,15 +1206,22 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                               ),
                               Align(
                                 alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: _audioBusy || audioRunning
-                                      ? null
-                                      : () => _startAudiobook(regenerate: true),
-                                  child: Text(
-                                    audioRunning ? 'Regenerating…' : 'Regenerate',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ),
+                                child: AppBilling.iapEnabled
+                                    ? TextButton(
+                                        onPressed: _audioBusy || audioRunning
+                                            ? null
+                                            : () => _startAudiobook(
+                                                  regenerate: true,
+                                                ),
+                                        child: Text(
+                                          audioRunning
+                                              ? 'Regenerating…'
+                                              : 'Regenerate',
+                                          style:
+                                              const TextStyle(fontSize: 12),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
                               ),
                             ] else ...[
                               const Text(
@@ -1217,14 +1235,17 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                     ? 'Audiobook converting… pull to refresh in a moment'
                                     : audioDone
                                         ? 'Audio finished, but no playable file URL was returned. Try regenerate, or open the web editor.'
-                                        : 'Convert the finished manuscript to audio',
+                                        : AppBilling.iapEnabled
+                                            ? 'Convert the finished manuscript to audio'
+                                            : AppBilling.freeAppMessage,
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textMuted,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              FilledButton.icon(
+                              if (AppBilling.iapEnabled) ...[
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
                                 onPressed: _audioBusy || audioRunning
                                     ? null
                                     : () => _startAudiobook(
@@ -1248,6 +1269,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                           : 'Convert to audiobook',
                                 ),
                               ),
+                              ],
                               const SizedBox(height: 8),
                               TextButton(
                                 onPressed: _loadAudios,

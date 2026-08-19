@@ -24,7 +24,7 @@ class UsageScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user.onTrial ? 'Premium trial' : user.planLabel,
+                        user.displayPlanLabel,
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

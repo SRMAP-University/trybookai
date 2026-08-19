@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
@@ -79,6 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String get _planLabel {
+    if (!AppBilling.iapEnabled) return 'Free';
     switch (_plan) {
       case 'ENTERPRISE':
         return 'Premium';
@@ -138,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: SwitchListTile(
                     title: const Text('Email notifications'),
                     subtitle: const Text(
-                      'Usage alerts and billing emails',
+                      'Usage alerts and product emails',
                       style:
                           TextStyle(fontSize: 12, color: AppColors.textMuted),
                     ),

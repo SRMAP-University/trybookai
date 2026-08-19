@@ -1,4 +1,5 @@
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 
 class UserModel {
   UserModel({
@@ -47,8 +48,14 @@ class UserModel {
   double get pagesPercent =>
       pagesLimit <= 0 ? 0 : (pagesUsed / pagesLimit).clamp(0, 1);
 
+  String get displayPlanLabel {
+    if (!AppBilling.iapEnabled) return 'Free';
+    return onTrial ? 'Free trial' : planLabel;
+  }
+
   bool get isPaid =>
-      plan == 'PRO' || plan == 'ENTERPRISE' || plan == 'UNLIMITED';
+      AppBilling.iapEnabled &&
+      (plan == 'PRO' || plan == 'ENTERPRISE' || plan == 'UNLIMITED');
 
   int get pagesRemaining => (pagesLimit - pagesUsed).clamp(0, pagesLimit);
 

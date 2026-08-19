@@ -3,11 +3,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
-import 'package:go_router/go_router.dart';
 
 class AudioStudioScreen extends StatefulWidget {
   const AudioStudioScreen({super.key});
@@ -45,11 +45,17 @@ class _AudioStudioScreenState extends State<AudioStudioScreen> {
 
   Future<void> _generate() async {
     final auth = context.read<AuthProvider>();
-    if (auth.user?.plan == 'FREE' && !(auth.user?.onTrial ?? false)) {
+    if (!AppBilling.iapEnabled ||
+        (auth.user?.plan == 'FREE' && !(auth.user?.onTrial ?? false))) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Audio requires Pro, Premium, or a trial.')),
+        SnackBar(
+          content: Text(
+            AppBilling.iapEnabled
+                ? 'Audio requires Pro, Premium, or a trial.'
+                : AppBilling.freeAppMessage,
+          ),
+        ),
       );
-      context.go('/billing');
       return;
     }
     if (_title.text.trim().isEmpty) {
@@ -102,7 +108,17 @@ class _AudioStudioScreenState extends State<AudioStudioScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Audio Studio')),
-      body: ListView(
+      body: !AppBilling.iapEnabled
+          ? const Padding(
+              padding: EdgeInsets.fromLTRB(20, 24, 20, 40),
+              child: StripeCard(
+                child: Text(
+                  AppBilling.freeAppMessage,
+                  style: TextStyle(height: 1.4),
+                ),
+              ),
+            )
+          : ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
         children: [
           if (user != null)

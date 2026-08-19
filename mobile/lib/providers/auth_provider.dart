@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/google_auth_service.dart';
@@ -52,6 +53,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Never await from UI-critical paths — Purchases.configure can hang.
   void _linkRevenueCat(String userId) {
+    if (!AppBilling.iapEnabled) return;
     final rc = _revenueCat;
     if (rc == null) return;
     unawaited(() async {

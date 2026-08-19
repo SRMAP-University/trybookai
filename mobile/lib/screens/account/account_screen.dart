@@ -57,9 +57,7 @@ class AccountScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        user?.onTrial == true
-                            ? 'Free trial'
-                            : (user?.planLabel ?? 'Free'),
+                        user?.displayPlanLabel ?? 'Free',
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -102,11 +100,6 @@ class AccountScreen extends StatelessWidget {
                 icon: Icons.bar_chart_rounded,
                 label: 'Usage',
                 onTap: () => context.push('/usage'),
-              ),
-              MenuTile(
-                icon: Icons.credit_card_rounded,
-                label: 'Billing',
-                onTap: () => context.push('/billing'),
               ),
             ],
           ),
@@ -161,7 +154,6 @@ Future<void> _confirmDeleteAccount(BuildContext context) async {
       title: const Text('Delete account?'),
       content: const Text(
         'This permanently deletes your BookAI account and all books. '
-        'Cancel Google Play subscriptions in Play Store as well. '
         'This cannot be undone.',
       ),
       actions: [

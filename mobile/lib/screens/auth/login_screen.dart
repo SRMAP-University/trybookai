@@ -77,6 +77,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: (auth.loading || _googleLoading) ? null : _google,
                 loading: _googleLoading,
               ),
+              const SizedBox(height: 10),
+              const AuthLegalNotice(),
               const SizedBox(height: 16),
               const AuthOrDivider(),
               const SizedBox(height: 16),
@@ -117,7 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? null
                             : 'Min 8 characters',
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 14),
+                      const AuthLegalNotice(actionLabel: 'By signing in'),
+                      const SizedBox(height: 18),
                       FilledButton(
                         onPressed: auth.loading ? null : _submit,
                         child: auth.loading

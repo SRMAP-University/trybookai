@@ -89,6 +89,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onPressed: (auth.loading || _googleLoading) ? null : _google,
                 loading: _googleLoading,
               ),
+              const SizedBox(height: 10),
+              const AuthLegalNotice(),
               const SizedBox(height: 16),
               const AuthOrDivider(),
               const SizedBox(height: 16),
@@ -146,13 +148,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             : 'Min 8 characters',
                       ),
                       const SizedBox(height: 14),
-                      const Text(
-                        'By continuing you agree to Terms, Privacy, and Refund Policy.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.4,
-                          color: AppColors.textMuted,
-                        ),
+                      const AuthLegalNotice(
+                        actionLabel: 'By creating an account',
                       ),
                       const SizedBox(height: 18),
                       FilledButton(

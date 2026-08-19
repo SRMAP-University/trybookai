@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/providers/new_book_draft_provider.dart';
@@ -38,7 +39,7 @@ class _NewBookScreenState extends State<NewBookScreen> {
   String _genre = 'Fiction';
   double _pages = 40;
   bool _starting = false;
-  bool _audiobookAfter = true;
+  bool _audiobookAfter = false;
   bool _showAdvanced = false;
   String? _enhancing;
   bool _restored = false;
@@ -56,8 +57,8 @@ class _NewBookScreenState extends State<NewBookScreen> {
     _customInstructions.text = draft.customInstructions;
     _characters.text = draft.characters;
     _genre = draft.genre;
-    _pages = draft.pages.clamp(5, 500);
-    _audiobookAfter = draft.audiobookAfter;
+    _pages = draft.pages.clamp(5, AppBilling.iapEnabled ? 500 : 50);
+    _audiobookAfter = AppBilling.iapEnabled && draft.audiobookAfter;
     _showAdvanced = draft.showAdvanced;
   }
 
@@ -314,28 +315,29 @@ class _NewBookScreenState extends State<NewBookScreen> {
           Slider(
             value: _pages,
             min: 5,
-            max: 500,
-            divisions: 48,
+            max: AppBilling.iapEnabled ? 500 : 50,
+            divisions: AppBilling.iapEnabled ? 48 : 9,
             label: '${_pages.round()} pages',
             onChanged: (v) {
               setState(() => _pages = v);
               _persistDraft();
             },
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Audiobook after complete'),
-            subtitle: const Text(
-              'Convert to audiobook when generation finishes',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+          if (AppBilling.iapEnabled)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Audiobook after complete'),
+              subtitle: const Text(
+                'Convert to audiobook when generation finishes',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              value: _audiobookAfter,
+              activeThumbColor: AppColors.primary,
+              onChanged: (v) {
+                setState(() => _audiobookAfter = v);
+                _persistDraft();
+              },
             ),
-            value: _audiobookAfter,
-            activeThumbColor: AppColors.primary,
-            onChanged: (v) {
-              setState(() => _audiobookAfter = v);
-              _persistDraft();
-            },
-          ),
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: () {

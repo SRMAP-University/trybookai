@@ -10,7 +10,6 @@ import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/routing/app_page.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
-import 'package:bookai_mobile/services/revenuecat_service.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/screens/auth/boot_screen.dart';
 import 'package:bookai_mobile/screens/auth/login_screen.dart';
@@ -23,7 +22,6 @@ import 'package:bookai_mobile/screens/books/book_detail_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_books_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_book_detail_screen.dart';
 import 'package:bookai_mobile/screens/studio/audio_studio_screen.dart';
-import 'package:bookai_mobile/screens/billing/billing_screen.dart';
 import 'package:bookai_mobile/screens/account/account_screen.dart';
 import 'package:bookai_mobile/screens/account/usage_screen.dart';
 import 'package:bookai_mobile/screens/account/settings_screen.dart';
@@ -34,8 +32,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final api = ApiClient();
   final push = PushNotificationService(api);
-  final revenueCat = RevenueCatService();
-  final auth = AuthProvider(api, push: push, revenueCat: revenueCat);
+  final auth = AuthProvider(api, push: push);
   final books = BooksProvider(api);
 
   // One gate before first frame: token read only (fast). Skip BootScreen → shell
@@ -57,7 +54,6 @@ Future<void> main() async {
       auth: auth,
       books: books,
       push: push,
-      revenueCat: revenueCat,
       initialLocation: hasToken ? '/home' : '/login',
     ),
   );
@@ -77,16 +73,6 @@ Future<void> main() async {
     if (auth.canEnterApp) {
       unawaited(books.load());
       unawaited(books.loadActiveJobs());
-    }
-    try {
-      await revenueCat.configure().timeout(const Duration(seconds: 8));
-      if (auth.isAuthenticated && auth.user != null) {
-        await revenueCat.logIn(auth.user!.id).timeout(const Duration(seconds: 8));
-      }
-    } on TimeoutException {
-      debugPrint('[main] RevenueCat configure timed out');
-    } catch (e) {
-      debugPrint('[main] RevenueCat init failed: $e');
     }
     try {
       await push.initialize();
@@ -111,7 +97,6 @@ class BookAiApp extends StatefulWidget {
     required this.auth,
     required this.books,
     required this.push,
-    required this.revenueCat,
     required this.initialLocation,
   });
 
@@ -119,7 +104,6 @@ class BookAiApp extends StatefulWidget {
   final AuthProvider auth;
   final BooksProvider books;
   final PushNotificationService push;
-  final RevenueCatService revenueCat;
   final String initialLocation;
 
   @override
@@ -149,7 +133,6 @@ class _BookAiAppState extends State<BookAiApp> {
       providers: [
         Provider.value(value: widget.api),
         Provider.value(value: widget.push),
-        ChangeNotifierProvider.value(value: widget.revenueCat),
         ChangeNotifierProvider.value(value: widget.auth),
         ChangeNotifierProvider.value(value: widget.books),
         ChangeNotifierProvider.value(value: _public),
@@ -195,6 +178,7 @@ GoRouter _buildRouter(
       if (inApp && (isAuthRoute || isBoot)) {
         return auth.pendingOnboarding ? '/books/new' : '/home';
       }
+      if (loc == '/billing') return '/account';
       return null;
     },
     routes: [
@@ -215,9 +199,7 @@ GoRouter _buildRouter(
       ),
       GoRoute(
         path: '/billing',
-        parentNavigatorKey: _rootNavigatorKey,
-        pageBuilder: (context, state) =>
-            AppPage.slide(state, const BillingScreen()),
+        redirect: (context, state) => '/account',
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
