@@ -32,6 +32,7 @@ export async function loadAdminOverview() {
           updatedAt: true,
           brandName: true,
           authorName: true,
+          countryCode: true,
           _count: { select: { pushTokens: true, books: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -256,12 +257,22 @@ export async function loadAdminOverview() {
   const atRisk = [...insights]
     .filter((i) => i.label === "frustrated" || i.label === "churning" || i.stuck)
     .sort((a, b) => a.score - b.score)
-    .slice(0, 20);
+    .slice(0, 20)
+    .map((i) => ({
+      ...i,
+      countryCode:
+        users.find((u) => u.id === i.userId)?.countryCode ?? null,
+    }));
 
   const champions = [...insights]
     .filter((i) => i.label === "delighted" || i.label === "happy")
     .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+    .slice(0, 12)
+    .map((i) => ({
+      ...i,
+      countryCode:
+        users.find((u) => u.id === i.userId)?.countryCode ?? null,
+    }));
 
   return {
     summary: {
@@ -375,12 +386,17 @@ function topImprovements(insights: UserInsight[], gaps: ImprovementGap[]) {
 }
 
 export async function loadAdminUsers(q?: string) {
+  const query = q?.trim() || undefined;
+  const countryFilter =
+    query && /^[A-Za-z]{2}$/.test(query) ? query.toUpperCase() : undefined;
+
   const users = await db.user.findMany({
-    where: q
+    where: query
       ? {
           OR: [
-            { email: { contains: q, mode: "insensitive" } },
-            { name: { contains: q, mode: "insensitive" } },
+            { email: { contains: query, mode: "insensitive" } },
+            { name: { contains: query, mode: "insensitive" } },
+            ...(countryFilter ? [{ countryCode: countryFilter }] : []),
           ],
         }
       : undefined,
@@ -402,6 +418,7 @@ export async function loadAdminUsers(q?: string) {
       updatedAt: true,
       brandName: true,
       authorName: true,
+      countryCode: true,
       _count: { select: { books: true, pushTokens: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -541,6 +558,7 @@ export async function loadAdminUsers(q?: string) {
       audioMinutesUsed: u.audioMinutesUsed,
       audioMinutesLimit: u.audioMinutesLimit,
       hasSub: Boolean(u.stripeSubId),
+      countryCode: u.countryCode,
     };
   });
 }

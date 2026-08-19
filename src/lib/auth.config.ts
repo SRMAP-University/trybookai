@@ -4,7 +4,7 @@ export const authConfig = {
   trustHost: true,
   pages: {
     signIn: "/login",
-    newUser: "/dashboard",
+    newUser: "/dashboard/books/new",
   },
   providers: [],
   callbacks: {
@@ -34,7 +34,8 @@ export const authConfig = {
         path.startsWith("/api/settings") ||
         path.startsWith("/api/branding") ||
         path.startsWith("/api/analytics") ||
-        path.startsWith("/api/studio");
+        path.startsWith("/api/studio") ||
+        path.startsWith("/api/account");
 
       if (isAuthPage && isLoggedIn) {
         // Keep same host (www vs apex) — absolute AUTH_URL redirects cause CORS on RSC.

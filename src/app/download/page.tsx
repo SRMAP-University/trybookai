@@ -3,6 +3,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
+import { WebInstallSection } from "@/components/pwa/web-install-section";
 import { getAppUrl } from "@/lib/book-public";
 import {
   ANDROID_APP_VERSION,
@@ -13,14 +14,14 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Download BookAI for Android",
+  title: "Install BookAI",
   description:
-    "Download the BookAI Android app. Scan the QR code on desktop, or tap Download APK on your phone.",
+    "Install BookAI as a web app on your phone or desktop, or download the Android APK.",
   alternates: { canonical: `${getAppUrl()}/download` },
   openGraph: {
-    title: "Download BookAI for Android",
+    title: "Install BookAI",
     description:
-      "Download the BookAI Android app. Scan the QR code on desktop, or tap Download APK on your phone.",
+      "Install BookAI as a web app on your phone or desktop, or download the Android APK.",
     url: `${getAppUrl()}/download`,
     type: "website",
   },
@@ -43,11 +44,29 @@ export default async function DownloadPage() {
         <section className="landing-section pt-28 pb-20">
           <div className="mx-auto max-w-[920px] px-6">
             <p className="text-center text-[13px] font-medium uppercase tracking-[0.08em] text-[#6b6b6b]">
-              Android app
+              Install BookAI
             </p>
             <h1 className="landing-heading mt-3 text-center">
-              Download BookAI
+              Install on any device
             </h1>
+            <p className="mx-auto mt-4 max-w-[560px] text-center text-[17px] leading-relaxed text-[#425466]">
+              Install the BookAI web app for quick access, or download the native
+              Android APK if you prefer a standalone mobile build.
+            </p>
+
+            <div id="pwa" className="mx-auto mt-10 max-w-[760px]">
+              <WebInstallSection />
+            </div>
+
+            <div className="mx-auto mt-14 max-w-[760px] border-t border-[#e8e8e6] pt-12">
+              <p className="text-center text-[13px] font-medium uppercase tracking-[0.08em] text-[#6b6b6b]">
+                Android app
+              </p>
+              <h2 className="landing-heading mt-3 text-center text-[32px]">
+                Download APK
+              </h2>
+            </div>
+
             <p className="mx-auto mt-4 max-w-[520px] text-center text-[17px] leading-relaxed text-[#425466] md:hidden">
               Tap the button below to install the APK on this phone. Enable
               “Install unknown apps” if Android asks.

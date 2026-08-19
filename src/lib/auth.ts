@@ -8,10 +8,19 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 import { verifyMobileToken } from "@/lib/mobile-auth";
+import { persistUserCountryFromRequest } from "@/lib/geo";
 
 const nextAuth = NextAuth({
   adapter: PrismaAdapter(db),
   ...authConfig,
+  events: {
+    async createUser({ user }) {
+      if (user.id) await persistUserCountryFromRequest(user.id);
+    },
+    async signIn({ user }) {
+      if (user.id) await persistUserCountryFromRequest(user.id);
+    },
+  },
   providers: [
     Credentials({
       name: "credentials",

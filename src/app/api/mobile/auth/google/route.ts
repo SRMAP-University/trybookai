@@ -6,6 +6,7 @@ import { cleanEnv } from "@/lib/env";
 import { isTrialActive } from "@/lib/billing";
 import { signMobileToken } from "@/lib/mobile-auth";
 import { sendWelcomeEmail } from "@/lib/emails/transactional";
+import { countryCodeFromRequest, persistUserCountryFromRequest } from "@/lib/geo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -151,9 +152,11 @@ export async function POST(request: Request) {
         email: existingAccount.user.email,
         name: existingAccount.user.name,
       });
+      void persistUserCountryFromRequest(existingAccount.user.id, request);
       return NextResponse.json({
         token,
         user: userPayload(existingAccount.user),
+        isNew: false,
       });
     }
 
@@ -192,6 +195,7 @@ export async function POST(request: Request) {
           email,
           name,
           image: picture,
+          countryCode: countryCodeFromRequest(request),
           accounts: {
             create: {
               type: "oauth",
@@ -214,6 +218,8 @@ export async function POST(request: Request) {
       email: user.email,
       name: user.name,
     });
+
+    void persistUserCountryFromRequest(user.id, request);
 
     return NextResponse.json({
       token,

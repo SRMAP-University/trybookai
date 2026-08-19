@@ -192,7 +192,9 @@ GoRouter _buildRouter(
         return isBoot ? null : '/boot';
       }
       if (!inApp && !isAuthRoute) return '/login';
-      if (inApp && (isAuthRoute || isBoot)) return '/home';
+      if (inApp && (isAuthRoute || isBoot)) {
+        return auth.pendingOnboarding ? '/books/new' : '/home';
+      }
       return null;
     },
     routes: [

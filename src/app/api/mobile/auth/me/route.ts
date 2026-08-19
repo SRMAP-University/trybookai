@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { verifyMobileToken } from "@/lib/mobile-auth";
 import { isTrialActive } from "@/lib/billing";
+import { persistUserCountryFromRequest } from "@/lib/geo";
 
 /** GET /api/mobile/auth/me — current user from Bearer token */
 export async function GET() {
@@ -38,6 +39,8 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  void persistUserCountryFromRequest(user.id);
 
   return NextResponse.json({
     user: {

@@ -22,7 +22,7 @@ export default function PrivacyPage() {
             Privacy Policy
           </h1>
           <p className="mt-2 text-[14px] text-[#697386]">
-            Last updated: July 14, 2026
+            Last updated: August 19, 2026
           </p>
 
           <div className="mt-8 space-y-6 text-[16px] leading-relaxed text-[#425466]">
@@ -93,8 +93,10 @@ export default function PrivacyPage() {
               </h2>
               <p>
                 Depending on your location, you may have the right to access,
-                correct, or delete your personal information. Contact us at the
-                email below to make a request.
+                correct, or delete your personal information. You can delete
+                your account in the BookAI app under{" "}
+                <strong>Account → Delete account</strong>, or on the web under
+                Settings. You may also email us at the address below.
               </p>
             </section>
 

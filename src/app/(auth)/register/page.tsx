@@ -24,7 +24,16 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const prompt = searchParams.get("prompt");
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackUrl = searchParams.get("callbackUrl");
+  const afterSignupUrl = (() => {
+    const params = new URLSearchParams();
+    if (prompt) params.set("prompt", prompt);
+    const qs = params.toString();
+    if (callbackUrl && callbackUrl.startsWith("/dashboard/books/new")) {
+      return callbackUrl;
+    }
+    return `/dashboard/books/new${qs ? `?${qs}` : ""}`;
+  })();
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -63,8 +72,8 @@ function RegisterForm() {
       return;
     }
 
-    toast.success("Welcome to BookAI");
-    router.push("/dashboard");
+    toast.success("Welcome — let’s create your first book");
+    router.push(afterSignupUrl);
     router.refresh();
   }
 
@@ -86,7 +95,7 @@ function RegisterForm() {
           Create your account
         </h1>
         <p className="mt-2 text-[14px] text-[#425466]">
-          50 pages included every month
+          50 pages included — next we&rsquo;ll start your first book
         </p>
       </div>
 
@@ -177,7 +186,7 @@ function RegisterForm() {
           </div>
         </div>
 
-        <GoogleButton callbackUrl={callbackUrl} />
+        <GoogleButton callbackUrl={afterSignupUrl} />
         <LegalClickAgreement
           className="mt-3 text-center"
           actionLabel="By continuing with Google"

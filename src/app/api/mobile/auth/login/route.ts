@@ -6,6 +6,7 @@ import { legalConsentField } from "@/lib/legal";
 import { signMobileToken } from "@/lib/mobile-auth";
 import { sendWelcomeEmail } from "@/lib/emails/transactional";
 import { isTrialActive } from "@/lib/billing";
+import { persistUserCountryFromRequest } from "@/lib/geo";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -101,6 +102,8 @@ export async function POST(request: Request) {
     email: user.email,
     name: user.name,
   });
+
+  void persistUserCountryFromRequest(user.id, request);
 
   return NextResponse.json({
     token,

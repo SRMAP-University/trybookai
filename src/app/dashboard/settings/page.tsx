@@ -27,6 +27,7 @@ import {
   STYLE_PRESETS,
 } from "@/lib/constants";
 import { toast } from "sonner";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { readJson } from "@/lib/api";
 import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
@@ -76,6 +77,7 @@ function SettingsPageContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -191,6 +193,29 @@ function SettingsPageContent() {
         err instanceof Error ? err.message : "Could not open billing portal"
       );
       setPortalLoading(false);
+    }
+  }
+
+  async function deleteAccount() {
+    const ok = window.confirm(
+      "Permanently delete your BookAI account and all books? This cannot be undone. Play Store / App Store subscriptions must also be cancelled in the store."
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account", { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Could not delete account"
+        );
+      }
+      await signOut({ callbackUrl: "/" });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not delete account"
+      );
+      setDeleting(false);
     }
   }
 
@@ -348,6 +373,25 @@ function SettingsPageContent() {
                   setSettings({ ...settings, emailNotifications })
                 }
               />
+            </Section>
+
+            <Section title="Delete account">
+              <p className="text-[13px] leading-relaxed text-[#697386]">
+                Permanently delete your account, books, and stored profile data.
+                Store subscriptions (Google Play / App Store) should be cancelled
+                in the store as well.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-4 h-10 border-[#f8d7da] text-[13px] text-[#df1b41] hover:bg-[#fff5f5]"
+                onClick={deleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Delete my account
+              </Button>
             </Section>
           </>
         )}

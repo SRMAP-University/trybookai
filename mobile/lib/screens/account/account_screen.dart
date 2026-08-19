@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
@@ -111,6 +113,20 @@ class AccountScreen extends StatelessWidget {
           MenuSection(
             children: [
               MenuTile(
+                icon: Icons.privacy_tip_outlined,
+                label: 'Privacy policy',
+                onTap: () => _openLegal('/privacy'),
+              ),
+              MenuTile(
+                icon: Icons.description_outlined,
+                label: 'Terms of service',
+                onTap: () => _openLegal('/terms'),
+              ),
+            ],
+          ),
+          MenuSection(
+            children: [
+              MenuTile(
                 icon: Icons.logout_rounded,
                 label: 'Sign out',
                 trailing: const SizedBox.shrink(),
@@ -119,10 +135,58 @@ class AccountScreen extends StatelessWidget {
                   if (context.mounted) context.go('/login');
                 },
               ),
+              MenuTile(
+                icon: Icons.delete_outline_rounded,
+                label: 'Delete account',
+                trailing: const SizedBox.shrink(),
+                onTap: () => _confirmDeleteAccount(context),
+              ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _openLegal(String path) async {
+  final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
+Future<void> _confirmDeleteAccount(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete account?'),
+      content: const Text(
+        'This permanently deletes your BookAI account and all books. '
+        'Cancel Google Play subscriptions in Play Store as well. '
+        'This cannot be undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: TextButton.styleFrom(foregroundColor: AppColors.destructive),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final auth = context.read<AuthProvider>();
+  final ok = await auth.deleteAccount();
+  if (!context.mounted) return;
+  if (ok) {
+    context.go('/login');
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(auth.error ?? 'Could not delete account')),
     );
   }
 }

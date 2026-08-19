@@ -117,9 +117,12 @@ class BooksProvider extends ChangeNotifier {
     }
   }
 
-  Future<BookModel?> fetchBook(String id) async {
+  Future<BookModel?> fetchBook(String id, {bool summary = true}) async {
     try {
-      final res = await _api.dio.get('${ApiConfig.books}/$id');
+      final res = await _api.dio.get(
+        '${ApiConfig.books}/$id',
+        queryParameters: summary ? {'summary': '1'} : null,
+      );
       return BookModel.fromJson(res.data as Map<String, dynamic>);
     } catch (e) {
       error = _api.extractError(e);

@@ -25,21 +25,30 @@ class GenerationStream {
     required void Function(GenerationStreamEvent event) onEvent,
     void Function()? onDone,
     void Function(Object error)? onError,
-    bool resume = true,
+    bool resume = false,
+    bool watchOnly = true,
   }) async {
     _stopped = false;
+    _cancel?.cancel('replaced');
     _cancel = CancelToken();
 
     try {
+      final params = <String>[
+        if (resume) 'resume=1',
+        if (watchOnly) 'watch=1',
+      ];
+      final qs = params.isEmpty ? '' : '?${params.join('&')}';
+
       final res = await _api.dio.post<ResponseBody>(
-        '/api/generate/$bookId/stream${resume ? '?resume=1' : ''}',
+        '/api/generate/$bookId/stream$qs',
         options: Options(
           responseType: ResponseType.stream,
           headers: {
             'Accept': 'text/event-stream',
             'Cache-Control': 'no-cache',
           },
-          receiveTimeout: const Duration(minutes: 60),
+          receiveTimeout: const Duration(minutes: 8),
+          sendTimeout: const Duration(seconds: 30),
         ),
         cancelToken: _cancel,
       );
@@ -52,10 +61,21 @@ class GenerationStream {
 
       var buffer = '';
       String? eventType;
+      var chunks = 0;
 
       await for (final Uint8List chunk in stream) {
         if (_stopped) break;
+        chunks += 1;
+        if (chunks % 6 == 0) {
+          // Let the UI isolate handle frames / taps (prevents ANR).
+          await Future<void>.delayed(Duration.zero);
+          if (_stopped) break;
+        }
+
         buffer += utf8.decode(chunk, allowMalformed: true);
+        if (buffer.length > 256 * 1024) {
+          buffer = buffer.substring(buffer.length - 64 * 1024);
+        }
 
         while (true) {
           final sep = buffer.indexOf('\n\n');
@@ -69,10 +89,13 @@ class GenerationStream {
             } else if (line.startsWith('data:')) {
               final raw = line.substring(5).trim();
               Map<String, dynamic> data = {};
-              try {
-                final decoded = jsonDecode(raw);
-                if (decoded is Map<String, dynamic>) data = decoded;
-              } catch (_) {}
+              if (raw.length < 20000) {
+                try {
+                  final decoded = jsonDecode(raw);
+                  if (decoded is Map<String, dynamic>) data = decoded;
+                } catch (_) {}
+              }
+              if (_stopped) break;
               onEvent(
                 GenerationStreamEvent(
                   type: eventType ?? data['type'] as String? ?? 'message',

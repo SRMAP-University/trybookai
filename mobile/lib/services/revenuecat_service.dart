@@ -219,7 +219,9 @@ class RevenueCatService extends ChangeNotifier {
     required String interval,
   }) async {
     if (!_configured) {
-      throw Exception('RevenueCat is not configured yet. Restart the app.');
+      throw Exception(
+        'In-app purchases are not available right now. Try again in a moment.',
+      );
     }
     if (!hasPackages) {
       await refreshOfferings();
@@ -228,15 +230,15 @@ class RevenueCatService extends ChangeNotifier {
     if (package == null) {
       throw Exception(
         plan == 'UNLIMITED'
-            ? 'No Unlimited product found. Add a lifetime (or unlimited) '
-                'product to your RevenueCat Offering.'
-            : 'No RevenueCat package for $plan ($interval). Add products '
-                'named pro / premium / unlimited to your Offering.',
+            ? 'Unlimited is not available as an in-app purchase on this device.'
+            : 'This plan is not available as an in-app purchase on this device.',
       );
     }
     if (plan == 'UNLIMITED' && !_isLifetime(package) &&
         _planIdForPackage(package) != 'UNLIMITED') {
-      throw Exception('Refusing to purchase a non-Unlimited package for Unlimited.');
+      throw Exception(
+        'Unlimited is not available as an in-app purchase on this device.',
+      );
     }
     if (kDebugMode) {
       debugPrint(
@@ -268,4 +270,29 @@ class RevenueCatService extends ChangeNotifier {
     final package = packageForPlan(plan, interval: interval);
     return package?.storeProduct.priceString;
   }
+}
+
+String friendlyPurchaseError(Object error) {
+  if (error is PlatformException) {
+    final code = PurchasesErrorHelper.getErrorCode(error);
+    if (code == PurchasesErrorCode.purchaseCancelledError) {
+      return '';
+    }
+    if (code == PurchasesErrorCode.productNotAvailableForPurchaseError ||
+        code == PurchasesErrorCode.productAlreadyPurchasedError) {
+      return error.message ?? 'This purchase is not available.';
+    }
+    final msg = error.message ?? '';
+    if (RegExp(r'revenuecat|offering|test store', caseSensitive: false)
+        .hasMatch(msg)) {
+      return 'This plan is not available on the store right now.';
+    }
+    return msg.isEmpty ? 'Purchase failed' : msg;
+  }
+  final raw = error.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+  if (RegExp(r'revenuecat|offering|test store', caseSensitive: false)
+      .hasMatch(raw)) {
+    return 'This plan is not available on the store right now.';
+  }
+  return raw;
 }

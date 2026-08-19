@@ -38,7 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (!mounted) return;
     if (ok) {
-      context.go('/home');
+      context.go('/books/new');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(auth.error ?? 'Could not register')),
@@ -53,7 +53,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
     setState(() => _googleLoading = false);
     if (ok) {
-      context.go('/home');
+      context.go(
+        auth.pendingOnboarding ? '/books/new' : '/home',
+      );
     } else if (auth.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(auth.error!)),

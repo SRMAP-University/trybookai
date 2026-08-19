@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 
@@ -342,6 +344,27 @@ class _ExpandableTextState extends State<ExpandableText> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Play / App Store subscription disclosure — no third-party billing brands.
+class SubscriptionLegalNote extends StatelessWidget {
+  const SubscriptionLegalNote({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = Platform.isIOS ? 'the App Store' : 'Google Play';
+    return Text(
+      'Paid plans are subscriptions billed through $store. '
+      'They renew automatically at the price shown until you cancel. '
+      'Cancel or manage anytime in $store under Subscriptions. '
+      'Restore purchases if you already subscribed on this account.',
+      style: const TextStyle(
+        fontSize: 11,
+        height: 1.4,
+        color: AppColors.textMuted,
+      ),
     );
   }
 }

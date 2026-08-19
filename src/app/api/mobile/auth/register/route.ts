@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { legalConsentField } from "@/lib/legal";
 import { signMobileToken } from "@/lib/mobile-auth";
 import { sendWelcomeEmail } from "@/lib/emails/transactional";
+import { countryCodeFromRequest } from "@/lib/geo";
 
 const registerSchema = z.object({
   name: z.string().min(1).max(100),
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
       name: parsed.data.name.trim(),
       email,
       passwordHash,
+      countryCode: countryCodeFromRequest(request),
     },
   });
 
@@ -78,6 +80,7 @@ export async function POST(request: Request) {
         hasUsedPremiumTrial: user.hasUsedPremiumTrial,
         hasStripeSubscription: false,
       },
+      isNew: true,
     },
     { status: 201 }
   );

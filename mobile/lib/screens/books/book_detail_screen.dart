@@ -37,7 +37,12 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   BookModel? _book;
   bool _loading = true;
   Timer? _poll;
+  Timer? _reconnect;
+  Timer? _uiFlush;
   GenerationStream? _stream;
+  int _listenId = 0;
+  int _backoffMs = 2000;
+  bool _uiDirty = false;
   String _phase = '';
   String _liveText = '';
   bool _streaming = false;
@@ -57,12 +62,14 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       if (_book?.status == 'COMPLETED') _loadAudios();
       _maybePromptGenerate();
     });
-    _poll = Timer.periodic(const Duration(seconds: 8), (_) => _refreshQuiet());
+    _poll = Timer.periodic(const Duration(seconds: 12), (_) => _refreshQuiet());
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _reconnect?.cancel();
+    _uiFlush?.cancel();
     _stream?.stop();
     super.dispose();
   }
@@ -98,6 +105,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     if (book.isGenerating && !_streaming) {
       _connectStream();
     } else if (!book.isGenerating && wasGenerating) {
+      _listenId += 1;
+      _reconnect?.cancel();
       _stream?.stop();
       setState(() => _streaming = false);
     }
@@ -339,8 +348,33 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     });
   }
 
+  void _flushUi() {
+    _uiDirty = false;
+    if (mounted) setState(() {});
+  }
+
+  void _scheduleUi() {
+    if (_uiDirty) return;
+    _uiDirty = true;
+    _uiFlush?.cancel();
+    _uiFlush = Timer(const Duration(milliseconds: 250), _flushUi);
+  }
+
+  void _scheduleReconnect() {
+    if (!mounted || _book?.isGenerating != true) return;
+    _reconnect?.cancel();
+    _reconnect = Timer(Duration(milliseconds: _backoffMs), () {
+      if (!mounted) return;
+      if (_book?.isGenerating == true && !_streaming) _connectStream();
+    });
+    _backoffMs = (_backoffMs * 2).clamp(2000, 30000);
+  }
+
   void _connectStream() {
+    if (_streaming) return;
+    _reconnect?.cancel();
     _stream?.stop();
+    final listenId = ++_listenId;
     final api = context.read<ApiClient>();
     _stream = GenerationStream(api);
     setState(() {
@@ -348,80 +382,88 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       _phase = 'Connecting to live stream…';
     });
 
-    _stream!.listen(
+    unawaited(_stream!.listen(
       widget.bookId,
+      watchOnly: true,
+      resume: false,
       onEvent: (event) {
-        if (!mounted) return;
-        setState(() {
-          switch (event.type) {
-            case 'phase':
-              _phase = event.data['message'] as String? ??
-                  event.data['phase'] as String? ??
-                  _phase;
-              break;
-            case 'progress':
-              if (_book != null) {
-                _book = _book!.copyWith(
-                  progress: (event.data['progress'] as num?)?.toDouble() ??
-                      _book!.progress,
-                  currentPages:
-                      (event.data['currentPages'] as num?)?.toInt() ??
-                          _book!.currentPages,
-                  targetPages: (event.data['targetPages'] as num?)?.toInt() ??
-                      _book!.targetPages,
-                  status: event.data['status'] as String? ?? _book!.status,
-                );
-              }
-              break;
-            case 'token':
-              final text = event.data['text'] as String? ?? '';
-              _liveText = _liveText + text;
-              if (_liveText.length > 4000) {
-                _liveText = _liveText.substring(_liveText.length - 4000);
-              }
-              break;
-            case 'section_start':
-              final title = event.data['sectionTitle'] as String? ??
-                  event.data['title'] as String?;
-              if (title != null) {
-                _phase = 'Writing: $title';
-                _liveText = '';
-              }
-              break;
-            case 'outline_ready':
-              _phase =
-                  'Outline ready · ${event.data['chapterCount'] ?? ''} chapters';
-              break;
-            case 'cover_ready':
-              _phase = 'Cover ready';
-              break;
-            case 'done':
-              _phase = 'Complete';
-              _streaming = false;
-              break;
-            case 'error':
-              _phase = event.data['message'] as String? ?? 'Stream error';
-              break;
-          }
-        });
-        if (event.type == 'done') {
-          _refreshQuiet();
+        if (!mounted || listenId != _listenId) return;
+        _backoffMs = 2000;
+        switch (event.type) {
+          case 'phase':
+            _phase = event.data['message'] as String? ??
+                event.data['phase'] as String? ??
+                _phase;
+            _scheduleUi();
+            break;
+          case 'progress':
+            if (_book != null) {
+              _book = _book!.copyWith(
+                progress: (event.data['progress'] as num?)?.toDouble() ??
+                    _book!.progress,
+                currentPages:
+                    (event.data['currentPages'] as num?)?.toInt() ??
+                        _book!.currentPages,
+                targetPages: (event.data['targetPages'] as num?)?.toInt() ??
+                    _book!.targetPages,
+                status: event.data['status'] as String? ?? _book!.status,
+              );
+            }
+            _scheduleUi();
+            break;
+          case 'token':
+            final text = event.data['text'] as String? ?? '';
+            if (text.isEmpty) break;
+            _liveText = _liveText + text;
+            if (_liveText.length > 2500) {
+              _liveText = _liveText.substring(_liveText.length - 2500);
+            }
+            _scheduleUi();
+            break;
+          case 'section_start':
+            final title = event.data['sectionTitle'] as String? ??
+                event.data['title'] as String?;
+            if (title != null) {
+              _phase = 'Writing: $title';
+              _liveText = '';
+              _scheduleUi();
+            }
+            break;
+          case 'outline_ready':
+            _phase =
+                'Outline ready · ${event.data['chapterCount'] ?? ''} chapters';
+            _scheduleUi();
+            break;
+          case 'cover_ready':
+            _phase = 'Cover ready';
+            _scheduleUi();
+            break;
+          case 'done':
+            _phase = 'Complete';
+            _streaming = false;
+            _flushUi();
+            unawaited(_refreshQuiet());
+            break;
+          case 'error':
+            _phase = event.data['message'] as String? ?? 'Stream error';
+            _scheduleUi();
+            break;
         }
       },
       onDone: () {
-        if (!mounted) return;
-        setState(() => _streaming = false);
-        _refreshQuiet();
-        Future.delayed(const Duration(milliseconds: 1200), () {
-          if (!mounted) return;
-          if (_book?.isGenerating == true) _connectStream();
-        });
+        if (!mounted || listenId != _listenId) return;
+        _streaming = false;
+        _scheduleUi();
+        unawaited(_refreshQuiet());
+        _scheduleReconnect();
       },
       onError: (_) {
-        if (!mounted) return;
-        setState(() => _streaming = false);
+        if (!mounted || listenId != _listenId) return;
+        _streaming = false;
+        _scheduleUi();
+        _scheduleReconnect();
       },
-    );
+    ));
   }
 
   void _maybePromptGenerate() {
@@ -490,10 +532,16 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       ),
     );
     await _load();
+    _listenId += 1;
+    _reconnect?.cancel();
+    _stream?.stop();
+    _streaming = false;
     if (_book?.isGenerating == true) _connectStream();
   }
 
   Future<void> _cancel() async {
+    _listenId += 1;
+    _reconnect?.cancel();
     _stream?.stop();
     await context.read<BooksProvider>().cancelGeneration(widget.bookId);
     await _load();

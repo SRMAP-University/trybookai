@@ -8,6 +8,30 @@ const nextConfig: NextConfig = {
   },
   // pdfkit loads AFM font metrics from disk via __dirname; bundling breaks that path.
   serverExternalPackages: ["pdf-parse", "pdfkit", "epub-gen-memory"],
+  headers: async () => [
+    {
+      source: "/sw.js",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=0, must-revalidate",
+        },
+        {
+          key: "Service-Worker-Allowed",
+          value: "/",
+        },
+      ],
+    },
+    {
+      source: "/manifest.webmanifest",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=86400, stale-while-revalidate=604800",
+        },
+      ],
+    },
+  ],
   // Prefer www as canonical — apex is often misconfigured at DNS/CDN.
   redirects: async () => [
     {

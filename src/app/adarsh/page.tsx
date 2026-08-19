@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, RefreshCw } from "lucide-react";
 import { BarChart, StackedSentiment, StatCard } from "@/components/admin/charts";
+import { CountryFlag } from "@/components/admin/country-flag";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +68,7 @@ type Overview = {
     stuck: boolean;
     books: number;
     failed: number;
+    countryCode?: string | null;
   }>;
   champions: Array<{
     userId: string;
@@ -75,6 +77,7 @@ type Overview = {
     label: string;
     happy: string[];
     completed: number;
+    countryCode?: string | null;
   }>;
   topImprovements: Array<{ text: string; count: number; source: string }>;
 };
@@ -286,7 +289,10 @@ export default function AdarshOverviewPage() {
                 className="rounded-lg border border-[#e6ebf1] px-3 py-2"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-[13px] font-medium">{u.email}</p>
+                  <p className="flex min-w-0 items-center gap-2 truncate text-[13px] font-medium">
+                    <CountryFlag code={u.countryCode} showCode={false} />
+                    <span className="truncate">{u.email}</span>
+                  </p>
                   <span className="text-[11px] tabular-nums text-[#df1b41]">
                     {u.score}
                   </span>
@@ -313,7 +319,10 @@ export default function AdarshOverviewPage() {
               className="rounded-lg border border-[#cbf4c9]/60 bg-[#f6fff8] px-3 py-2"
             >
               <div className="flex justify-between gap-2">
-                <p className="truncate text-[13px] font-medium">{u.email}</p>
+                <p className="flex min-w-0 items-center gap-2 truncate text-[13px] font-medium">
+                  <CountryFlag code={u.countryCode} showCode={false} />
+                  <span className="truncate">{u.email}</span>
+                </p>
                 <span className="text-[11px] tabular-nums text-[#0e6245]">
                   +{u.score}
                 </span>

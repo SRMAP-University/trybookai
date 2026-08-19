@@ -6,7 +6,7 @@ import { getEditionRootId } from "@/lib/book-editions";
 import { z } from "zod";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -15,35 +15,66 @@ export async function GET(
   }
 
   const { id } = await params;
+  const summary =
+    new URL(request.url).searchParams.get("summary") === "1";
 
   try {
-    const book = await withDbRetry("book.get", () =>
-      db.book.findFirst({
-        where: { id, userId: session.user.id },
-        include: {
-          chapters: {
-            orderBy: { number: "asc" },
-            include: {
-              sections: { orderBy: { number: "asc" } },
+    const book = summary
+      ? await withDbRetry("book.get.summary", () =>
+          db.book.findFirst({
+            where: { id, userId: session.user.id },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              progress: true,
+              currentPages: true,
+              targetPages: true,
+              genre: true,
+              coverImage: true,
+              description: true,
+              updatedAt: true,
+              slug: true,
+              isPublic: true,
+              generateAudiobookOnComplete: true,
+              user: { select: { plan: true } },
             },
-          },
-          generationJobs: {
-            orderBy: { createdAt: "desc" },
-            take: 5,
-          },
-          audios: {
-            orderBy: { createdAt: "desc" },
+          })
+        )
+      : await withDbRetry("book.get", () =>
+          db.book.findFirst({
+            where: { id, userId: session.user.id },
             include: {
-              tracks: { orderBy: { number: "asc" } },
+              chapters: {
+                orderBy: { number: "asc" },
+                include: {
+                  sections: { orderBy: { number: "asc" } },
+                },
+              },
+              generationJobs: {
+                orderBy: { createdAt: "desc" },
+                take: 5,
+              },
+              audios: {
+                orderBy: { createdAt: "desc" },
+                include: {
+                  tracks: { orderBy: { number: "asc" } },
+                },
+              },
+              user: { select: { plan: true } },
             },
-          },
-          user: { select: { plan: true } },
-        },
-      })
-    );
+          })
+        );
 
     if (!book) {
       return NextResponse.json({ error: "Book not found" }, { status: 404 });
+    }
+
+    const canPrivate = canMakePrivate(book.user.plan);
+
+    if (summary) {
+      const { user: _user, ...rest } = book;
+      return NextResponse.json({ ...rest, canMakePrivate: canPrivate });
     }
 
     const rootId = getEditionRootId(book);
@@ -68,7 +99,7 @@ export async function GET(
 
     return NextResponse.json({
       ...book,
-      canMakePrivate: canMakePrivate(book.user.plan),
+      canMakePrivate: canPrivate,
       editions,
     });
   } catch (error) {

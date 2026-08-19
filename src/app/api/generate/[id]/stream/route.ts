@@ -35,6 +35,7 @@ export async function POST(
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const resume = searchParams.get("resume") === "1";
+  const watchOnly = searchParams.get("watch") === "1";
   const client = resolveClientSource(request);
   const appVersion = getAppVersion(request);
 
@@ -45,15 +46,17 @@ export async function POST(
   speed = parseGenerationSpeed(body?.speed) ?? speed;
 
   try {
-    if (speed) {
-      await applyGenerationSpeed(id, session.user.id, speed);
-    } else {
-      await enforceGenerationSpeedForPlan(id, session.user.id);
+    if (!watchOnly) {
+      if (speed) {
+        await applyGenerationSpeed(id, session.user.id, speed);
+      } else {
+        await enforceGenerationSpeedForPlan(id, session.user.id);
+      }
+      await ensureGenerationRunning(id, session.user.id, resume, {
+        client,
+        appVersion,
+      });
     }
-    await ensureGenerationRunning(id, session.user.id, resume, {
-      client,
-      appVersion,
-    });
   } catch (error) {
     if (error instanceof GenerationPausedError) {
       return new Response(

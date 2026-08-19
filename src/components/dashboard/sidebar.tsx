@@ -6,6 +6,7 @@ import {
   Activity,
   BarChart3,
   CreditCard,
+  Download,
   Headphones,
   LayoutGrid,
   Palette,
@@ -131,6 +132,18 @@ export function DashboardSidebar() {
 
       <div className="border-t border-[#e6ebf1] px-3 pt-3">
         <Link
+          href="/download#pwa"
+          className={cn(
+            "mb-2 flex items-center gap-2.5 rounded-md px-3 py-2 text-[14px] transition-colors",
+            pathname.startsWith("/download")
+              ? "bg-[#f0efff] font-medium text-[#635bff]"
+              : "text-[#635bff] hover:bg-[#f0efff] hover:text-[#5851e5]"
+          )}
+        >
+          <Download className="h-4 w-4 shrink-0" />
+          Install app
+        </Link>
+        <Link
           href="/download"
           className={cn(
             "mb-2 flex items-center gap-2.5 rounded-md px-3 py-2 text-[14px] transition-colors",
@@ -140,7 +153,7 @@ export function DashboardSidebar() {
           )}
         >
           <AndroidIcon className="h-4 w-4 shrink-0" />
-          Download for Android
+          Android APK
         </Link>
       </div>
 

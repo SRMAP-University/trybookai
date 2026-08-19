@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { legalConsentField } from "@/lib/legal";
 import { sendWelcomeEmail } from "@/lib/emails/transactional";
+import { countryCodeFromRequest } from "@/lib/geo";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
       name: parsed.data.name,
       email: parsed.data.email,
       passwordHash,
+      countryCode: countryCodeFromRequest(request),
     },
   });
 

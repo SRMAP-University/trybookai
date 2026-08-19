@@ -9,6 +9,7 @@ import {
 } from "@/lib/billing";
 import { syncUserSubscriptionFromStripe } from "@/lib/stripe-sync";
 import { z } from "zod";
+import { persistUserCountryFromRequest } from "@/lib/geo";
 
 const settingsSchema = z.object({
   name: z.string().max(100).optional(),
@@ -68,6 +69,8 @@ export async function GET() {
     }
 
     await syncUserTrialState(session.user.id);
+
+    await persistUserCountryFromRequest(session.user.id);
 
     let user = await db.user.findUnique({
       where: { id: session.user.id },

@@ -1,196 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
-import 'package:bookai_mobile/services/api_client.dart';
-import 'package:bookai_mobile/services/revenuecat_service.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 
-class BillingScreen extends StatefulWidget {
+class BillingScreen extends StatelessWidget {
   const BillingScreen({super.key});
 
-  @override
-  State<BillingScreen> createState() => _BillingScreenState();
-}
+  static Uri get _webBillingUri =>
+      Uri.parse('${ApiConfig.baseUrl}/dashboard/billing');
 
-class _BillingScreenState extends State<BillingScreen> {
-  String _interval = 'month';
-  String? _loadingPlan;
-  bool _loadingOfferings = true;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadOfferings());
-  }
-
-  Future<void> _loadOfferings() async {
-    setState(() => _loadingOfferings = true);
-    final rc = context.read<RevenueCatService>();
-    final auth = context.read<AuthProvider>();
-    final userId = auth.user?.id;
-    if (!rc.isConfigured) {
-      await rc.configure(appUserId: userId);
-    } else if (userId != null) {
-      await rc.logIn(userId);
-    }
-    await rc.refreshOfferings();
-    if (mounted) setState(() => _loadingOfferings = false);
-  }
-
-  Future<Map<String, dynamic>?> _syncRevenueCat(
-    CustomerInfo? info, {
-    String? requestedPlan,
-    bool allowDowngrade = false,
-  }) async {
-    final api = context.read<ApiClient>();
-    final auth = context.read<AuthProvider>();
-    final rc = context.read<RevenueCatService>();
-    final entitlements =
-        info?.entitlements.active.keys.toList() ?? await rc.activeEntitlements();
-    final productIds = <String>{
-      ...?info?.activeSubscriptions,
-      for (final e in info?.entitlements.active.values ?? const [])
-        if (e.productIdentifier.isNotEmpty) e.productIdentifier,
-    }.toList();
-
-    final res = await api.dio.post(
-      ApiConfig.billingRevenueCatSync,
-      data: {
-        'entitlements': entitlements,
-        'productIds': productIds,
-        'appUserId': auth.user?.id,
-        if (requestedPlan != null) 'requestedPlan': requestedPlan,
-        'allowDowngrade': allowDowngrade,
-      },
+  Future<void> _openWebsite(BuildContext context) async {
+    final ok = await launchUrl(
+      _webBillingUri,
+      mode: LaunchMode.externalApplication,
     );
-    await auth.refreshUser();
-    final data = res.data;
-    return data is Map<String, dynamic> ? data : null;
-  }
-
-  Future<void> _checkout(String plan) async {
-    setState(() => _loadingPlan = plan);
-    final api = context.read<ApiClient>();
-    final auth = context.read<AuthProvider>();
-    final rc = context.read<RevenueCatService>();
-    try {
-      final info = await rc.purchasePlan(plan, interval: _interval);
-      if (info == null) return; // cancelled
-      final sync = await _syncRevenueCat(info, requestedPlan: plan);
-      if (!mounted) return;
-      await auth.refreshUser();
-      final label = auth.user?.planLabel ??
-          (sync?['plan'] as String?) ??
-          plan;
+    if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upgraded to $label')),
+        const SnackBar(content: Text('Could not open the website')),
       );
-    } on PlatformException catch (e) {
-      if (!mounted) return;
-      final code = PurchasesErrorHelper.getErrorCode(e);
-      if (code == PurchasesErrorCode.purchaseCancelledError) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'Purchase failed')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(api.extractError(e))),
-      );
-    } finally {
-      if (mounted) setState(() => _loadingPlan = null);
     }
-  }
-
-  Future<void> _restore() async {
-    setState(() => _loadingPlan = 'RESTORE');
-    final api = context.read<ApiClient>();
-    final auth = context.read<AuthProvider>();
-    final rc = context.read<RevenueCatService>();
-    try {
-      final info = await rc.restore();
-      await _syncRevenueCat(info, allowDowngrade: true);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Purchases restored · ${auth.user?.planLabel ?? 'Free'}',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(api.extractError(e))),
-      );
-    } finally {
-      if (mounted) setState(() => _loadingPlan = null);
-    }
-  }
-
-  /// Local Premium trial (no Stripe checkout).
-  Future<void> _startLocalTrial() async {
-    setState(() => _loadingPlan = 'TRIAL');
-    final api = context.read<ApiClient>();
-    final auth = context.read<AuthProvider>();
-    try {
-      final res = await api.dio.post(
-        ApiConfig.billingTrial,
-        data: {
-          'action': 'start',
-          'interval': _interval,
-          'acceptedTerms': true,
-          'localOnly': true,
-        },
-      );
-      await auth.refreshUser();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res.data['message'] ?? 'Trial started')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(api.extractError(e))),
-      );
-    } finally {
-      if (mounted) setState(() => _loadingPlan = null);
-    }
-  }
-
-  String _priceText(String plan, int fallback) {
-    final rc = context.read<RevenueCatService>();
-    final storePrice = rc.priceLabelForPlan(plan, interval: _interval);
-    if (storePrice != null) return storePrice;
-    return '\$$fallback';
   }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
-    final rc = context.watch<RevenueCatService>();
-    final hasPackages = rc.hasPackages;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Billing'),
-        actions: [
-          TextButton(
-            onPressed: _loadingPlan != null ? null : _restore,
-            child: _loadingPlan == 'RESTORE'
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Restore'),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Billing')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
@@ -214,44 +53,65 @@ class _BillingScreenState extends State<BillingScreen> {
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _loadingOfferings
-                        ? 'Loading in-app products…'
-                        : hasPackages
-                            ? 'Pay with RevenueCat in-app purchase'
-                            : 'No store products yet — add Test Store products to your RevenueCat Offering',
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                  if (!_loadingOfferings && !hasPackages) ...[
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _loadOfferings,
-                      child: const Text('Retry loading products'),
-                    ),
-                  ],
                 ],
               ),
             ),
           const SizedBox(height: 16),
-          Center(
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'month', label: Text('Monthly')),
-                ButtonSegment(value: 'year', label: Text('Yearly')),
+          StripeCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Text(
+                    'Coming soon',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'In-app purchases coming soon',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Google Play billing is not available in the app yet. '
+                  'Subscribe on the BookAI website — your plan applies here after you sign in with the same account.',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => _openWebsite(context),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: const Text('Subscribe on website'),
+                  ),
+                ),
               ],
-              selected: {_interval},
-              onSelectionChanged: (s) => setState(() => _interval = s.first),
             ),
           ),
           const SizedBox(height: 16),
-          _planCard(
+          _planPreview(
             name: 'Pro',
-            priceFallback: _interval == 'year' ? 200 : 20,
-            plan: 'PRO',
+            price: r'$20',
+            period: '/mo',
             features: const [
               '5,000 pages / mo',
               '1 hour audiobook',
@@ -260,25 +120,23 @@ class _BillingScreenState extends State<BillingScreen> {
             current: user?.plan == 'PRO',
           ),
           const SizedBox(height: 12),
-          _planCard(
+          _planPreview(
             name: 'Premium',
-            priceFallback: _interval == 'year' ? 300 : 30,
-            plan: 'ENTERPRISE',
+            price: r'$30',
+            period: '/mo',
             features: const [
               '10,000 pages / mo',
               '3 hours audiobook',
-              '2-day free trial',
+              'Priority support',
             ],
             highlight: true,
-            showTrial:
-                user?.plan == 'FREE' && !(user?.hasUsedPremiumTrial ?? true),
             current: user?.plan == 'ENTERPRISE',
           ),
           const SizedBox(height: 12),
-          _planCard(
+          _planPreview(
             name: 'Unlimited',
-            priceFallback: _interval == 'year' ? 990 : 99,
-            plan: 'UNLIMITED',
+            price: r'$99',
+            period: '/mo',
             features: const [
               'Unlimited pages*',
               'Unlimited audio*',
@@ -286,32 +144,34 @@ class _BillingScreenState extends State<BillingScreen> {
             ],
             current: user?.plan == 'UNLIMITED',
           ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _openWebsite(context),
+              icon: const Icon(Icons.open_in_new_rounded, size: 18),
+              label: const Text('Subscribe on website'),
+            ),
+          ),
           const SizedBox(height: 12),
           const Text(
-            '*Unlimited is subject to fair-use Terms (rate limits).',
-            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            '*Unlimited is subject to fair-use Terms (rate limits). '
+            'Manage or cancel a website subscription from trybookai.com.',
+            style: TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.4),
           ),
         ],
       ),
     );
   }
 
-  Widget _planCard({
+  Widget _planPreview({
     required String name,
-    required int priceFallback,
-    required String plan,
+    required String price,
+    required String period,
     required List<String> features,
     bool highlight = false,
-    bool showTrial = false,
     bool current = false,
   }) {
-    final loading =
-        _loadingPlan == plan || (_loadingPlan == 'TRIAL' && showTrial);
-    final rc = context.read<RevenueCatService>();
-    final package = rc.packageForPlan(plan, interval: _interval);
-    final price = _priceText(plan, priceFallback);
-    final canBuy = package != null && !current;
-
     return StripeCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,15 +232,14 @@ class _BillingScreenState extends State<BillingScreen> {
                 letterSpacing: -1,
               ),
               children: [
-                if (package == null)
-                  TextSpan(
-                    text: _interval == 'year' ? ' /yr' : ' /mo',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textMuted,
-                    ),
+                TextSpan(
+                  text: ' $period',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textMuted,
                   ),
+                ),
               ],
             ),
           ),
@@ -403,42 +262,6 @@ class _BillingScreenState extends State<BillingScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          if (showTrial)
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.navy),
-              onPressed: loading ? null : _startLocalTrial,
-              child: loading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Start free trial · \$0 today'),
-            )
-          else
-            FilledButton(
-              onPressed: !canBuy || loading ? null : () => _checkout(plan),
-              child: loading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(
-                      current
-                          ? 'Your current plan'
-                          : package == null
-                              ? 'Product unavailable'
-                              : 'Upgrade to $name',
-                    ),
-            ),
         ],
       ),
     );

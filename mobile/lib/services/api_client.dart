@@ -23,7 +23,7 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _storage.read(key: _tokenKey);
+          final token = await _readToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -48,18 +48,30 @@ class ApiClient {
   static const _tokenKey = 'bookai_mobile_token';
   final _storage = const FlutterSecureStorage();
   late final Dio _dio;
+  String? _cachedToken;
 
   Dio get dio => _dio;
 
+  Future<String?> _readToken() async {
+    if (_cachedToken != null && _cachedToken!.isNotEmpty) {
+      return _cachedToken;
+    }
+    final token = await _storage.read(key: _tokenKey);
+    _cachedToken = token;
+    return token;
+  }
+
   Future<void> setToken(String? token) async {
+    _cachedToken = token;
     if (token == null || token.isEmpty) {
+      _cachedToken = null;
       await _storage.delete(key: _tokenKey);
     } else {
       await _storage.write(key: _tokenKey, value: token);
     }
   }
 
-  Future<String?> getToken() => _storage.read(key: _tokenKey);
+  Future<String?> getToken() => _readToken();
 
   Future<bool> get hasToken async {
     final t = await getToken();

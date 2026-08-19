@@ -43,7 +43,7 @@ class _MainShellState extends State<MainShell> {
       books.addListener(_onBooksChanged);
       books.loadActiveJobs();
       unawaited(push.registerToken());
-      _jobsPoll = Timer.periodic(const Duration(seconds: 4), (_) {
+      _jobsPoll = Timer.periodic(const Duration(seconds: 10), (_) {
         if (!mounted) return;
         context.read<BooksProvider>().loadActiveJobs();
       });

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { CountryFlag } from "@/components/admin/country-flag";
 
 type UserRow = {
   userId: string;
@@ -34,6 +35,7 @@ type UserRow = {
   hasSub: boolean;
   audioMinutesUsed: number;
   audioMinutesLimit: number;
+  countryCode: string | null;
 };
 
 const labelStyle: Record<string, string> = {
@@ -86,7 +88,7 @@ export default function AdarshUsersPage() {
           User management
         </h1>
         <p className="text-[13px] text-[#697386]">
-          Sentiment scores, pain points, and plan controls
+          Sentiment scores, country flags, and plan controls
         </p>
       </div>
 
@@ -102,7 +104,7 @@ export default function AdarshUsersPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search email or name…"
+            placeholder="Search email, name, or country code…"
             className="pl-9"
           />
         </div>
@@ -122,6 +124,7 @@ export default function AdarshUsersPage() {
               <thead className="border-b border-[#e6ebf1] bg-[#f6f9fc] text-[11px] uppercase tracking-wider text-[#a3acb9]">
                 <tr>
                   <th className="px-3 py-2.5 font-medium">User</th>
+                  <th className="px-3 py-2.5 font-medium">Country</th>
                   <th className="px-3 py-2.5 font-medium">Sentiment</th>
                   <th className="px-3 py-2.5 font-medium">Books</th>
                   <th className="px-3 py-2.5 font-medium">Usage</th>
@@ -145,6 +148,9 @@ export default function AdarshUsersPage() {
                           {u.stuck ? " · stuck" : ""}
                           {u.onTrial ? " · trial" : ""}
                         </p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <CountryFlag code={u.countryCode} />
                       </td>
                       <td className="px-3 py-2.5">
                         <span
@@ -196,7 +202,7 @@ export default function AdarshUsersPage() {
                     </tr>
                     {expanded === u.userId && (
                       <tr className="border-b border-[#e6ebf1] bg-[#fafbff]">
-                        <td colSpan={6} className="px-4 py-3">
+                        <td colSpan={7} className="px-4 py-3">
                           <div className="grid gap-3 sm:grid-cols-3">
                             <div>
                               <p className="text-[11px] font-medium uppercase text-[#0e6245]">

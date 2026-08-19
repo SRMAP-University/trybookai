@@ -29,10 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
       books.load();
       books.loadActiveJobs();
       context.read<PublicBooksProvider>().load();
-      _poll = Timer.periodic(const Duration(seconds: 4), (_) {
+      _poll = Timer.periodic(const Duration(seconds: 12), (_) {
         if (!mounted) return;
         context.read<BooksProvider>().loadActiveJobs();
-        context.read<AuthProvider>().refreshUser();
       });
     });
   }

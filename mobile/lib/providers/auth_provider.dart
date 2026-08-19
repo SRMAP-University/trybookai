@@ -30,6 +30,8 @@ class AuthProvider extends ChangeNotifier {
   /// True during login / register / Google sign-in network calls.
   bool loading = false;
   String? error;
+  /// New account — send them to create-book instead of an empty home.
+  bool pendingOnboarding = false;
 
   bool get isAuthenticated => user != null;
 
@@ -105,6 +107,7 @@ class AuthProvider extends ChangeNotifier {
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
       hasStoredSession = true;
+      pendingOnboarding = false;
       _linkRevenueCat(user!.id);
       unawaited(_push?.registerToken() ?? Future.value());
       return true;
@@ -140,6 +143,7 @@ class AuthProvider extends ChangeNotifier {
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
       hasStoredSession = true;
+      pendingOnboarding = true;
       _linkRevenueCat(user!.id);
       unawaited(_push?.registerToken() ?? Future.value());
       return true;
@@ -170,6 +174,7 @@ class AuthProvider extends ChangeNotifier {
       await _api.setToken(token);
       user = UserModel.fromJson(res.data['user'] as Map<String, dynamic>);
       hasStoredSession = true;
+      pendingOnboarding = res.data['isNew'] == true;
       _linkRevenueCat(user!.id);
       unawaited(_push?.registerToken() ?? Future.value());
       return true;
@@ -213,6 +218,20 @@ class AuthProvider extends ChangeNotifier {
     await _api.setToken(null);
     user = null;
     hasStoredSession = false;
+    pendingOnboarding = false;
     notifyListeners();
+  }
+
+  Future<bool> deleteAccount() async {
+    error = null;
+    try {
+      await _api.dio.delete(ApiConfig.account);
+      await logout();
+      return true;
+    } catch (e) {
+      error = _api.extractError(e);
+      notifyListeners();
+      return false;
+    }
   }
 }

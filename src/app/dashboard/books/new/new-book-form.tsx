@@ -185,6 +185,13 @@ export function NewBookForm() {
     if (title) {
       setForm((prev) => ({ ...prev, title: prev.title || title }));
     }
+    const prompt = searchParams.get("prompt");
+    if (prompt) {
+      setForm((prev) => ({
+        ...prev,
+        description: prev.description || prompt,
+      }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- apply once after defaults
   }, [defaultsLoaded, searchParams]);
 
