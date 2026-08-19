@@ -19,64 +19,70 @@ export async function GET(
     new URL(request.url).searchParams.get("summary") === "1";
 
   try {
-    const book = summary
-      ? await withDbRetry("book.get.summary", () =>
-          db.book.findFirst({
-            where: { id, userId: session.user.id },
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              progress: true,
-              currentPages: true,
-              targetPages: true,
-              genre: true,
-              coverImage: true,
-              description: true,
-              updatedAt: true,
-              slug: true,
-              isPublic: true,
-              generateAudiobookOnComplete: true,
-              user: { select: { plan: true } },
-            },
-          })
-        )
-      : await withDbRetry("book.get", () =>
-          db.book.findFirst({
-            where: { id, userId: session.user.id },
+    if (summary) {
+      const book = await withDbRetry("book.get.summary", () =>
+        db.book.findFirst({
+          where: { id, userId: session.user.id },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            progress: true,
+            currentPages: true,
+            targetPages: true,
+            genre: true,
+            coverImage: true,
+            description: true,
+            updatedAt: true,
+            slug: true,
+            isPublic: true,
+            generateAudiobookOnComplete: true,
+            user: { select: { plan: true } },
+          },
+        })
+      );
+
+      if (!book) {
+        return NextResponse.json({ error: "Book not found" }, { status: 404 });
+      }
+
+      const { user, ...rest } = book;
+      return NextResponse.json({
+        ...rest,
+        canMakePrivate: canMakePrivate(user.plan),
+      });
+    }
+
+    const book = await withDbRetry("book.get", () =>
+      db.book.findFirst({
+        where: { id, userId: session.user.id },
+        include: {
+          chapters: {
+            orderBy: { number: "asc" },
             include: {
-              chapters: {
-                orderBy: { number: "asc" },
-                include: {
-                  sections: { orderBy: { number: "asc" } },
-                },
-              },
-              generationJobs: {
-                orderBy: { createdAt: "desc" },
-                take: 5,
-              },
-              audios: {
-                orderBy: { createdAt: "desc" },
-                include: {
-                  tracks: { orderBy: { number: "asc" } },
-                },
-              },
-              user: { select: { plan: true } },
+              sections: { orderBy: { number: "asc" } },
             },
-          })
-        );
+          },
+          generationJobs: {
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
+          audios: {
+            orderBy: { createdAt: "desc" },
+            include: {
+              tracks: { orderBy: { number: "asc" } },
+            },
+          },
+          user: { select: { plan: true } },
+        },
+      })
+    );
 
     if (!book) {
       return NextResponse.json({ error: "Book not found" }, { status: 404 });
     }
 
     const canPrivate = canMakePrivate(book.user.plan);
-
-    if (summary) {
-      const { user: _user, ...rest } = book;
-      return NextResponse.json({ ...rest, canMakePrivate: canPrivate });
-    }
-
     const rootId = getEditionRootId(book);
     const editions = await withDbRetry("book.editions", () =>
       db.book.findMany({
