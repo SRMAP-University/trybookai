@@ -1,4 +1,4 @@
-import { countryName, flagEmoji } from "@/lib/geo";
+import { countryName, flagEmoji } from "@/lib/country-display";
 import { cn } from "@/lib/utils";
 
 export function CountryFlag({
