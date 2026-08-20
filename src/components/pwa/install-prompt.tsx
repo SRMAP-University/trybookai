@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/sheet";
 
 const DISMISS_KEY = "bookai_pwa_install_dismissed_v1";
+const SESSION_SHOWN_KEY = "bookai_pwa_install_shown_session";
 const DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** Survives layout remounts during client navigations in this tab. */
+let autoPromptedThisLoad = false;
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -52,6 +56,24 @@ function rememberDismiss() {
   }
 }
 
+function shownThisVisit() {
+  if (autoPromptedThisLoad) return true;
+  try {
+    return sessionStorage.getItem(SESSION_SHOWN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markShownThisVisit() {
+  autoPromptedThisLoad = true;
+  try {
+    sessionStorage.setItem(SESSION_SHOWN_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
 export function InstallPrompt() {
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
@@ -66,6 +88,15 @@ export function InstallPrompt() {
       return;
     }
 
+    const openOnce = (ios: boolean) => {
+      if (shownThisVisit() || wasDismissedRecently() || isStandalone()) {
+        return;
+      }
+      markShownThisVisit();
+      setShowIosHint(ios);
+      setOpen(true);
+    };
+
     const onBeforeInstall = (event: Event) => {
       event.preventDefault();
       const installEvent = event as BeforeInstallPromptEvent;
@@ -75,18 +106,25 @@ export function InstallPrompt() {
         }
       ).__bookaiDeferredInstall = installEvent;
       setDeferredPrompt(installEvent);
-      setShowIosHint(false);
-      window.setTimeout(() => setOpen(true), 1200);
+      window.setTimeout(() => openOnce(false), 1200);
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     setReady(true);
 
+    const existing = (
+      window as Window & {
+        __bookaiDeferredInstall?: BeforeInstallPromptEvent;
+      }
+    ).__bookaiDeferredInstall;
+    if (existing) {
+      setDeferredPrompt(existing);
+    }
+
     if (isIos()) {
       window.setTimeout(() => {
         if (!isStandalone() && !wasDismissedRecently()) {
-          setShowIosHint(true);
-          setOpen(true);
+          openOnce(true);
         }
       }, 1800);
     }
@@ -122,7 +160,9 @@ export function InstallPrompt() {
 
   return (
     <>
-      {!open && (deferredPrompt || showIosHint) && (
+      {!open &&
+        !shownThisVisit() &&
+        (deferredPrompt || showIosHint) && (
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -136,7 +176,13 @@ export function InstallPrompt() {
         </button>
       )}
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) markShownThisVisit();
+        }}
+      >
         <SheetContent
           side="bottom"
           className="mx-auto max-w-lg gap-0 rounded-t-3xl border-[#e6ebf1] bg-white px-0 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_40px_rgba(10,37,64,0.12)]"
