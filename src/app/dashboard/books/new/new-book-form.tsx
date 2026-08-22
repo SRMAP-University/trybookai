@@ -225,7 +225,9 @@ export function NewBookForm() {
       includeExamples: template.includeExamples,
       description: prev.description || template.description,
     }));
-    const isPreset = PAGE_PRESETS.some((p) => p.pages === template.targetPages);
+    const isPreset = PAGE_PRESETS.some(
+      (p) => p.pages === Number(template.targetPages)
+    );
     setCustomLength(!isPreset);
     if (typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches) {
       setShowAdvanced(true);
