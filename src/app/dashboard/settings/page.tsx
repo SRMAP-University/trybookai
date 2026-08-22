@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -101,7 +101,7 @@ function SettingsPageContent() {
             defaultLanguage: data.defaultLanguage || "en",
             defaultModel: data.defaultModel || DEFAULT_AI_MODEL,
             defaultAudience: data.defaultAudience || "General readers",
-            defaultTargetPages: Number(data.defaultTargetPages) || 40,
+            defaultTargetPages: Number(data.defaultTargetPages) || 10,
             defaultWordsPerPage: Number(data.defaultWordsPerPage) || 300,
             defaultSectionsPerChapter:
               Number(data.defaultSectionsPerChapter) || 4,
@@ -506,7 +506,7 @@ function SettingsPageContent() {
                   onChange={(e) =>
                     setSettings({
                       ...settings,
-                      defaultTargetPages: Number(e.target.value) || 40,
+                      defaultTargetPages: Number(e.target.value) || 10,
                     })
                   }
                   className="h-10 w-full border-[#e6ebf1]"

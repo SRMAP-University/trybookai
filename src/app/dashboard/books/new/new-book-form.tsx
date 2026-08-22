@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -25,6 +25,7 @@ import {
   CREATIVITY_LEVELS,
   DEFAULT_AI_MODEL,
   STYLE_PRESETS,
+  PLANS,
 } from "@/lib/constants";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -59,13 +60,19 @@ type FormState = {
   generateAudiobook: boolean;
 };
 
+const PAGE_PRESETS = [
+  { pages: 10, label: "Short", hint: "Quick read" },
+  { pages: 25, label: "Medium", hint: "Standard" },
+  { pages: 50, label: "Long", hint: "Full book" },
+] as const;
+
 const initialForm: FormState = {
   title: "",
   description: "",
   genre: "Fiction",
   tone: "Professional",
   audience: "General readers",
-  targetPages: 40,
+  targetPages: 10,
   pov: "third",
   tense: "past",
   language: "en",
@@ -93,6 +100,10 @@ export function NewBookForm() {
   const canGenerateAudio = Boolean(
     user && user.plan !== "FREE" && (user.audioMinutesLimit ?? 0) > 0
   );
+  const maxBookPages =
+    (user?.plan && user.plan in PLANS
+      ? PLANS[user.plan as keyof typeof PLANS].maxBookPages
+      : PLANS.FREE.maxBookPages) ?? 50;
   const [form, setForm] = useState<FormState>(initialForm);
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -102,6 +113,7 @@ export function NewBookForm() {
   const [premiumFeatureLabel, setPremiumFeatureLabel] = useState(
     "Upgrade for more monthly page credits."
   );
+  const [customLength, setCustomLength] = useState(false);
 
   async function enhanceField(
     field:
@@ -160,7 +172,7 @@ export function NewBookForm() {
           genre: data.defaultGenre ?? prev.genre,
           tone: data.defaultTone ?? prev.tone,
           audience: data.defaultAudience ?? prev.audience,
-          targetPages: data.defaultTargetPages ?? prev.targetPages,
+          targetPages: 10, // product default (settings value often still 100 for existing users)
           pov: data.defaultPov ?? prev.pov,
           tense: data.defaultTense ?? prev.tense,
           language: data.defaultLanguage ?? prev.language,
@@ -213,7 +225,11 @@ export function NewBookForm() {
       includeExamples: template.includeExamples,
       description: prev.description || template.description,
     }));
-    setShowAdvanced(true);
+    const isPreset = PAGE_PRESETS.some((p) => p.pages === template.targetPages);
+    setCustomLength(!isPreset);
+    if (typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches) {
+      setShowAdvanced(true);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -304,31 +320,44 @@ export function NewBookForm() {
   }
 
   return (
-    <div className="w-full max-w-[1100px]">
-      <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-[#0a2540]">
-        New book
-      </h1>
-      <p className="mt-1 text-[14px] text-[#697386]">
-        Configure your book on the left, or pick a template on the right.
-      </p>
+    <div className="w-full max-w-[1100px] max-lg:pb-28">
+      <div className="lg:hidden">
+        <p className="mb-2 text-[13px] font-medium text-[#0a2540]">Start from</p>
+        <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TemplateChip
+            selected={!form.templateId}
+            title="Blank"
+            onClick={() => applyTemplate("")}
+          />
+          {BOOK_TEMPLATES.map((template) => (
+            <TemplateChip
+              key={template.id}
+              selected={form.templateId === template.id}
+              title={template.name}
+              onClick={() => applyTemplate(template.id)}
+            />
+          ))}
+        </div>
+      </div>
 
-      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mt-6 grid items-start gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_300px]">
         <form
+          id="new-book-form"
           onSubmit={handleSubmit}
-          className="space-y-6 rounded-lg border border-[#e6ebf1] bg-white p-6"
+          className="space-y-5 lg:space-y-6 lg:rounded-lg lg:border lg:border-[#e6ebf1] lg:bg-white lg:p-6"
         >
         <Field label="Title">
           <Input
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder="The Silent Archive"
-            className="h-10 border-[#e6ebf1]"
+            className="h-12 border-[#e6ebf1] text-[16px] lg:h-10 lg:text-[14px]"
             required
           />
         </Field>
 
         <Field
-          label="Description / premise"
+          label="What’s the book about?"
           action={
             <EnhanceButton
               loading={enhancing === "description"}
@@ -340,13 +369,107 @@ export function NewBookForm() {
           <Textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Plot, themes, or subject matter..."
-            rows={4}
-            className="border-[#e6ebf1]"
+            placeholder="A few sentences on plot, topic, or who it’s for…"
+            rows={5}
+            className="border-[#e6ebf1] text-[16px] lg:text-[14px]"
           />
         </Field>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="lg:hidden">
+          <p className="mb-2 text-[13px] font-medium text-[#425466]">Genre</p>
+          <div className="flex flex-wrap gap-2">
+            {BOOK_GENRES.map((g) => {
+              const selected = form.genre === g;
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setForm({ ...form, genre: g })}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-[13px] transition-colors",
+                    selected
+                      ? "border-[#635bff] bg-[#f0efff] font-medium text-[#635bff]"
+                      : "border-[#e6ebf1] bg-white text-[#425466]"
+                  )}
+                >
+                  {g}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="lg:hidden">
+          <p className="mb-2 text-[13px] font-medium text-[#425466]">Length</p>
+          <div className="grid grid-cols-4 gap-2">
+            {PAGE_PRESETS.map((preset) => {
+              const selected =
+                !customLength && form.targetPages === preset.pages;
+              return (
+                <button
+                  key={preset.pages}
+                  type="button"
+                  onClick={() => {
+                    setCustomLength(false);
+                    setForm({ ...form, targetPages: preset.pages });
+                  }}
+                  className={cn(
+                    "rounded-xl border px-1.5 py-3 text-center transition-colors",
+                    selected
+                      ? "border-[#635bff] bg-[#f8f7ff]"
+                      : "border-[#e6ebf1] bg-white"
+                  )}
+                >
+                  <p className="text-[13px] font-semibold text-[#0a2540]">
+                    {preset.label}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#697386]">
+                    {preset.pages}p
+                  </p>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setCustomLength(true)}
+              className={cn(
+                "rounded-xl border px-1.5 py-3 text-center transition-colors",
+                customLength
+                  ? "border-[#635bff] bg-[#f8f7ff]"
+                  : "border-[#e6ebf1] bg-white"
+              )}
+            >
+              <p className="text-[13px] font-semibold text-[#0a2540]">
+                Custom
+              </p>
+              <p className="mt-0.5 text-[11px] text-[#697386]">Any</p>
+            </button>
+          </div>
+          {customLength && (
+            <div className="mt-3">
+              <Input
+                type="number"
+                min={3}
+                max={maxBookPages}
+                inputMode="numeric"
+                value={form.targetPages}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setForm({
+                    ...form,
+                    targetPages: Number.isFinite(n) ? n : form.targetPages,
+                  });
+                }}
+                className="h-12 border-[#e6ebf1] text-[16px]"
+              />
+              <p className="mt-1.5 text-[12px] text-[#697386]">
+                {form.targetPages} pages (3–{maxBookPages} on your plan)
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden gap-4 lg:grid lg:grid-cols-2">
           <Field label="Genre">
             <Select
               value={form.genre}
@@ -406,14 +529,14 @@ export function NewBookForm() {
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex w-full items-center justify-between rounded-md border border-[#e6ebf1] px-4 py-3 text-left hover:bg-[#f6f9fc]"
+          className="flex w-full items-center justify-between rounded-xl border border-[#e6ebf1] px-4 py-3.5 text-left lg:rounded-md"
         >
           <div>
             <p className="text-[14px] font-medium text-[#0a2540]">
-              Advanced settings
+              More options
             </p>
             <p className="text-[12px] text-[#697386]">
-              POV, structure, characters, model, style, and more
+              Voice, characters, style — optional
             </p>
           </div>
           <ChevronDown
@@ -426,6 +549,34 @@ export function NewBookForm() {
 
         {showAdvanced && (
           <div className="space-y-6 border-t border-[#e6ebf1] pt-6">
+            <div className="grid gap-4 lg:hidden">
+              <Field label="Tone">
+                <Select
+                  value={form.tone}
+                  onValueChange={(tone) => setForm({ ...form, tone })}
+                >
+                  <SelectTrigger className="h-12 border-[#e6ebf1] text-[16px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BOOK_TONES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Audience">
+                <Input
+                  value={form.audience}
+                  onChange={(e) =>
+                    setForm({ ...form, audience: e.target.value })
+                  }
+                  className="h-12 border-[#e6ebf1] text-[16px]"
+                />
+              </Field>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Point of view">
                 <Select
@@ -685,6 +836,7 @@ export function NewBookForm() {
           </div>
         )}
 
+        <div className="hidden space-y-4 lg:block">
         <Toggle
           label="Start generation after create"
           checked={form.startGeneration}
@@ -714,7 +866,7 @@ export function NewBookForm() {
           }}
         />
         {!canGenerateAudio && (
-          <p className="-mt-4 text-[12px] text-[#697386]">
+          <p className="-mt-2 text-[12px] text-[#697386]">
             Audiobooks require Pro or Premium.{" "}
             <UpgradeLink
               plan="PRO"
@@ -737,9 +889,10 @@ export function NewBookForm() {
               : "Create & generate"
             : "Create book"}
         </Button>
+        </div>
       </form>
 
-        <aside className="lg:sticky lg:top-6">
+        <aside className="hidden lg:sticky lg:top-6 lg:block">
           <div className="rounded-lg border border-[#e6ebf1] bg-white p-4">
             <p className="text-[13px] font-medium text-[#0a2540]">Templates</p>
             <p className="mt-1 text-[12px] text-[#697386]">
@@ -793,7 +946,44 @@ export function NewBookForm() {
         onOpenChange={setPremiumUpgradeOpen}
         featureLabel={premiumFeatureLabel}
       />
+
+      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-[#e6ebf1] bg-white/95 px-4 py-3 backdrop-blur-md lg:hidden">
+        <Button
+          form="new-book-form"
+          type="submit"
+          className="h-12 w-full rounded-full bg-[#635bff] text-[15px] font-medium hover:bg-[#5851e5]"
+          disabled={loading}
+        >
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Create & generate
+        </Button>
+      </div>
     </div>
+  );
+}
+
+function TemplateChip({
+  selected,
+  title,
+  onClick,
+}: {
+  selected: boolean;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "shrink-0 snap-start rounded-full border px-3.5 py-2 text-[13px] font-medium whitespace-nowrap",
+        selected
+          ? "border-[#635bff] bg-[#f0efff] text-[#635bff]"
+          : "border-[#e6ebf1] bg-white text-[#425466]"
+      )}
+    >
+      {title}
+    </button>
   );
 }
 
