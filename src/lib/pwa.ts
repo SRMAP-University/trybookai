@@ -64,9 +64,9 @@ export function buildWebManifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
       },
       {
-        name: "Audio Studio",
-        short_name: "Audio",
-        url: "/dashboard/audio-studio",
+        name: "Song Studio",
+        short_name: "Songs",
+        url: "/dashboard/songs",
         icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
       },
     ],

@@ -50,7 +50,7 @@ type GeneratingBook = {
 export function AnimatedCoverGrid({ covers }: { covers: CoverBook[] }) {
   return (
     <motion.div
-      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-3 lg:grid-cols-4"
       variants={list}
       initial="hidden"
       animate="show"

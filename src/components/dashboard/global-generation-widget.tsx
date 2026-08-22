@@ -8,6 +8,7 @@ import {
   Headphones,
   Loader2,
   Mic2,
+  MicVocal,
   Music2,
   X,
 } from "lucide-react";
@@ -28,7 +29,7 @@ type ActiveAudioJob = {
   id: string;
   bookId: string;
   bookTitle: string;
-  type: "AUDIOBOOK" | "PODCAST" | "MUSIC";
+  type: "AUDIOBOOK" | "PODCAST" | "MUSIC" | "SONG";
   status: string;
   progress: number;
   title: string | null;
@@ -45,6 +46,7 @@ const AUDIO_META = {
   AUDIOBOOK: { label: "Audiobook", icon: Headphones },
   PODCAST: { label: "Podcast", icon: Mic2 },
   MUSIC: { label: "Theme music", icon: Music2 },
+  SONG: { label: "Song", icon: MicVocal },
 } as const;
 
 function statusLabel(status: string) {

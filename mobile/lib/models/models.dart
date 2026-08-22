@@ -193,6 +193,8 @@ class ActiveAudioJob {
         return 'Podcast';
       case 'MUSIC':
         return 'Theme music';
+      case 'SONG':
+        return 'Song';
       default:
         return 'Audiobook';
     }

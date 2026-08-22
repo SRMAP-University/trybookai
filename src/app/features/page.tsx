@@ -52,7 +52,7 @@ const features = [
     icon: Headphones,
     title: "AI audiobooks & narration",
     description:
-      "Turn completed books into audiobooks, podcasts, or theme music with AI-powered audio generation and voice customization.",
+      "Turn completed books into audiobooks, podcasts, or theme music. Generate original songs separately in Song Studio.",
   },
   {
     icon: Download,

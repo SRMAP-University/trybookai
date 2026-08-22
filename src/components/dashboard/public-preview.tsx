@@ -135,7 +135,7 @@ export async function PublicDashboardPreview() {
             Browse all
           </Link>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {recentCovers.map((book, i) => {
             const sample = SAMPLE_BOOKS[i % SAMPLE_BOOKS.length];
             const href = book.slug

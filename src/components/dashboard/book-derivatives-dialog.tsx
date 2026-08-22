@@ -36,7 +36,7 @@ import {
 } from "@/lib/elevenlabs-voices";
 import { DEFAULT_VOICE_ID } from "@/lib/elevenlabs";
 
-export type AudioDerivativeType = "AUDIOBOOK" | "PODCAST" | "MUSIC";
+export type AudioDerivativeType = "AUDIOBOOK" | "PODCAST" | "MUSIC" | "SONG";
 
 export type AudioGenerationOptions = {
   voiceId?: string;
@@ -276,11 +276,11 @@ export function BookDerivativesDialog({
     <Dialog open={open} onOpenChange={resetAndClose}>
       <DialogContent
         showCloseButton
-        className="gap-0 overflow-hidden border-[#e6ebf1] bg-white p-0 sm:max-w-[640px]"
+        className="max-h-[min(92dvh,760px)] gap-0 overflow-y-auto border-[#e6ebf1] bg-white p-0 sm:max-w-[640px]"
       >
         {step === "pick" ? (
           <>
-            <div className="relative overflow-hidden border-b border-[#e6ebf1] bg-[#f6f9fc] px-6 pb-5 pt-7">
+            <div className="relative overflow-hidden border-b border-[#e6ebf1] bg-[#f6f9fc] px-5 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-7">
               <div
                 className="pointer-events-none absolute inset-0 opacity-[0.4]"
                 style={{
@@ -290,23 +290,25 @@ export function BookDerivativesDialog({
                 }}
               />
               <div className="relative">
-                <FormatVisual />
-                <div className="mt-5 text-center">
+                <div className="hidden sm:block">
+                  <FormatVisual />
+                </div>
+                <div className="text-center sm:mt-5">
                   <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#635bff]">
                     Audio studio
                   </p>
-                  <DialogTitle className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-[#0a2540]">
+                  <DialogTitle className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-[#0a2540] sm:text-[22px]">
                     Turn your book into audio
                   </DialogTitle>
-                  <DialogDescription className="mx-auto mt-2 max-w-[360px] text-[13px] leading-relaxed text-[#697386]">
+                  <DialogDescription className="mx-auto mt-2 max-w-[400px] text-[13px] leading-relaxed text-[#697386]">
                     <span className="font-medium text-[#0a2540]">{bookTitle}</span>{" "}
-                    can become an audiobook, podcast series, or theme track.
+                    can become an audiobook, podcast, or theme track.
                   </DialogDescription>
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-3 p-5 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 p-4 sm:p-5">
               {OPTIONS.map((option) => {
                 const Icon = option.icon;
                 const hasExisting =

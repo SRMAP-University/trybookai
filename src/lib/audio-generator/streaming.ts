@@ -7,6 +7,7 @@ import {
 } from "@/lib/book-generator/llm";
 import {
   generateMusic,
+  generateSong,
   isElevenLabsConfigured,
   textToSpeechLong,
   type TtsOptions,
@@ -22,6 +23,7 @@ import {
   formatAudioMinutes,
 } from "@/lib/audio-quota";
 import { PLANS } from "@/lib/constants";
+import { SONG_STUDIO_GENRE } from "@/lib/song-studio";
 import { uploadAudioToR2, uploadFullAudioToR2 } from "@/lib/r2";
 import {
   createAudioEventEmitter,
@@ -455,7 +457,10 @@ async function runMusic(
     .filter(Boolean)
     .join(" ");
 
-  const audioBytes = await generateMusic(prompt, 45_000);
+  const audioBytes = await generateMusic(prompt, {
+    musicLengthMs: 45_000,
+    forceInstrumental: true,
+  });
   await creditAudioMinutes(userId, 1);
 
   const audioUrl = await saveTrack({
@@ -496,6 +501,171 @@ async function runMusic(
     audioType: "MUSIC",
     trackNumber: 1,
     trackTitle: `${book.title} — Theme`,
+  });
+}
+
+async function buildSongPrompt(book: {
+  title: string;
+  description: string | null;
+  genre: string | null;
+  tone: string | null;
+  model: string;
+  chapters: { title: string; summary: string | null }[];
+}): Promise<string> {
+  const chapterHints = book.chapters
+    .slice(0, 8)
+    .map((c) => `${c.title}${c.summary ? `: ${c.summary.slice(0, 120)}` : ""}`)
+    .join("; ");
+
+  try {
+    const raw = await createChatCompletion({
+      model: book.model || "llama-3.3",
+      temperature: 0.85,
+      json: true,
+      max_tokens: 1200,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You write prompts for ElevenLabs Music to generate original songs with sung vocals and lyrics. Return JSON only.",
+        },
+        {
+          role: "user",
+          content: `Write one Eleven Music prompt for a complete song inspired by the book "${book.title}".
+Genre: ${book.genre ?? "storytelling"}. Tone: ${book.tone ?? "cinematic"}.
+Description: ${book.description ?? "n/a"}
+Chapters: ${chapterHints || "n/a"}
+
+Return JSON: { "prompt": "..." }
+
+The prompt must:
+- Specify a vocal song (male or female lead singer), not instrumental-only
+- Name genre, BPM range, and mood
+- Include full lyrics for verse 1, chorus, verse 2, chorus, and a short outro
+- Stay under 1800 characters
+- Avoid copyrighted song titles or artist names`,
+        },
+      ],
+    });
+    const parsed = JSON.parse(extractJsonPayload(raw)) as { prompt?: string };
+    const prompt = parsed.prompt?.trim();
+    if (prompt && prompt.length > 40) return prompt.slice(0, 2000);
+  } catch (error) {
+    console.warn("[audio] song prompt LLM failed", error);
+  }
+
+  return [
+    `An original vocal song inspired by the book "${book.title}".`,
+    book.genre ? `Musical genre close to ${book.genre}.` : "Cinematic pop.",
+    book.tone ? `Mood: ${book.tone}.` : "",
+    book.description
+      ? `Story: ${book.description.slice(0, 240)}.`
+      : "",
+    "Lead vocals, memorable chorus, verse-chorus structure, polished production, not instrumental.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function studioSongPrompt(book: {
+  title: string;
+  description: string | null;
+  tone: string | null;
+  customInstructions: string | null;
+}): string {
+  const style = book.customInstructions?.startsWith("song-studio:")
+    ? book.customInstructions.slice("song-studio:".length).trim()
+    : "";
+  return [
+    `An original vocal song titled "${book.title}".`,
+    style ? `Musical style: ${style}.` : "",
+    book.tone ? `Mood: ${book.tone}.` : "",
+    book.description?.trim() ||
+      "Write original lyrics with a verse and a memorable chorus.",
+    "Lead vocals, verse-chorus structure, polished production, not instrumental.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+async function runSong(
+  bookId: string,
+  audioId: string,
+  userId: string,
+  emit: AudioStreamEmitter
+) {
+  const book = await db.book.findUniqueOrThrow({
+    where: { id: bookId },
+    include: {
+      chapters: {
+        orderBy: { number: "asc" },
+        select: { title: true, summary: true },
+      },
+    },
+  });
+
+  await assertAudioQuota(userId, 2);
+
+  emit({
+    type: "phase",
+    message: "Writing lyrics…",
+    audioType: "SONG",
+  });
+
+  const prompt =
+    book.genre === SONG_STUDIO_GENRE ||
+    book.customInstructions?.startsWith("song-studio:")
+      ? studioSongPrompt(book)
+      : await buildSongPrompt(book);
+
+  emit({
+    type: "phase",
+    message: "Generating song with ElevenLabs…",
+    audioType: "SONG",
+  });
+
+  const audioBytes = await generateSong(prompt, 90_000);
+  await creditAudioMinutes(userId, 2);
+
+  const trackTitle = `${book.title} — Song`;
+  const audioUrl = await saveTrack({
+    bookId,
+    audioId,
+    number: 1,
+    title: trackTitle,
+    audioBytes,
+  });
+
+  const { publicUrl: fullUrl } = await uploadFullAudioToR2(
+    bookId,
+    audioId,
+    audioBytes,
+    `${book.title.replace(/[^\w\s.-]+/g, "").trim() || "song"}.mp3`
+  );
+
+  await db.bookAudio.update({
+    where: { id: audioId },
+    data: {
+      progress: 100,
+      audioUrl: fullUrl,
+      status: "GENERATING",
+    },
+  });
+
+  emit({
+    type: "track_done",
+    trackNumber: 1,
+    trackTitle,
+    audioUrl,
+    audioType: "SONG",
+  });
+  emit({
+    type: "progress",
+    progress: 100,
+    status: "GENERATING",
+    audioType: "SONG",
+    trackNumber: 1,
+    trackTitle,
   });
 }
 
@@ -564,6 +734,8 @@ export async function runAudioGeneration(
         emitter,
         voiceSettings
       );
+    } else if (audio.type === "SONG") {
+      await runSong(audio.bookId, audioId, userId, emitter);
     } else {
       await runMusic(audio.bookId, audioId, userId, emitter);
     }
@@ -699,7 +871,9 @@ export async function ensureAudioRecord(params: {
       ? "Audiobook"
       : params.type === "PODCAST"
         ? "Podcast"
-        : "Theme music";
+        : params.type === "SONG"
+          ? "Song"
+          : "Theme music";
 
   const priorCount = await db.bookAudio.count({
     where: { bookId: params.bookId, type: params.type },

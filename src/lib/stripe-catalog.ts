@@ -4,7 +4,7 @@ import { PREMIUM_TRIAL, UNLIMITED_FAIR_USE } from "@/lib/constants";
 export const STRIPE_PREMIUM_INCLUDED_ADDONS = [
   "10,000 pages per month",
   "3 hours of audiobook narration",
-  "Audiobook, podcast & theme music",
+  "Audiobook, podcast, theme music & songs",
   "Qwen 32B premium model access",
   "Up to 1,000 pages per book",
   "Unlimited books",
@@ -16,7 +16,7 @@ export const STRIPE_PREMIUM_INCLUDED_ADDONS = [
 export const STRIPE_PRO_INCLUDED_ADDONS = [
   "5,000 pages per month",
   "1 hour of audiobook narration",
-  "Audiobook, podcast & theme music",
+  "Audiobook, podcast, theme music & songs",
   "Up to 500 pages per book",
   "Private books",
   "Priority generation",
@@ -26,7 +26,7 @@ export const STRIPE_PRO_INCLUDED_ADDONS = [
 export const STRIPE_UNLIMITED_INCLUDED_ADDONS = [
   "Unlimited pages (fair use)",
   "Unlimited audiobook narration (fair use)",
-  "Audiobook, podcast & theme music",
+  "Audiobook, podcast, theme music & songs",
   "All AI models & voices",
   "Up to 5,000 pages per book",
   "Unlimited books & Audio Studio",

@@ -806,7 +806,9 @@ function BookDetailPageContent() {
         ? "Narrating audiobook…"
         : type === "PODCAST"
           ? "Recording podcast…"
-          : "Composing theme music…"
+          : type === "SONG"
+            ? "Writing and generating a song…"
+            : "Composing theme music…"
     );
     await subscribeToAudio(audio.id);
   }
@@ -1240,6 +1242,19 @@ function BookDetailPageContent() {
           generatingType={audioGeneratingType}
           phaseMessage={audioPhaseMessage}
           onOpenStudio={() => setDerivativesOpen(true)}
+          onPickType={(type) => {
+            if (type === "MUSIC") {
+              void startAudioGeneration(type).catch((error) => {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to start audio generation"
+                );
+              });
+              return;
+            }
+            setDerivativesOpen(true);
+          }}
         />
       )}
 

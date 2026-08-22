@@ -6,6 +6,8 @@ import {
   ArrowRight,
   BookOpen,
   Clapperboard,
+  Headphones,
+  MicVocal,
   Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import { PublicDashboardPreview } from "@/components/dashboard/public-preview";
 import { getRecentLandingCovers } from "@/lib/landing-covers";
 import { isTrialActive, syncUserTrialState } from "@/lib/billing";
 import { AUDIO_STUDIO_GENRE } from "@/lib/audio-studio";
+import { SONG_STUDIO_GENRE } from "@/lib/song-studio";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -34,7 +37,7 @@ export default async function DashboardPage() {
   const books = await db.book.findMany({
     where: {
       userId: session.user.id,
-      NOT: { genre: AUDIO_STUDIO_GENRE },
+      NOT: { genre: { in: [AUDIO_STUDIO_GENRE, SONG_STUDIO_GENRE] } },
     },
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { chapters: true } } },
@@ -60,8 +63,8 @@ export default async function DashboardPage() {
   const firstName = user.name?.split(" ")[0];
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-8 lg:space-y-10">
+      <div className="hidden items-start justify-between gap-4 lg:flex">
         <div>
           <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-[#0a2540]">
             Home
@@ -81,8 +84,12 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {/* Promotional banner */}
-      <div className="relative overflow-hidden rounded-lg bg-[#0a2540] px-4 py-2.5 sm:px-5 sm:py-3">
+      <a
+        href="https://litemoov.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="relative hidden overflow-hidden rounded-lg bg-[#0a2540] px-5 py-3 lg:block"
+      >
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.08]"
           style={{
@@ -97,35 +104,67 @@ export default async function DashboardPage() {
               <Clapperboard className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-[14px] font-semibold tracking-[-0.02em] text-white sm:text-[15px]">
+              <h2 className="truncate text-[15px] font-semibold tracking-[-0.02em] text-white">
                 Turn book into movie with AI
               </h2>
-              <p className="mt-0.5 hidden truncate text-[11px] text-white/60 sm:block">
+              <p className="mt-0.5 truncate text-[11px] text-white/60">
                 Screenplay, shot list & scene breakdown — page to screen.
               </p>
             </div>
           </div>
-          <Button
-            className="h-7 shrink-0 rounded-md bg-white px-3 text-[12px] font-medium text-[#0a2540] hover:bg-white/90"
-            asChild
-          >
-            <a
-              href="https://litemoov.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Early access
-              <ArrowRight className="ml-1 h-3 w-3" />
-            </a>
-          </Button>
+          <span className="inline-flex h-7 shrink-0 items-center rounded-md bg-white px-3 text-[12px] font-medium text-[#0a2540]">
+            Early access
+            <ArrowRight className="ml-1 h-3 w-3" />
+          </span>
         </div>
+      </a>
+
+      <div className="grid grid-cols-3 gap-2.5 lg:hidden">
+        {(
+          [
+            {
+              href: "/dashboard/books/new",
+              label: "Book",
+              hint: "Write",
+              icon: BookOpen,
+            },
+            {
+              href: "/dashboard/audio-studio",
+              label: "Audiobook",
+              hint: "Narrate",
+              icon: Headphones,
+            },
+            {
+              href: "/dashboard/songs",
+              label: "Music",
+              hint: "Song",
+              icon: MicVocal,
+            },
+          ] as const
+        ).map((card) => (
+          <Link
+            key={card.href}
+            href={card.href}
+            className="flex flex-col items-center rounded-2xl border border-[#e6ebf1] bg-white px-2 py-3.5 text-center shadow-[0_1px_2px_rgba(10,37,64,0.04)]"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f0efff] text-[#635bff]">
+              <card.icon className="h-4 w-4" />
+            </span>
+            <span className="mt-2 text-[13px] font-semibold text-[#0a2540]">
+              {card.label}
+            </span>
+            <span className="mt-0.5 text-[11px] text-[#697386]">
+              {card.hint}
+            </span>
+          </Link>
+        ))}
       </div>
 
       {onTrial && <DashboardTrialSection />}
 
       {/* Banners */}
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="relative overflow-hidden rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] px-4 py-3.5">
+        <div className="relative hidden overflow-hidden rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] px-4 py-3.5 lg:block">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540]">

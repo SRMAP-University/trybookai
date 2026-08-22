@@ -38,7 +38,7 @@ export const PLANS = {
       "Priority generation",
       "Advanced style controls",
       "Private books",
-      "Audiobook, podcast & theme music",
+      "Audiobook, podcast, theme music & songs",
     ],
   },
   ENTERPRISE: {
@@ -59,6 +59,7 @@ export const PLANS = {
       "Private books",
       "Qwen 32B model access",
       "Custom styles & voices",
+      "Audiobook, podcast, theme music & songs",
       "Priority support",
     ],
   },

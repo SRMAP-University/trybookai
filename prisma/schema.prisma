@@ -42,6 +42,7 @@ enum AudioDerivativeType {
   AUDIOBOOK
   PODCAST
   MUSIC
+  SONG
 }
 
 enum AudioDerivativeStatus {

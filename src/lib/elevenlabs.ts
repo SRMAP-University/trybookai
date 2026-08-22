@@ -134,8 +134,16 @@ export async function textToSpeechLong(
 
 export async function generateMusic(
   prompt: string,
-  musicLengthMs = 30_000
+  options: {
+    musicLengthMs?: number;
+    modelId?: string;
+    forceInstrumental?: boolean;
+  } = {}
 ): Promise<Buffer> {
+  const musicLengthMs = Math.min(
+    Math.max(options.musicLengthMs ?? 30_000, 3_000),
+    600_000
+  );
   const url = `${ELEVEN_BASE}/music`;
   const res = await fetch(url, {
     method: "POST",
@@ -146,7 +154,11 @@ export async function generateMusic(
     },
     body: JSON.stringify({
       prompt,
-      music_length_ms: Math.min(Math.max(musicLengthMs, 3000), 180_000),
+      music_length_ms: musicLengthMs,
+      model_id: options.modelId ?? "music_v2",
+      ...(options.forceInstrumental != null
+        ? { force_instrumental: options.forceInstrumental }
+        : {}),
     }),
   });
 
@@ -158,4 +170,68 @@ export async function generateMusic(
   }
 
   return Buffer.from(await res.arrayBuffer());
+}
+
+/** Vocal song via composition plan when available, otherwise a lyrics-rich prompt. */
+export async function generateSong(
+  prompt: string,
+  musicLengthMs = 90_000
+): Promise<Buffer> {
+  const length = Math.min(Math.max(musicLengthMs, 10_000), 180_000);
+  const key = getApiKey();
+
+  const planRes = await fetch(`${ELEVEN_BASE}/music/plan`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": key,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt,
+      music_length_ms: length,
+      model_id: "music_v2",
+    }),
+  });
+
+  if (planRes.ok) {
+    const planJson = (await planRes.json()) as Record<string, unknown>;
+    const compositionPlan =
+      planJson.composition_plan && typeof planJson.composition_plan === "object"
+        ? planJson.composition_plan
+        : planJson;
+    const composeRes = await fetch(`${ELEVEN_BASE}/music`, {
+      method: "POST",
+      headers: {
+        "xi-api-key": key,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body: JSON.stringify({
+        composition_plan: compositionPlan,
+        model_id: "music_v2",
+      }),
+    });
+    if (composeRes.ok) {
+      return Buffer.from(await composeRes.arrayBuffer());
+    }
+    const composeBody = await composeRes.text();
+    console.warn(
+      "[elevenlabs] song compose from plan failed",
+      composeRes.status,
+      composeBody.slice(0, 240)
+    );
+  } else {
+    const planBody = await planRes.text();
+    console.warn(
+      "[elevenlabs] song plan failed",
+      planRes.status,
+      planBody.slice(0, 240)
+    );
+  }
+
+  return generateMusic(prompt, {
+    musicLengthMs: length,
+    modelId: "music_v2",
+    forceInstrumental: false,
+  });
 }

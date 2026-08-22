@@ -5,6 +5,7 @@ import {
   Download,
   Headphones,
   Mic2,
+  MicVocal,
   Music2,
   Pause,
   Play,
@@ -62,6 +63,12 @@ const TYPE_META: Record<
     icon: Music2,
     tone: "text-[#9a6700] bg-[#fcf5e0]",
     accent: "#9a6700",
+  },
+  SONG: {
+    label: "Song",
+    icon: MicVocal,
+    tone: "text-[#df1b41] bg-[#fde8e8]",
+    accent: "#df1b41",
   },
 };
 
@@ -414,20 +421,84 @@ function AudioCard({
   );
 }
 
+const CREATE_OPTIONS: {
+  type: AudioDerivativeType;
+  label: string;
+  hint: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  {
+    type: "AUDIOBOOK",
+    label: "Audiobook",
+    hint: "Narrate every chapter",
+    icon: Headphones,
+  },
+  {
+    type: "PODCAST",
+    label: "Podcast",
+    hint: "Episode from the story",
+    icon: Mic2,
+  },
+  {
+    type: "MUSIC",
+    label: "Theme music",
+    hint: "Instrumental intro",
+    icon: Music2,
+  },
+];
+
 type BookAudioPanelProps = {
   audios: BookAudioItem[];
   generatingType?: AudioDerivativeType | null;
   phaseMessage?: string | null;
   onOpenStudio?: () => void;
+  onPickType?: (type: AudioDerivativeType) => void;
   /** Public book pages — play only, no studio / generate controls. */
   readOnly?: boolean;
 };
+
+function CreateTypeGrid({
+  missing,
+  onPickType,
+}: {
+  missing: AudioDerivativeType[];
+  onPickType: (type: AudioDerivativeType) => void;
+}) {
+  const options = CREATE_OPTIONS.filter((o) => missing.includes(o.type));
+  if (options.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {options.map((option) => {
+        const Icon = option.icon;
+        return (
+          <button
+            key={option.type}
+            type="button"
+            onClick={() => onPickType(option.type)}
+            className="flex items-start gap-3 rounded-xl border border-[#e6ebf1] bg-white px-3.5 py-3 text-left transition-colors hover:border-[#635bff]/40 hover:bg-[#f8f7ff]"
+          >
+            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#635bff]" />
+            <span>
+              <span className="block text-[13px] font-semibold text-[#0a2540]">
+                {option.label}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-[#697386]">
+                {option.hint}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function BookAudioPanel({
   audios,
   generatingType = null,
   phaseMessage = null,
   onOpenStudio,
+  onPickType,
   readOnly = false,
 }: BookAudioPanelProps) {
   const playable = useMemo(() => {
@@ -439,32 +510,40 @@ export function BookAudioPanel({
         )
       : audios;
     return [...list].sort((a, b) => {
-      const order = { AUDIOBOOK: 0, PODCAST: 1, MUSIC: 2 };
+      const order = { AUDIOBOOK: 0, PODCAST: 1, MUSIC: 2, SONG: 3 };
       return order[a.type] - order[b.type];
     });
   }, [audios, readOnly]);
+
+  const missingTypes = useMemo(() => {
+    const have = new Set(
+      audios
+        .filter((a) => a.status !== "FAILED")
+        .map((a) => a.type)
+    );
+    return CREATE_OPTIONS.map((o) => o.type).filter((t) => !have.has(t));
+  }, [audios]);
 
   if (playable.length === 0 && !generatingType) {
     if (readOnly) return null;
     return (
       <div className="rounded-xl border border-[#e6ebf1] bg-white p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[15px] font-semibold text-[#0a2540]">Audiobook</p>
-            <p className="mt-1 text-[13px] text-[#697386]">
-              Generate narration, then play or download chapter audio here.
-            </p>
-          </div>
-          {onOpenStudio && (
-            <Button
-              onClick={onOpenStudio}
-              className="bg-[#635bff] text-white hover:bg-[#4b44d4]"
-            >
-              <Headphones className="mr-1.5 h-3.5 w-3.5" />
-              Generate audiobook
-            </Button>
-          )}
+        <div className="mb-4">
+          <p className="text-[15px] font-semibold text-[#0a2540]">Audio</p>
+          <p className="mt-1 text-[13px] text-[#697386]">
+            Audiobook, podcast, or theme music.
+          </p>
         </div>
+        {onPickType ? (
+          <CreateTypeGrid missing={missingTypes} onPickType={onPickType} />
+        ) : onOpenStudio ? (
+          <Button
+            onClick={onOpenStudio}
+            className="bg-[#635bff] text-white hover:bg-[#4b44d4]"
+          >
+            Open audio studio
+          </Button>
+        ) : null}
       </div>
     );
   }
@@ -480,11 +559,11 @@ export function BookAudioPanel({
           </p>
           <p className="mt-1 text-[13px] text-[#697386]">
             {readOnly
-              ? "Play the audiobook, podcast, or theme music for this book."
+              ? "Play the audiobook, podcast, theme, or song for this book."
               : "Live progress, player, and downloads"}
           </p>
         </div>
-        {!readOnly && onOpenStudio && (
+        {!readOnly && onOpenStudio && missingTypes.length === 0 && (
           <Button
             variant="outline"
             onClick={onOpenStudio}
@@ -515,6 +594,15 @@ export function BookAudioPanel({
           />
         );
       })}
+
+      {!readOnly && onPickType && missingTypes.length > 0 && (
+        <div className="rounded-xl border border-dashed border-[#e6ebf1] bg-[#fafbfc] p-4">
+          <p className="mb-3 text-[13px] font-medium text-[#0a2540]">
+            Create more audio
+          </p>
+          <CreateTypeGrid missing={missingTypes} onPickType={onPickType} />
+        </div>
+      )}
     </div>
   );
 }

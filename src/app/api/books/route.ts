@@ -5,6 +5,8 @@ import { createBookSlug } from "@/lib/book-public";
 import { DEFAULT_AI_MODEL, isModelAvailable } from "@/lib/ai-models";
 import { maxBookPagesForUser, syncUserTrialState } from "@/lib/billing";
 import { resolveClientSource } from "@/lib/client-source";
+import { AUDIO_STUDIO_GENRE } from "@/lib/audio-studio";
+import { SONG_STUDIO_GENRE } from "@/lib/song-studio";
 import { z } from "zod";
 
 const createBookSchema = z.object({
@@ -41,7 +43,10 @@ export async function GET() {
   }
 
   const books = await db.book.findMany({
-    where: { userId: session.user.id },
+    where: {
+      userId: session.user.id,
+      NOT: { genre: { in: [AUDIO_STUDIO_GENRE, SONG_STUDIO_GENRE] } },
+    },
     orderBy: { updatedAt: "desc" },
     include: {
       _count: { select: { chapters: true } },

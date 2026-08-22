@@ -445,7 +445,15 @@ export function AudioStudioClient() {
             Audio Studio
           </h1>
           <p className="mt-1 max-w-lg text-[14px] text-[#697386]">
-            Turn pasted text or a PDF into an audiobook or podcast.
+            Turn pasted text or a PDF into an audiobook or podcast. For original
+            songs, use{" "}
+            <Link
+              href="/dashboard/songs"
+              className="font-medium text-[#635bff] hover:underline"
+            >
+              Song Studio
+            </Link>
+            .
           </p>
         </div>
 

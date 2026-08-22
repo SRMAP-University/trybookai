@@ -22,7 +22,7 @@ const voiceSettingsSchema = z
 
 const startSchema = z.object({
   bookId: z.string().min(1),
-  type: z.enum(["AUDIOBOOK", "PODCAST", "MUSIC"]),
+  type: z.enum(["AUDIOBOOK", "PODCAST", "MUSIC", "SONG"]),
   voiceId: z.string().optional(),
   voiceName: z.string().optional(),
   voiceSettings: voiceSettingsSchema,
