@@ -995,8 +995,8 @@ function BookDetailPageContent() {
           </Link>
         </Button>
 
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="flex min-w-0 flex-1 gap-4">
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:items-start lg:text-left">
             <div className="shrink-0 space-y-2">
               <BookCover
                 title={book.title}
@@ -1009,7 +1009,7 @@ function BookDetailPageContent() {
                       generating))
                 }
                 aspect="compact"
-                className="shadow-sm ring-1 ring-black/5"
+                className="w-[132px] shadow-sm ring-1 ring-black/5 lg:w-[88px]"
               />
               {(book.chapters.length > 0 || book.coverImage) && (
                 <button
@@ -1027,81 +1027,52 @@ function BookDetailPageContent() {
                 </button>
               )}
             </div>
-            <div className="min-w-0 flex-1 pt-0.5">
-            <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-[#0a2540]">
-              {book.title}
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px]">
-              {(book.edition ?? 1) > 1 && (
-                <span className="rounded bg-[#f0efff] px-2 py-0.5 text-[11px] font-medium text-[#635bff]">
-                  Edition {book.edition}
-                </span>
-              )}
-              <span
-                className={cn(
-                  "font-medium capitalize",
-                  statusStyles[book.status] ?? "text-[#697386]"
+            <div className="min-w-0 w-full flex-1 pt-0.5">
+              <h1 className="text-[22px] font-semibold tracking-[-0.03em] text-[#0a2540] lg:text-[26px]">
+                {book.title}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] lg:justify-start">
+                {(book.edition ?? 1) > 1 && (
+                  <span className="rounded bg-[#f0efff] px-2 py-0.5 text-[11px] font-medium text-[#635bff]">
+                    Edition {book.edition}
+                  </span>
                 )}
-              >
-                {book.status.toLowerCase()}
-              </span>
-              {book.genre && (
-                <span className="text-[#697386]">· {book.genre}</span>
+                <span
+                  className={cn(
+                    "font-medium capitalize",
+                    statusStyles[book.status] ?? "text-[#697386]"
+                  )}
+                >
+                  {book.status.toLowerCase()}
+                </span>
+                {book.genre && (
+                  <span className="text-[#697386]">· {book.genre}</span>
+                )}
+                {book.tone && (
+                  <span className="text-[#697386]">· {book.tone}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReviewMode("manual");
+                    setReviewOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#635bff]"
+                >
+                  <MessageSquareWarning className="h-3.5 w-3.5" />
+                  Troubleshoot
+                </button>
+              </div>
+              {book.description && (
+                <ExpandableDescription
+                  text={book.description}
+                  className="mt-3 text-left text-[15px] leading-relaxed text-[#425466] lg:text-[14px]"
+                />
               )}
-              {book.tone && (
-                <span className="text-[#697386]">· {book.tone}</span>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setReviewMode("manual");
-                  setReviewOpen(true);
-                }}
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#635bff]"
-              >
-                <MessageSquareWarning className="h-3.5 w-3.5" />
-                Troubleshoot
-              </button>
-            </div>
-            {book.description && (
-              <ExpandableDescription
-                text={book.description}
-                className="mt-3 text-[14px] text-[#425466]"
-              />
-            )}
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {book.chapters.length > 0 && (
-              <Button
-                variant="outline"
-                className="h-9 border-[#e6ebf1] text-[13px]"
-                asChild
-              >
-                <a
-                  href={`/editor/${book.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <PenLine className="mr-1.5 h-3.5 w-3.5" />
-                  Open editor
-                </a>
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => createEdition(true)}
-              disabled={creatingEdition}
-              className="h-9 border-[#e6ebf1] text-[13px]"
-            >
-              {creatingEdition ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <CopyPlus className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              New edition
-            </Button>
+          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:justify-end">
             {(book.status === "DRAFT" ||
               book.status === "FAILED" ||
               book.status === "PAUSED") &&
@@ -1109,7 +1080,7 @@ function BookDetailPageContent() {
                 <Button
                   onClick={() => void startGeneration()}
                   disabled={generating}
-                  className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+                  className="col-span-2 h-11 rounded-xl bg-[#635bff] text-[14px] hover:bg-[#5851e5] lg:col-span-1 lg:h-9 lg:rounded-md lg:text-[13px]"
                 >
                   {generating ? (
                     <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -1121,11 +1092,40 @@ function BookDetailPageContent() {
                     : "Generate"}
                 </Button>
               )}
+            {book.chapters.length > 0 && (
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
+                asChild
+              >
+                <a
+                  href={`/editor/${book.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <PenLine className="mr-1.5 h-3.5 w-3.5" />
+                  Editor
+                </a>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => createEdition(true)}
+              disabled={creatingEdition}
+              className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
+            >
+              {creatingEdition ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CopyPlus className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              New edition
+            </Button>
             {book.status === "GENERATING" && (
               <Button
                 variant="outline"
                 onClick={fetchBook}
-                className="h-9 border-[#e6ebf1] text-[13px]"
+                className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
               >
                 <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
                 Refresh
@@ -1136,31 +1136,31 @@ function BookDetailPageContent() {
                 variant="outline"
                 onClick={stopGeneration}
                 disabled={stopping}
-                className="h-9 border-[#df1b41] text-[13px] text-[#df1b41] hover:bg-[#fde8e8]"
+                className="h-11 rounded-xl border-[#df1b41] text-[13px] text-[#df1b41] hover:bg-[#fde8e8] lg:h-9 lg:rounded-md"
               >
                 {stopping ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <X className="mr-1.5 h-3.5 w-3.5" />
                 )}
-                Stop generation
+                Stop
               </Button>
             )}
             {book.status === "COMPLETED" && (
               <Button
                 variant="outline"
                 onClick={() => setDerivativesOpen(true)}
-                className="h-9 border-[#e6ebf1] text-[13px]"
+                className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
               >
                 <Headphones className="mr-1.5 h-3.5 w-3.5" />
-                Audio studio
+                Audio
               </Button>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-9 border-[#e6ebf1] text-[13px]"
+                  className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
                 >
                   <Download className="mr-1.5 h-3.5 w-3.5" />
                   Export
@@ -1244,13 +1244,12 @@ function BookDetailPageContent() {
       )}
 
       {book.status !== "COMPLETED" && (
-        <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
-          <div className="mb-2 flex items-center justify-between text-[13px] text-[#697386]">
-            <span>Progress</span>
+        <div className="rounded-xl border border-[#e6ebf1] bg-white p-4 lg:rounded-lg lg:p-5">
+          <div className="mb-3 flex flex-col gap-0.5 text-[13px] text-[#697386] lg:mb-2 lg:flex-row lg:items-center lg:justify-between">
+            <span className="font-medium text-[#0a2540]">Progress</span>
             <span>
-              {Math.round(book.progress)}% complete · {book.currentPages} pages
-              written
-              {book.targetPages > 0 ? ` (target ${book.targetPages})` : ""}
+              {Math.round(book.progress)}% · {book.currentPages}
+              {book.targetPages > 0 ? ` / ${book.targetPages}` : ""} pages
             </span>
           </div>
           <Progress value={book.progress} className="h-1.5" />
