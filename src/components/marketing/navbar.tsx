@@ -18,7 +18,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#f3f3f1]/85 backdrop-blur-md">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-transparent backdrop-blur-[2px]">
       <nav className="mx-auto flex h-[72px] max-w-[1200px] items-center px-6">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
@@ -67,7 +67,7 @@ export function Navbar() {
       </nav>
 
       {mobileOpen && (
-        <div className="border-t border-[#e8e8e6] bg-[#f3f3f1] px-6 py-5 md:hidden">
+        <div className="border-t border-[#e8e8e6]/80 bg-[#f3f3f1]/90 px-6 py-5 backdrop-blur-md md:hidden">
           <div className="flex flex-col gap-4">
             {navLinks.map((link) => (
               <a
