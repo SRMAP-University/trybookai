@@ -36,6 +36,7 @@ type UserRow = {
   audioMinutesUsed: number;
   audioMinutesLimit: number;
   countryCode: string | null;
+  signupVia: "phone" | "pc" | "unknown";
 };
 
 const labelStyle: Record<string, string> = {
@@ -88,7 +89,7 @@ export default function AdarshUsersPage() {
           User management
         </h1>
         <p className="text-[13px] text-[#697386]">
-          Sentiment scores, country flags, and plan controls
+          Sentiment scores, country flags, signup device, and plan controls
         </p>
       </div>
 
@@ -124,6 +125,7 @@ export default function AdarshUsersPage() {
               <thead className="border-b border-[#e6ebf1] bg-[#f6f9fc] text-[11px] uppercase tracking-wider text-[#a3acb9]">
                 <tr>
                   <th className="px-3 py-2.5 font-medium">User</th>
+                  <th className="px-3 py-2.5 font-medium">Signed up</th>
                   <th className="px-3 py-2.5 font-medium">Country</th>
                   <th className="px-3 py-2.5 font-medium">Sentiment</th>
                   <th className="px-3 py-2.5 font-medium">Books</th>
@@ -148,6 +150,24 @@ export default function AdarshUsersPage() {
                           {u.stuck ? " · stuck" : ""}
                           {u.onTrial ? " · trial" : ""}
                         </p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
+                            u.signupVia === "phone"
+                              ? "bg-[#ebe9ff] text-[#635bff]"
+                              : u.signupVia === "pc"
+                                ? "bg-[#e8f0fe] text-[#0a2540]"
+                                : "bg-[#f0f3f7] text-[#697386]"
+                          )}
+                        >
+                          {u.signupVia === "phone"
+                            ? "Phone"
+                            : u.signupVia === "pc"
+                              ? "PC"
+                              : "Unknown"}
+                        </span>
                       </td>
                       <td className="px-3 py-2.5">
                         <CountryFlag code={u.countryCode} />
@@ -202,7 +222,7 @@ export default function AdarshUsersPage() {
                     </tr>
                     {expanded === u.userId && (
                       <tr className="border-b border-[#e6ebf1] bg-[#fafbff]">
-                        <td colSpan={7} className="px-4 py-3">
+                        <td colSpan={8} className="px-4 py-3">
                           <div className="grid gap-3 sm:grid-cols-3">
                             <div>
                               <p className="text-[11px] font-medium uppercase text-[#0e6245]">

@@ -79,6 +79,13 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
+            <Link
+              href="/login"
+              className="text-[15px] text-[#111]"
+              onClick={() => setMobileOpen(false)}
+            >
+              Sign in
+            </Link>
             <Link href="/register" className="landing-btn-dark mt-2 text-center">
               Get started
             </Link>

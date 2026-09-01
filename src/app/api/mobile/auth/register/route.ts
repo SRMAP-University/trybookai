@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       email,
       passwordHash,
       countryCode: countryCodeFromRequest(request),
+      signupVia: "phone",
     },
   });
 

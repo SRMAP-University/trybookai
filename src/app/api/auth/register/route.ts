@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       email: parsed.data.email,
       passwordHash,
       countryCode: countryCodeFromRequest(request),
+      signupVia: "pc",
     },
   });
 

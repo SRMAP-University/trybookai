@@ -3,10 +3,16 @@ import { cleanEnv } from "@/lib/env";
 import { getAppUrl } from "@/lib/book-public";
 import { canUploadCoversToR2, uploadCoverToR2 } from "@/lib/r2";
 
-/** Fast Flux text-to-image on Cloudflare Workers AI */
+/** Highest-quality Flux.2 on Cloudflare Workers AI (multipart API) */
+export const FLUX2_DEV_MODEL = "@cf/black-forest-labs/flux-2-dev";
+
+/** Fast Flux.2 distilled — still far above Schnell / SDXL Lightning */
+export const FLUX2_KLEIN_9B_MODEL = "@cf/black-forest-labs/flux-2-klein-9b";
+
+/** Legacy Flux.1 — kept as a last Flux fallback */
 export const FLUX_COVER_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
-/** Fallback when Flux rejects input or is unavailable */
+/** Fallback when Flux.2 is unavailable */
 export const SDXL_LIGHTNING_MODEL =
   "@cf/bytedance/stable-diffusion-xl-lightning";
 
@@ -61,13 +67,12 @@ export function buildBookCoverPrompt(book: BookForCover): string {
 
   return sanitizeCoverPrompt(
     [
-      `Professional book cover art for ${title}.`,
+      `Award-winning illustrated book cover for "${title}".`,
       `Genre: ${genre}. Mood: ${tone}.`,
-      `Theme: ${synopsis}.`,
-      "Vertical portrait book jacket composition.",
-      "Cinematic lighting, detailed focal subject, atmospheric background.",
-      "No text, no letters, no words, no typography, no watermarks.",
-      "High quality illustrated cover art.",
+      `Story: ${synopsis}.`,
+      "Vertical 3:4 hardcover jacket, one striking focal subject, painterly cinematic lighting, rich color, atmospheric depth.",
+      "Print-ready illustration, sharp detail, no collage, no UI.",
+      "No text, no letters, no title, no typography, no watermark, no barcode.",
     ].join(" ")
   );
 }
@@ -120,10 +125,7 @@ function parseCloudflareImageResponse(buffer: Buffer): Buffer {
   return Buffer.from(image, "base64");
 }
 
-async function runCloudflareImageModel(
-  model: string,
-  body: Record<string, unknown>
-): Promise<Buffer> {
+function cloudflareAiCredentials() {
   const accountId = cleanEnv(process.env.CLOUDFLARE_ACCOUNT_ID);
   const apiToken = cleanEnv(process.env.CLOUDFLARE_API_TOKEN);
 
@@ -133,9 +135,76 @@ async function runCloudflareImageModel(
     );
   }
 
-  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  return {
+    url: `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run`,
+    apiToken,
+  };
+}
 
-  const res = await fetch(url, {
+function decodeImageResponse(
+  buffer: Buffer,
+  contentType: string,
+  status: number,
+  ok: boolean
+): Buffer {
+  if (!ok) {
+    if (contentType.includes("json") || buffer[0] === 0x7b) {
+      try {
+        const data = JSON.parse(buffer.toString("utf8")) as CloudflareImageResponse;
+        throw new Error(
+          data.errors?.[0]?.message ??
+            `Cover image generation failed (${status})`
+        );
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          /* fall through to generic status */
+        } else {
+          throw error;
+        }
+      }
+    }
+    throw new Error(`Cover image generation failed (${status})`);
+  }
+
+  if (contentType.includes("image/") || isImageBytes(buffer)) {
+    return buffer;
+  }
+
+  return parseCloudflareImageResponse(buffer);
+}
+
+async function runCloudflareImageMultipart(
+  model: string,
+  fields: Record<string, string>
+): Promise<Buffer> {
+  const { url, apiToken } = cloudflareAiCredentials();
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    form.append(key, value);
+  }
+
+  const res = await fetch(`${url}/${model}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiToken}` },
+    body: form,
+  });
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return decodeImageResponse(
+    buffer,
+    res.headers.get("content-type") ?? "",
+    res.status,
+    res.ok
+  );
+}
+
+async function runCloudflareImageModel(
+  model: string,
+  body: Record<string, unknown>
+): Promise<Buffer> {
+  const { url, apiToken } = cloudflareAiCredentials();
+
+  const res = await fetch(`${url}/${model}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiToken}`,
@@ -145,44 +214,64 @@ async function runCloudflareImageModel(
   });
 
   const buffer = Buffer.from(await res.arrayBuffer());
-  const contentType = res.headers.get("content-type") ?? "";
-
-  if (!res.ok) {
-    if (contentType.includes("json") || buffer[0] === 0x7b) {
-      try {
-        const data = JSON.parse(buffer.toString("utf8")) as CloudflareImageResponse;
-        throw new Error(
-          data.errors?.[0]?.message ??
-            `Cover image generation failed (${res.status})`
-        );
-      } catch (error) {
-        if (error instanceof Error && /AiError|invalid input/i.test(error.message)) {
-          throw error;
-        }
-      }
-    }
-    throw new Error(`Cover image generation failed (${res.status})`);
-  }
-
-  // SDXL and some models return raw JPEG/PNG bytes instead of JSON.
-  if (contentType.includes("image/") || isImageBytes(buffer)) {
-    return buffer;
-  }
-
-  return parseCloudflareImageResponse(buffer);
+  return decodeImageResponse(
+    buffer,
+    res.headers.get("content-type") ?? "",
+    res.status,
+    res.ok
+  );
 }
 
 export async function runFluxCoverImage(prompt: string): Promise<Buffer> {
   const sanitized = sanitizeCoverPrompt(prompt);
+  const portrait = { width: "768", height: "1024" };
 
-  // Flux Schnell currently returns "Invalid input" for most prompts on this
-  // account — skip it and use SDXL Lightning first (returns raw JPEG).
-  const attempts: Array<{ model: string; body: Record<string, unknown> }> = [
+  const attempts: Array<
+    | {
+        model: string;
+        mode: "multipart";
+        fields: Record<string, string>;
+      }
+    | {
+        model: string;
+        mode: "json";
+        body: Record<string, unknown>;
+      }
+  > = [
+    {
+      model: FLUX2_DEV_MODEL,
+      mode: "multipart",
+      fields: {
+        prompt: sanitized,
+        ...portrait,
+        guidance: "3.5",
+        steps: "20",
+      },
+    },
+    {
+      model: FLUX2_DEV_MODEL,
+      mode: "multipart",
+      fields: {
+        prompt: sanitized,
+        ...portrait,
+        guidance: "3.5",
+      },
+    },
+    {
+      model: FLUX2_KLEIN_9B_MODEL,
+      mode: "multipart",
+      fields: {
+        prompt: sanitized,
+        ...portrait,
+        guidance: "4",
+      },
+    },
     {
       model: SDXL_LIGHTNING_MODEL,
+      mode: "json",
       body: {
         prompt: sanitized,
-        num_steps: 4,
+        num_steps: 8,
         width: 768,
         height: 1024,
         guidance: 7.5,
@@ -192,22 +281,26 @@ export async function runFluxCoverImage(prompt: string): Promise<Buffer> {
     },
     {
       model: DREAMSHAPER_MODEL,
+      mode: "json",
       body: {
         prompt: sanitized,
-        num_steps: 4,
+        num_steps: 8,
         width: 768,
         height: 1024,
         guidance: 7.5,
         negative_prompt: "text, words, letters, typography, watermark",
       },
     },
-    { model: FLUX_COVER_MODEL, body: { prompt: sanitized } },
+    { model: FLUX_COVER_MODEL, mode: "json", body: { prompt: sanitized } },
   ];
 
   let lastError: Error | null = null;
 
   for (const attempt of attempts) {
     try {
+      if (attempt.mode === "multipart") {
+        return await runCloudflareImageMultipart(attempt.model, attempt.fields);
+      }
       return await runCloudflareImageModel(attempt.model, attempt.body);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));

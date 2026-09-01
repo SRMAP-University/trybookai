@@ -196,6 +196,7 @@ export async function POST(request: Request) {
           name,
           image: picture,
           countryCode: countryCodeFromRequest(request),
+          signupVia: "phone",
           accounts: {
             create: {
               type: "oauth",

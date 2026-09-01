@@ -15,7 +15,13 @@ const nextAuth = NextAuth({
   ...authConfig,
   events: {
     async createUser({ user }) {
-      if (user.id) await persistUserCountryFromRequest(user.id);
+      if (user.id) {
+        await persistUserCountryFromRequest(user.id);
+        await db.user.update({
+          where: { id: user.id },
+          data: { signupVia: "pc" },
+        });
+      }
     },
     async signIn({ user }) {
       if (user.id) await persistUserCountryFromRequest(user.id);

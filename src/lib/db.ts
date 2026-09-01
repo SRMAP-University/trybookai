@@ -4,7 +4,7 @@ import { PrismaClient } from "@/generated/prisma/client";
 import { cleanEnv } from "@/lib/env";
 
 /** Bump when Prisma schema enums/models change so HMR picks up a new client. */
-const PRISMA_SCHEMA_VERSION = 4;
+const PRISMA_SCHEMA_VERSION = 5;
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;

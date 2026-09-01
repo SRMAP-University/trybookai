@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPageMetadata({
   title: "BookAI — AI Book Generator",
   description:
-    "Generate full-length books up to 1,000 pages with AI. Outline, write, and export publication-ready manuscripts, audiobooks, and branded content.",
+    "Generate full-length books with AI — outline, manuscript, cover art, audiobooks, and export-ready files.",
   path: "/",
 });
 

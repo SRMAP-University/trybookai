@@ -419,6 +419,7 @@ export async function loadAdminUsers(q?: string) {
       brandName: true,
       authorName: true,
       countryCode: true,
+      signupVia: true,
       _count: { select: { books: true, pushTokens: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -442,6 +443,7 @@ export async function loadAdminUsers(q?: string) {
           completedAt: true,
           createdAt: true,
           generateAudiobookOnComplete: true,
+          createdVia: true,
           _count: { select: { chapters: true, generationJobs: true } },
         },
       })
@@ -500,6 +502,7 @@ export async function loadAdminUsers(q?: string) {
       completedAt: Date | null;
       createdAt: Date;
       generateAudiobookOnComplete: boolean;
+      createdVia: string;
       jobsFailed: number;
       jobsTotal: number;
       audioDone: number;
@@ -521,6 +524,7 @@ export async function loadAdminUsers(q?: string) {
       completedAt: b.completedAt,
       createdAt: b.createdAt,
       generateAudiobookOnComplete: b.generateAudiobookOnComplete,
+      createdVia: b.createdVia,
       jobsFailed: failedByBook[b.id] ?? 0,
       jobsTotal: b._count.generationJobs,
       audioDone: audioByBook[b.id]?.done ?? 0,
@@ -559,8 +563,35 @@ export async function loadAdminUsers(q?: string) {
       audioMinutesLimit: u.audioMinutesLimit,
       hasSub: Boolean(u.stripeSubId),
       countryCode: u.countryCode,
+      signupVia: inferSignupVia(
+        u.signupVia,
+        u._count.pushTokens,
+        booksByUser[u.id] ?? []
+      ),
     };
   });
+}
+
+function inferSignupVia(
+  stored: string,
+  pushTokenCount: number,
+  books: Array<{ createdVia: string; createdAt: Date }>
+): "phone" | "pc" | "unknown" {
+  if (stored === "phone" || stored === "pc") return stored;
+  if (pushTokenCount > 0) return "phone";
+  const first = [...books].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+  )[0];
+  if (!first) return "unknown";
+  if (first.createdVia === "web") return "pc";
+  if (
+    first.createdVia === "ios" ||
+    first.createdVia === "android" ||
+    first.createdVia === "unknown"
+  ) {
+    return "phone";
+  }
+  return "unknown";
 }
 
 export async function loadAdminBooks() {
