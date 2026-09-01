@@ -29,10 +29,13 @@ function RegisterForm() {
     const params = new URLSearchParams();
     if (prompt) params.set("prompt", prompt);
     const qs = params.toString();
-    if (callbackUrl && callbackUrl.startsWith("/dashboard/books/new")) {
+    if (callbackUrl && callbackUrl.startsWith("/dashboard")) {
       return callbackUrl;
     }
-    return `/dashboard/books/new${qs ? `?${qs}` : ""}`;
+    if (prompt) {
+      return `/dashboard/books/new?${qs}`;
+    }
+    return "/dashboard";
   })();
   const [loading, setLoading] = useState(false);
 

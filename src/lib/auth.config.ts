@@ -4,7 +4,7 @@ export const authConfig = {
   trustHost: true,
   pages: {
     signIn: "/login",
-    newUser: "/dashboard/books/new",
+    newUser: "/dashboard",
   },
   providers: [],
   callbacks: {

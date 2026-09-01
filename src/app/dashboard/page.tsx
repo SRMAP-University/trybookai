@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { BookOpen, Plus } from "lucide-react";
@@ -34,12 +33,6 @@ export default async function DashboardPage() {
     orderBy: { updatedAt: "desc" },
     include: { _count: { select: { chapters: true } } },
   });
-
-  const justSignedUp =
-    Date.now() - user.createdAt.getTime() < 15 * 60 * 1000;
-  if (books.length === 0 && justSignedUp) {
-    redirect("/dashboard/books/new");
-  }
 
   const recentCovers = await getRecentLandingCovers(4);
 
