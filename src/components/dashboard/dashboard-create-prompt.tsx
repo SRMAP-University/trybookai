@@ -12,6 +12,7 @@ import {
   Mic2,
   MicVocal,
   Music2,
+  type LucideIcon,
 } from "lucide-react";
 import { BookCoverCard } from "@/components/marketing/book-cover-card";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,7 @@ type ServiceId =
 const SERVICES: {
   id: ServiceId;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   placeholder: string;
   chips: string[];
   cta: string;
