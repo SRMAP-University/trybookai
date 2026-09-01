@@ -132,6 +132,7 @@ export function DashboardCreatePrompt({
   const sideCovers = showcaseCovers.slice(0, 2);
   const coverA = sideCovers[0];
   const coverB = sideCovers[1] ?? sideCovers[0];
+  const expanded = focused || prompt.trim().length > 0;
 
   const canGenerate =
     active.id === "movie" ||
@@ -185,8 +186,6 @@ export function DashboardCreatePrompt({
     }
   }
 
-  const expanded = focused || prompt.trim().length > 0;
-
   return (
     <div className="space-y-3">
       {firstName ? (
@@ -198,10 +197,10 @@ export function DashboardCreatePrompt({
 
       <form
         onSubmit={handleSubmit}
-        className="overflow-hidden rounded-[20px] border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_28px_rgba(15,23,42,0.1),0_28px_56px_rgba(15,23,42,0.06)] ring-1 ring-black/[0.03]"
+        className="rounded-2xl border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_28px_rgba(15,23,42,0.1)] ring-1 ring-black/[0.03] sm:rounded-[20px]"
       >
-        {/* Service tabs */}
-        <div className="flex gap-0.5 overflow-x-auto px-2.5 pt-2.5 scrollbar-none sm:px-3">
+        {/* Service tabs — full scroll on phone */}
+        <div className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-[#f0f2f5] px-3 pt-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {SERVICES.map((s) => {
             const Icon = s.icon;
             const selected = service === s.id;
@@ -211,7 +210,7 @@ export function DashboardCreatePrompt({
                 type="button"
                 onClick={() => setService(s.id)}
                 className={cn(
-                  "mb-1 inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors",
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium transition-colors",
                   selected
                     ? "bg-[#f0f2f5] text-[#111827]"
                     : "text-[#6b7280] hover:bg-[#f7f8fa] hover:text-[#111827]"
@@ -237,24 +236,25 @@ export function DashboardCreatePrompt({
               onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              rows={5}
+              rows={expanded ? 5 : 3}
               placeholder={active.placeholder}
               className={cn(
-                "w-full resize-none overflow-hidden bg-transparent text-[15px] leading-relaxed text-[#111827] outline-none placeholder:text-[#9ca3af] transition-[min-height,height] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                expanded ? "min-h-[128px]" : "min-h-[72px]"
+                "w-full resize-none bg-transparent text-[16px] leading-relaxed text-[#111827] outline-none placeholder:text-[#9ca3af] sm:text-[15px]",
+                "transition-[min-height] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                // Phone: always a complete, readable field — no mid-clip
+                "min-h-[96px]",
+                // Desktop: compact → expand on focus
+                expanded ? "sm:min-h-[128px]" : "sm:min-h-[88px]"
               )}
-              style={{
-                height: expanded ? 128 : 72,
-              }}
             />
 
-            <div className="-mx-4 mt-1 flex gap-2 overflow-x-auto px-4 pb-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+            <div className="-mx-4 mt-1 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-3 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-4 [&::-webkit-scrollbar]:hidden">
               {active.chips.map((chip) => (
                 <button
                   key={chip}
                   type="button"
                   onClick={() => applyChip(chip)}
-                  className="shrink-0 rounded-full bg-[#f3f4f6] px-3 py-1.5 text-[12px] text-[#4b5563] transition-colors hover:bg-[#e5e7eb]"
+                  className="shrink-0 rounded-full bg-[#f3f4f6] px-3 py-1.5 text-[12px] text-[#4b5563] transition-colors hover:bg-[#e5e7eb] active:bg-[#e5e7eb]"
                 >
                   {chip}
                 </button>
@@ -302,46 +302,37 @@ export function DashboardCreatePrompt({
           ) : null}
         </div>
 
-        {/* Footer bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#f0f2f5] px-4 py-2.5 sm:px-5">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#6b7280]">
+        {/* Footer — stacked cleanly on phone */}
+        <div className="flex items-center justify-between gap-3 border-t border-[#f0f2f5] px-4 py-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2 text-[12px] text-[#6b7280]">
             <span className="inline-flex items-center gap-1.5 font-medium text-[#111827]">
-              <active.icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {active.label}
+              <active.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{active.label}</span>
             </span>
             {!active.available && (
               <span className="rounded-full bg-[#fef3c7] px-2 py-0.5 text-[11px] font-medium text-[#92400e]">
                 Waitlist
               </span>
             )}
-            <button
-              type="button"
-              onClick={() => router.push("/dashboard/books/new")}
-              className="hidden text-[#6b7280] transition-colors hover:text-[#111827] sm:inline"
-            >
-              More options ›
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 tabular-nums text-[12px] text-[#6b7280]">
+            <span className="hidden items-center gap-1 tabular-nums sm:inline-flex">
               <LayoutGrid className="h-3.5 w-3.5" strokeWidth={1.75} />
               {pagesRemaining.toLocaleString()} left
             </span>
-            <button
-              type="submit"
-              disabled={!canGenerate}
-              className={cn(
-                "inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors",
-                canGenerate
-                  ? "bg-[#374151] text-white hover:bg-[#1f2937]"
-                  : "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]"
-              )}
-            >
-              {active.cta}
-              <ArrowUp className="h-3.5 w-3.5" />
-            </button>
           </div>
+
+          <button
+            type="submit"
+            disabled={!canGenerate}
+            className={cn(
+              "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors sm:h-9",
+              canGenerate
+                ? "bg-[#374151] text-white hover:bg-[#1f2937]"
+                : "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]"
+            )}
+          >
+            {active.cta}
+            <ArrowUp className="h-3.5 w-3.5" />
+          </button>
         </div>
       </form>
     </div>
