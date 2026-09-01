@@ -105,7 +105,6 @@ export type PromptShowcaseCover = {
 type DashboardCreatePromptProps = {
   pagesRemaining: number;
   pagesLimit: number;
-  firstName?: string | null;
   /** When set, Generate redirects here instead of studio routes (signed-out preview). */
   signInHref?: string;
   /** Desktop-only covers beside the prompt (user’s own, or public fallback). */
@@ -115,7 +114,6 @@ type DashboardCreatePromptProps = {
 export function DashboardCreatePrompt({
   pagesRemaining,
   pagesLimit: _pagesLimit,
-  firstName,
   signInHref,
   showcaseCovers = [],
 }: DashboardCreatePromptProps) {
@@ -187,14 +185,7 @@ export function DashboardCreatePrompt({
   }
 
   return (
-    <div className="space-y-2 sm:space-y-3">
-      {firstName ? (
-        <p className="text-[12px] text-[#697386] sm:text-[14px]">
-          Welcome back,{" "}
-          <span className="font-medium text-[#0a2540]">{firstName}</span>
-        </p>
-      ) : null}
-
+    <div>
       <form
         onSubmit={handleSubmit}
         className="rounded-xl border border-[#e2e6ec] bg-white shadow-sm sm:rounded-[20px] sm:border-[#d8dee8] sm:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_28px_rgba(15,23,42,0.1)] sm:ring-1 sm:ring-black/[0.03]"

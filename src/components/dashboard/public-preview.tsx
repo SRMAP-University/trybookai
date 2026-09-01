@@ -25,17 +25,12 @@ export async function PublicDashboardPreview() {
         showcaseCovers={showcaseCovers}
       />
 
-      {/* Latest covers */}
+      {/* Latest books */}
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-[15px] font-medium text-[#0a2540]">
-              Latest covers
-            </h2>
-            <p className="mt-0.5 text-[13px] text-[#697386]">
-              Recently generated book covers from BookAI.
-            </p>
-          </div>
+          <h2 className="text-[15px] font-medium text-[#0a2540]">
+            Latest books
+          </h2>
           <Link
             href="/books"
             className="text-[13px] text-[#635bff] hover:underline"
