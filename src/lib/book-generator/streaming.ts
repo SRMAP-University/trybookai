@@ -425,6 +425,28 @@ export async function runBookGeneration(
       });
     }
 
+    // Cover ASAP from title/description — do not wait for outline or prose.
+    {
+      const coverStatus = await db.book.findUnique({
+        where: { id: bookId },
+        select: { coverImage: true },
+      });
+      if (!coverStatus?.coverImage) {
+        publisher({
+          type: "phase",
+          phase: "cover",
+          message: "Generating cover…",
+        });
+        void generateAndSaveBookCover(bookId)
+          .then(({ coverImage }) => {
+            publisher({ type: "cover_ready", coverImage });
+          })
+          .catch((error) => {
+            console.error(`Cover generation failed for book ${bookId}:`, error);
+          });
+      }
+    }
+
     if (!book.outline) {
       publisher({
         type: "phase",
@@ -452,22 +474,6 @@ export async function runBookGeneration(
         progress: 5,
         phase: "outline",
       });
-    }
-
-    await throwIfCancelled(bookId);
-
-    const coverStatus = await db.book.findUnique({
-      where: { id: bookId },
-      select: { coverImage: true },
-    });
-    if (!coverStatus?.coverImage) {
-      void generateAndSaveBookCover(bookId)
-        .then(({ coverImage }) => {
-          publisher({ type: "cover_ready", coverImage });
-        })
-        .catch((error) => {
-          console.error(`Cover generation failed for book ${bookId}:`, error);
-        });
     }
 
     await throwIfCancelled(bookId);

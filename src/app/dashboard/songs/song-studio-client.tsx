@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Loader2,
   MicVocal,
@@ -88,10 +89,12 @@ function statusTone(status: string) {
 
 export function SongStudioClient() {
   const { user, refresh: refreshUser } = useDashboardUser();
+  const searchParams = useSearchParams();
   const [title, setTitle] = useState("");
   const [style, setStyle] = useState("Pop");
   const [mood, setMood] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [promptHydrated, setPromptHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [projects, setProjects] = useState<StudioProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -128,6 +131,15 @@ export function SongStudioClient() {
   useEffect(() => {
     void loadProjects();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (promptHydrated) return;
+    const fromQuery = searchParams.get("prompt");
+    if (fromQuery?.trim()) {
+      setPrompt(fromQuery.trim().slice(0, 4000));
+    }
+    setPromptHydrated(true);
+  }, [promptHydrated, searchParams]);
 
   async function refreshActiveAudios(bookId: string | null) {
     if (!bookId) return;

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { SongStudioClient } from "./song-studio-client";
 import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 
@@ -7,7 +8,9 @@ export default function SongStudioPage() {
       title="Song Studio"
       description="Write a brief or lyrics and generate an original vocal song."
     >
-      <SongStudioClient />
+      <Suspense fallback={null}>
+        <SongStudioClient />
+      </Suspense>
     </AnonymousRouteFallback>
   );
 }

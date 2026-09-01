@@ -48,11 +48,43 @@ export function sanitizeCoverPrompt(text: string): string {
     .trim();
 
   if (!cleaned) {
-    return "Professional book cover illustration, atmospheric scene, no text";
+    return "Full-bleed flat book-cover artwork, atmospheric scene filling the frame, no text, no physical book object";
   }
 
   return cleaned.slice(0, 2048);
 }
+
+/** Shared negatives for models that support negative_prompt. */
+export const COVER_NEGATIVE_PROMPT = [
+  "text",
+  "words",
+  "letters",
+  "typography",
+  "title",
+  "watermark",
+  "logo",
+  "barcode",
+  "blurry",
+  "physical book",
+  "hardcover book object",
+  "paperback",
+  "book mockup",
+  "3d book",
+  "book on table",
+  "book on shelf",
+  "hands holding book",
+  "open book",
+  "book spine",
+  "pages",
+  "product photo",
+  "photograph of a book",
+  "framed picture",
+  "border",
+  "margin",
+  "collage",
+  "UI",
+  "screenshot",
+].join(", ");
 
 export function buildBookCoverPrompt(book: BookForCover): string {
   const title = (book.title?.trim() || "Untitled Book").slice(0, 120);
@@ -67,12 +99,14 @@ export function buildBookCoverPrompt(book: BookForCover): string {
 
   return sanitizeCoverPrompt(
     [
-      `Award-winning illustrated book cover for "${title}".`,
+      `Flat full-bleed cover artwork inspired by the story "${title}".`,
       `Genre: ${genre}. Mood: ${tone}.`,
-      `Story: ${synopsis}.`,
-      "Vertical 3:4 hardcover jacket, one striking focal subject, painterly cinematic lighting, rich color, atmospheric depth.",
-      "Print-ready illustration, sharp detail, no collage, no UI.",
-      "No text, no letters, no title, no typography, no watermark, no barcode.",
+      `Scene: ${synopsis}.`,
+      "Vertical 3:4 poster illustration that fills the entire image edge to edge.",
+      "One striking focal subject, painterly cinematic lighting, rich color, atmospheric depth.",
+      "Print-ready flat artwork only — the image IS the cover art, not a photo of a book.",
+      "Do not depict a physical book, hardcover, paperback, mockup, shelf, table, hands, spine, or pages.",
+      "No text, no letters, no title, no typography, no watermark, no barcode, no borders, no frames.",
     ].join(" ")
   );
 }
@@ -275,8 +309,7 @@ export async function runFluxCoverImage(prompt: string): Promise<Buffer> {
         width: 768,
         height: 1024,
         guidance: 7.5,
-        negative_prompt:
-          "text, words, letters, typography, watermark, logo, blurry",
+        negative_prompt: COVER_NEGATIVE_PROMPT,
       },
     },
     {
@@ -288,7 +321,7 @@ export async function runFluxCoverImage(prompt: string): Promise<Buffer> {
         width: 768,
         height: 1024,
         guidance: 7.5,
-        negative_prompt: "text, words, letters, typography, watermark",
+        negative_prompt: COVER_NEGATIVE_PROMPT,
       },
     },
     { model: FLUX_COVER_MODEL, mode: "json", body: { prompt: sanitized } },
