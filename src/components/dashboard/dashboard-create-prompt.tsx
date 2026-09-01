@@ -187,9 +187,9 @@ export function DashboardCreatePrompt({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2 sm:space-y-3">
       {firstName ? (
-        <p className="text-[14px] text-[#697386]">
+        <p className="text-[12px] text-[#697386] sm:text-[14px]">
           Welcome back,{" "}
           <span className="font-medium text-[#0a2540]">{firstName}</span>
         </p>
@@ -197,10 +197,10 @@ export function DashboardCreatePrompt({
 
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_28px_rgba(15,23,42,0.1)] ring-1 ring-black/[0.03] sm:rounded-[20px]"
+        className="rounded-xl border border-[#e2e6ec] bg-white shadow-sm sm:rounded-[20px] sm:border-[#d8dee8] sm:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_28px_rgba(15,23,42,0.1)] sm:ring-1 sm:ring-black/[0.03]"
       >
-        {/* Service tabs — full scroll on phone */}
-        <div className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-[#f0f2f5] px-3 pt-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Service tabs — compact on phone */}
+        <div className="flex gap-0.5 overflow-x-auto overscroll-x-contain border-b border-[#f0f2f5] px-2 pt-2 pb-1.5 [scrollbar-width:none] sm:gap-1 sm:px-3 sm:pt-3 sm:pb-2 [&::-webkit-scrollbar]:hidden">
           {SERVICES.map((s) => {
             const Icon = s.icon;
             const selected = service === s.id;
@@ -210,13 +210,16 @@ export function DashboardCreatePrompt({
                 type="button"
                 onClick={() => setService(s.id)}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium transition-colors",
+                  "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors sm:gap-1.5 sm:rounded-full sm:px-3 sm:py-2 sm:text-[13px]",
                   selected
                     ? "bg-[#f0f2f5] text-[#111827]"
                     : "text-[#6b7280] hover:bg-[#f7f8fa] hover:text-[#111827]"
                 )}
               >
-                <Icon className="h-3.5 w-3.5 opacity-80" strokeWidth={1.75} />
+                <Icon
+                  className="h-3 w-3 opacity-80 sm:h-3.5 sm:w-3.5"
+                  strokeWidth={1.75}
+                />
                 {s.label}
               </button>
             );
@@ -226,8 +229,10 @@ export function DashboardCreatePrompt({
         {/* Prompt + desktop covers */}
         <div
           className={cn(
-            "px-4 pt-3 sm:px-5",
-            coverA ? "lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-4" : ""
+            "px-3 pt-2 sm:px-5 sm:pt-3",
+            coverA
+              ? "lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-4"
+              : ""
           )}
         >
           <div className="min-w-0">
@@ -236,25 +241,23 @@ export function DashboardCreatePrompt({
               onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              rows={expanded ? 5 : 3}
+              rows={expanded ? 4 : 2}
               placeholder={active.placeholder}
               className={cn(
-                "w-full resize-none bg-transparent text-[16px] leading-relaxed text-[#111827] outline-none placeholder:text-[#9ca3af] sm:text-[15px]",
+                "w-full resize-none bg-transparent text-[13px] leading-snug text-[#111827] outline-none placeholder:text-[#9ca3af] sm:text-[15px] sm:leading-relaxed",
                 "transition-[min-height] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                // Phone: always a complete, readable field — no mid-clip
-                "min-h-[96px]",
-                // Desktop: compact → expand on focus
+                "min-h-[52px]",
                 expanded ? "sm:min-h-[128px]" : "sm:min-h-[88px]"
               )}
             />
 
-            <div className="-mx-4 mt-1 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-3 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-4 [&::-webkit-scrollbar]:hidden">
+            <div className="-mx-3 mt-0.5 flex gap-1.5 overflow-x-auto overscroll-x-contain px-3 pb-2 [scrollbar-width:none] sm:mx-0 sm:mt-1 sm:gap-2 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-4 [&::-webkit-scrollbar]:hidden">
               {active.chips.map((chip) => (
                 <button
                   key={chip}
                   type="button"
                   onClick={() => applyChip(chip)}
-                  className="shrink-0 rounded-full bg-[#f3f4f6] px-3 py-1.5 text-[12px] text-[#4b5563] transition-colors hover:bg-[#e5e7eb] active:bg-[#e5e7eb]"
+                  className="shrink-0 rounded-full bg-[#f3f4f6] px-2 py-1 text-[10px] text-[#4b5563] transition-colors hover:bg-[#e5e7eb] active:bg-[#e5e7eb] sm:px-3 sm:py-1.5 sm:text-[12px]"
                 >
                   {chip}
                 </button>
@@ -302,15 +305,18 @@ export function DashboardCreatePrompt({
           ) : null}
         </div>
 
-        {/* Footer — stacked cleanly on phone */}
-        <div className="flex items-center justify-between gap-3 border-t border-[#f0f2f5] px-4 py-3 sm:px-5">
-          <div className="flex min-w-0 items-center gap-2 text-[12px] text-[#6b7280]">
-            <span className="inline-flex items-center gap-1.5 font-medium text-[#111827]">
-              <active.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+        {/* Footer — compact on phone */}
+        <div className="flex items-center justify-between gap-2 border-t border-[#f0f2f5] px-3 py-2 sm:gap-3 sm:px-5 sm:py-3">
+          <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-[#6b7280] sm:gap-2 sm:text-[12px]">
+            <span className="inline-flex items-center gap-1 font-medium text-[#111827] sm:gap-1.5">
+              <active.icon
+                className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5"
+                strokeWidth={1.75}
+              />
               <span className="truncate">{active.label}</span>
             </span>
             {!active.available && (
-              <span className="rounded-full bg-[#fef3c7] px-2 py-0.5 text-[11px] font-medium text-[#92400e]">
+              <span className="rounded-full bg-[#fef3c7] px-1.5 py-0.5 text-[9px] font-medium text-[#92400e] sm:px-2 sm:text-[11px]">
                 Waitlist
               </span>
             )}
@@ -324,14 +330,14 @@ export function DashboardCreatePrompt({
             type="submit"
             disabled={!canGenerate}
             className={cn(
-              "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors sm:h-9",
+              "inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors sm:h-9 sm:gap-1.5 sm:px-4 sm:text-[13px]",
               canGenerate
                 ? "bg-[#374151] text-white hover:bg-[#1f2937]"
                 : "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]"
             )}
           >
             {active.cta}
-            <ArrowUp className="h-3.5 w-3.5" />
+            <ArrowUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           </button>
         </div>
       </form>
