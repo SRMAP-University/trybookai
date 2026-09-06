@@ -53,14 +53,15 @@ export async function PATCH(request: Request) {
   const { userId, plan, pagesLimit, audioMinutesLimit, pagesBonus } =
     parsed.data;
 
-  if (plan) {
-    const user = await grantUserPlan(userId, plan, {
-      pagesLimit,
-      audioMinutesLimit,
-      pagesBonus,
-    });
-    return NextResponse.json({ user });
-  }
+  try {
+    if (plan) {
+      const user = await grantUserPlan(userId, plan, {
+        pagesLimit,
+        audioMinutesLimit,
+        pagesBonus,
+      });
+      return NextResponse.json({ user });
+    }
 
   const data: {
     pagesLimit?: number;
@@ -89,5 +90,15 @@ export async function PATCH(request: Request) {
     },
   });
 
-  return NextResponse.json({ user });
+    return NextResponse.json({ user });
+  } catch (error) {
+    console.error("[adarsh/users PATCH]", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to update user",
+      },
+      { status: 500 }
+    );
+  }
 }

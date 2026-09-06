@@ -35,10 +35,12 @@ const DashboardUserContext = createContext<DashboardUserContextValue>({
 
 export function DashboardUserProvider({
   children,
+  initialUser = null,
 }: {
   children: React.ReactNode;
+  initialUser?: DashboardUser | null;
 }) {
-  const [user, setUser] = useState<DashboardUser | null>(null);
+  const [user, setUser] = useState<DashboardUser | null>(initialUser);
 
   const refresh = useCallback(() => {
     fetch("/api/settings")

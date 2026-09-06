@@ -10,11 +10,18 @@ import { DashboardUserProvider } from "@/components/dashboard/user-context";
 import { GlobalGenerationWidget } from "@/components/dashboard/global-generation-widget";
 import { ExplorationNotice } from "@/components/dashboard/exploration-notice";
 import { AppDownloadDrawer } from "@/components/app-download-drawer";
+import type { DashboardUser } from "@/components/dashboard/user-context";
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  children,
+  initialUser = null,
+}: {
+  children: React.ReactNode;
+  initialUser?: DashboardUser | null;
+}) {
   return (
     <SessionProvider refetchOnWindowFocus={false} refetchInterval={0}>
-      <DashboardUserProvider>
+      <DashboardUserProvider initialUser={initialUser}>
         <div className="min-h-screen bg-white">
           <DashboardSidebar />
           <div className="lg:pl-[240px]">

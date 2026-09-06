@@ -30,7 +30,7 @@ export function DashboardHeader() {
 
   const name = user?.name ?? session?.user?.name ?? "User";
   const email = user?.email ?? session?.user?.email ?? "";
-  const plan = user?.plan ?? "FREE";
+  const plan = user?.plan;
   const isFree = plan === "FREE";
   const initials =
     name
@@ -53,9 +53,11 @@ export function DashboardHeader() {
           </Link>
           <div className="hidden min-w-0 lg:block">
             <p className="truncate text-[13px] text-[#697386]">
-              {isFree
-                ? "Free plan"
-                : `${plan.charAt(0)}${plan.slice(1).toLowerCase()} plan`}
+              {plan
+                ? isFree
+                  ? "Free plan"
+                  : `${plan.charAt(0)}${plan.slice(1).toLowerCase()} plan`
+                : "Loading plan…"}
               {user ? ` · ${user.pagesUsed}/${user.pagesLimit} pages used` : ""}
             </p>
           </div>
@@ -97,7 +99,7 @@ export function DashboardHeader() {
                 >
                   <Link href="/dashboard/billing">
                     <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#635bff]" />
-                    <span className="capitalize">{plan.toLowerCase()}</span>
+                    <span className="capitalize">{plan?.toLowerCase()}</span>
                   </Link>
                 </Button>
               )}
@@ -120,7 +122,7 @@ export function DashboardHeader() {
                     <p className="text-[13px] font-medium text-[#0a2540]">{name}</p>
                     <p className="truncate text-[12px] text-[#697386]">{email}</p>
                     <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-[#635bff]">
-                      {plan.toLowerCase()} plan
+                      {plan ? `${plan.toLowerCase()} plan` : "Loading plan…"}
                     </p>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

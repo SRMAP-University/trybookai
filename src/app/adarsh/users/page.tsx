@@ -53,6 +53,7 @@ export default function AdarshUsersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   async function load(query?: string) {
     setLoading(true);
@@ -73,12 +74,21 @@ export default function AdarshUsersPage() {
 
   async function updatePlan(userId: string, plan: string) {
     setSaving(userId);
+    setPlanError(null);
     const res = await fetch("/api/adarsh/users", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, plan }),
     });
-    if (res.ok) await load(q || undefined);
+    if (res.ok) {
+      await load(q || undefined);
+    } else {
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setPlanError(body?.error || `Could not set plan to ${plan}`);
+      await load(q || undefined);
+    }
     setSaving(null);
   }
 
@@ -91,6 +101,9 @@ export default function AdarshUsersPage() {
         <p className="text-[13px] text-[#697386]">
           Sentiment scores, country flags, signup device, and plan controls
         </p>
+        {planError && (
+          <p className="mt-2 text-[13px] text-[#df1b41]">{planError}</p>
+        )}
       </div>
 
       <form
