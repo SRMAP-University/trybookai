@@ -6,6 +6,7 @@ import {
 } from "@/lib/addons";
 import { PLANS } from "@/lib/constants";
 import {
+  isPaidPlan,
   paidPriceIdFromSubscriptionItems,
   planFromPriceId,
 } from "@/lib/billing";
@@ -196,6 +197,16 @@ export async function syncUserSubscriptionFromStripe(userId: string) {
       audioMinutesBonus: true,
     },
   });
+
+  // Admin/complimentary grants have a paid plan and no Stripe subscription id.
+  // Looking up leftover customers or canceled checkouts would downgrade them.
+  if (isPaidPlan(user.plan) && !user.stripeSubId) {
+    return {
+      synced: false as const,
+      reason: "manual_grant" as const,
+      user,
+    };
+  }
 
   const stripe = getStripe();
   let customerId = user.stripeCustomerId;

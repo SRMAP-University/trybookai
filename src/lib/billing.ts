@@ -112,6 +112,15 @@ export async function syncUserTrialState(userId: string) {
       return user;
     }
 
+    // Premium trials are ENTERPRISE. A leftover trial date on PRO/UNLIMITED
+    // is from an admin grant — clear the date, keep the paid plan.
+    if (user.plan === "PRO" || user.plan === "UNLIMITED") {
+      return db.user.update({
+        where: { id: userId },
+        data: { trialEndsAt: null, trialReminderSentAt: null },
+      });
+    }
+
     return db.user.update({
       where: { id: userId },
       data: {
@@ -188,6 +197,41 @@ export async function endPremiumTrial(userId: string) {
       trialEndsAt: true,
       trialStartedAt: true,
       hasUsedPremiumTrial: true,
+    },
+  });
+}
+
+/** Complimentary / admin plan change. Must not be overwritten by trial or Stripe sync. */
+export async function grantUserPlan(
+  userId: string,
+  plan: keyof typeof PLANS,
+  overrides?: {
+    pagesLimit?: number;
+    audioMinutesLimit?: number;
+    pagesBonus?: number;
+  }
+) {
+  const config = PLANS[plan];
+
+  return db.user.update({
+    where: { id: userId },
+    data: {
+      plan,
+      pagesLimit: overrides?.pagesLimit ?? config.pagesLimit,
+      audioMinutesLimit: overrides?.audioMinutesLimit ?? config.audioMinutesLimit,
+      ...(overrides?.pagesBonus != null ? { pagesBonus: overrides.pagesBonus } : {}),
+      trialEndsAt: null,
+      trialReminderSentAt: null,
+      // Detach canceled/incomplete Stripe subs so dashboard self-heal cannot revert this.
+      ...(plan === "FREE" ? {} : { stripeSubId: null }),
+    },
+    select: {
+      id: true,
+      email: true,
+      plan: true,
+      pagesLimit: true,
+      audioMinutesLimit: true,
+      pagesBonus: true,
     },
   });
 }

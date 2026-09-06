@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/admin-auth";
 import { loadAdminUsers } from "@/lib/admin-data";
+import { grantUserPlan } from "@/lib/billing";
 import { db } from "@/lib/db";
-import { PLANS } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -53,21 +53,21 @@ export async function PATCH(request: Request) {
   const { userId, plan, pagesLimit, audioMinutesLimit, pagesBonus } =
     parsed.data;
 
+  if (plan) {
+    const user = await grantUserPlan(userId, plan, {
+      pagesLimit,
+      audioMinutesLimit,
+      pagesBonus,
+    });
+    return NextResponse.json({ user });
+  }
+
   const data: {
-    plan?: "FREE" | "PRO" | "ENTERPRISE" | "UNLIMITED";
     pagesLimit?: number;
     audioMinutesLimit?: number;
     pagesBonus?: number;
   } = {};
 
-  if (plan) {
-    data.plan = plan;
-    const defaults = PLANS[plan];
-    if (pagesLimit == null && defaults) data.pagesLimit = defaults.pagesLimit;
-    if (audioMinutesLimit == null && defaults) {
-      data.audioMinutesLimit = defaults.audioMinutesLimit;
-    }
-  }
   if (pagesLimit != null) data.pagesLimit = pagesLimit;
   if (audioMinutesLimit != null) data.audioMinutesLimit = audioMinutesLimit;
   if (pagesBonus != null) data.pagesBonus = pagesBonus;

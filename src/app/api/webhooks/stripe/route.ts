@@ -11,6 +11,7 @@ import {
   syncUserFromSubscription,
 } from "@/lib/stripe-sync";
 import { notifyTrialStarted } from "@/lib/emails/notify-trial-started";
+import { isPaidPlan } from "@/lib/billing";
 
 function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
   const raw = (
@@ -157,6 +158,20 @@ export async function POST(request: Request) {
           customerId
         );
         if (!userId) break;
+
+        const existing = await db.user.findUnique({
+          where: { id: userId },
+          select: { plan: true, stripeSubId: true },
+        });
+        if (
+          existing?.stripeSubId &&
+          existing.stripeSubId !== subscription.id
+        ) {
+          break;
+        }
+        if (!existing?.stripeSubId && existing && isPaidPlan(existing.plan)) {
+          break;
+        }
 
         await downgradeToFree(userId);
         break;

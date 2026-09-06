@@ -81,21 +81,15 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Keep local plan in sync with Stripe (upgrade OR revoke after failed payment)
-    const hasStripeLink = Boolean(user.stripeCustomerId || user.stripeSubId);
-    const looksFree =
-      user.plan === "FREE" ||
-      user.pagesLimit <= 50 ||
-      user.audioMinutesLimit <= 0;
-    const looksPaidWithoutProof =
-      (user.plan === "PRO" ||
-        user.plan === "ENTERPRISE" ||
-        user.plan === "UNLIMITED") &&
-      hasStripeLink;
+    // Keep local plan in sync with Stripe (upgrade OR revoke after failed payment).
+    // Do not treat a leftover Stripe customer id as proof of a paid sub — that
+    // overwrites complimentary / admin grants on every dashboard load.
+    const looksFree = user.plan === "FREE";
+    const hasManagedStripeSub = Boolean(user.stripeSubId);
 
     if (
       isStripeBillingEnabled() &&
-      (looksFree || looksPaidWithoutProof)
+      (looksFree || hasManagedStripeSub)
     ) {
       try {
         const synced = await syncUserSubscriptionFromStripe(session.user.id);
