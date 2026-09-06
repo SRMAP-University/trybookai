@@ -8,6 +8,7 @@ import {
 import { ensureBookCover } from "./cover";
 import { notifyApp } from "./notify";
 import { resolveGenerationShape } from "./shape";
+import { resolveContentFormat } from "./content-format";
 import { assembleSectionContext } from "./context-assembler";
 import { seedBibleFromOutline } from "./context-seed";
 import {
@@ -52,6 +53,7 @@ type BookRow = {
   model: string;
   creativity: number;
   generateAudiobookOnComplete: boolean;
+  templateId?: string | null;
 };
 
 export async function assertNotPaused(sql: Sql, bookId: string) {
@@ -185,7 +187,7 @@ async function getBook(sql: Sql, bookId: string): Promise<BookRow> {
       "chapterCount", "sectionsPerChapter", "wordsPerPage",
       "includeDialogue", "includeExamples", "customInstructions",
       characters, themes, "forbiddenTopics", model, creativity,
-      "generateAudiobookOnComplete"
+      "generateAudiobookOnComplete", "templateId"
     FROM "Book"
     WHERE id = ${bookId}
     LIMIT 1
@@ -216,6 +218,15 @@ function buildStyleBlock(book: BookRow): string {
   if (book.themes) parts.push(`Themes: ${JSON.stringify(book.themes)}`);
   if (book.forbiddenTopics)
     parts.push(`Avoid these topics: ${book.forbiddenTopics}`);
+  parts.push(
+    resolveContentFormat({
+      genre: book.genre,
+      templateId: book.templateId,
+      description: book.description,
+      customInstructions: book.customInstructions,
+      includeExamples: book.includeExamples,
+    }).instructions
+  );
   return parts.join("\n");
 }
 
@@ -265,7 +276,7 @@ export async function generateOutlineStep(
         [
           {
             role: "system",
-            content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book.`,
+            content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book. For practical, educational, business, or handbook books, plan sections that naturally include comparisons, frameworks, tables, or visual explanations when those help the reader.`,
           },
           {
             role: "user",
@@ -558,7 +569,7 @@ export async function writeSectionStep(
     .filter(Boolean)
     .join("\n");
 
-  const systemContent = `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Output only the final section prose — no headings, no reasoning, and no thinking notes.
+  const systemContent = `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Follow FORMAT RULES in the writing requirements. Output only the section manuscript — no preamble, no thinking notes.
 
 Writing requirements:
 ${assembled?.systemStyle ?? fallbackStyle}`;

@@ -9,6 +9,7 @@ import { BookCover } from "@/components/dashboard/book-cover";
 import { BookAudioPanel } from "@/components/dashboard/book-audio-panel";
 import type { BookAudioItem } from "@/components/dashboard/book-audio-panel";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
+import { BookManuscript } from "@/components/book/book-manuscript";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -262,9 +263,12 @@ export default async function PublicBookPage({ params }: Props) {
                             {section.title}
                           </h3>
                         )}
-                        <div className="mt-2 whitespace-pre-wrap text-[15px] leading-[1.75] text-[#425466]">
-                          {section.content || "Content coming soon."}
-                        </div>
+                        <BookManuscript
+                          className="mt-2"
+                          genre={book.genre}
+                          templateId={book.templateId}
+                          content={section.content || ""}
+                        />
                       </div>
                     ))}
                   </div>

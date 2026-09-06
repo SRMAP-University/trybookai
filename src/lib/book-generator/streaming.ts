@@ -16,6 +16,7 @@ import {
   creditSectionPages,
 } from "@/lib/book-generator/progress";
 import { resolveGenerationShape } from "@/lib/book-generator/shape";
+import { resolveContentFormat } from "@/lib/book-generator/content-format";
 import {
   createBookEventEmitter,
   mergeEmitters,
@@ -192,6 +193,13 @@ async function streamGenerateSection(
     book.customInstructions
       ? `Custom instructions: ${book.customInstructions}`
       : null,
+    resolveContentFormat({
+      genre: book.genre,
+      templateId: book.templateId,
+      description: book.description,
+      customInstructions: book.customInstructions,
+      includeExamples: book.includeExamples,
+    }).instructions,
   ].filter(Boolean);
 
   let draftContent = "";
@@ -266,7 +274,7 @@ async function streamGenerateSection(
     messages: [
       {
         role: "system",
-        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Output only the final section prose — no headings, no reasoning, and no thinking notes.
+        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Follow FORMAT RULES in the writing requirements. Output only the section manuscript — no preamble, no thinking notes.
 
 Writing requirements:
 ${assembled?.systemStyle ?? styleParts.join("\n")}`,

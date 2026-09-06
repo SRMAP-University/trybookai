@@ -11,6 +11,7 @@ import {
   creditSectionPages,
 } from "@/lib/book-generator/progress";
 import { resolveGenerationShape } from "@/lib/book-generator/shape";
+import { resolveContentFormat } from "@/lib/book-generator/content-format";
 import {
   assembleSectionContext,
   extractAndUpdateCanon,
@@ -52,6 +53,7 @@ type BookSettings = {
   model: string;
   creativity: number;
   outline: unknown;
+  templateId?: string | null;
 };
 
 function wordsForPages(pages: number, wordsPerPage: number): number {
@@ -93,6 +95,16 @@ function buildStyleBlock(book: BookSettings): string {
   if (book.forbiddenTopics)
     parts.push(`Avoid these topics: ${book.forbiddenTopics}`);
 
+  parts.push(
+    resolveContentFormat({
+      genre: book.genre,
+      templateId: book.templateId,
+      description: book.description,
+      customInstructions: book.customInstructions,
+      includeExamples: book.includeExamples,
+    }).instructions
+  );
+
   return parts.join("\n");
 }
 
@@ -129,7 +141,7 @@ export async function generateOutline(
     messages: [
       {
         role: "system",
-        content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book.`,
+        content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book. For practical, educational, business, or handbook books, plan sections that naturally include comparisons, frameworks, tables, or visual explanations when those help the reader.`,
       },
       {
         role: "user",
@@ -249,7 +261,7 @@ export async function generateSection(sectionId: string) {
     messages: [
       {
         role: "system",
-        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the provided CORE/CURRENT/RETRIEVED context. Output only the section content, no headings.
+        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the provided CORE/CURRENT/RETRIEVED context. Follow FORMAT RULES in the writing requirements. Output only the section manuscript — no preamble, no thinking notes.
 
 Writing requirements:
 ${assembled?.systemStyle ?? styleBlock}`,

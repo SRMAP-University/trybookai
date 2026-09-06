@@ -51,6 +51,7 @@ import {
 import { GenerationSpeedDialog } from "@/components/dashboard/generation-speed-dialog";
 import { PremiumUpgradeDialog } from "@/components/dashboard/premium-upgrade-dialog";
 import type { GenerationSpeed } from "@/lib/ai-models";
+import { BookManuscript } from "@/components/book/book-manuscript";
 
 interface Section {
   id: string;
@@ -96,6 +97,7 @@ interface Book {
   themes: string[] | null;
   errorMessage: string | null;
   coverImage: string | null;
+  templateId?: string | null;
   edition: number;
   generateAudiobookOnComplete?: boolean;
   chapters: Chapter[];
@@ -1492,14 +1494,20 @@ function BookDetailPageContent() {
                           {section.title}
                           {section.pageCount > 0 && ` · ${section.pageCount} pages`}
                         </p>
-                        <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-[#425466]">
-                          {section.content ??
+                        <BookManuscript
+                          className="mt-1"
+                          compact
+                          genre={book.genre}
+                          templateId={book.templateId}
+                          content={
+                            section.content ??
                             (generating &&
                             liveSection?.sectionId === section.id
                               ? liveContent
                               : null) ??
-                            "Not generated yet."}
-                        </p>
+                            ""
+                          }
+                        />
                       </div>
                     ))}
                   </div>

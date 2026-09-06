@@ -60,7 +60,7 @@ export function buildEditorAssistMessages(
 
   userParts.push(`Task: ${instruction}`);
   userParts.push(
-    "Output only the replacement or new prose. No headings, labels, or commentary."
+    "Output only the replacement or new manuscript text. Keep any existing Markdown headings, tables, lists, or [FIGURE: ...] markers. No commentary."
   );
 
   return [

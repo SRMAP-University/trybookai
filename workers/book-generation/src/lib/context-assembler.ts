@@ -6,6 +6,10 @@ import {
   extractEntityHints,
   formatList,
 } from "./context-utils";
+import {
+  resolveContentFormat,
+  sectionOutputHint,
+} from "./content-format";
 
 type OutlineLike = { synopsis?: string };
 
@@ -39,6 +43,7 @@ export async function assembleSectionContext(
       customInstructions: string | null;
       forbiddenTopics: string | null;
       sectionsPerChapter: number;
+      templateId: string | null;
     }[]
   >`
     SELECT
@@ -48,7 +53,7 @@ export async function assembleSectionContext(
       b.title AS "bookTitle", b.description, b.genre, b.outline, b.style,
       b.audience, b.tone, b.pov, b.tense, b.language,
       b."includeDialogue", b."includeExamples", b."customInstructions",
-      b."forbiddenTopics", b."sectionsPerChapter"
+      b."forbiddenTopics", b."sectionsPerChapter", b."templateId"
     FROM "Section" s
     INNER JOIN "Chapter" c ON c.id = s."chapterId"
     INNER JOIN "Book" b ON b.id = c."bookId"
@@ -144,6 +149,15 @@ export async function assembleSectionContext(
     bible?.themes ? `Themes: ${formatList(bible.themes)}` : null,
     section.forbiddenTopics ? `Avoid: ${section.forbiddenTopics}` : null,
   ].filter(Boolean);
+
+  const format = resolveContentFormat({
+    genre: section.genre,
+    templateId: section.templateId,
+    description: section.description,
+    customInstructions: section.customInstructions,
+    includeExamples: section.includeExamples,
+  });
+  styleParts.push(format.instructions);
 
   const systemStyle = styleParts.join("\n");
   const core = [
@@ -301,6 +315,7 @@ export async function assembleSectionContext(
     sectionTitle: section.title,
     sectionNumber: section.number,
     sectionsPerChapter: section.sectionsPerChapter || 4,
+    outputHint: sectionOutputHint(format),
   });
 
   return {

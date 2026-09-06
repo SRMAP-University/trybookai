@@ -77,15 +77,138 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function inlineHtml(text: string): string {
+  return escapeHtml(text)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+
+function splitExportRow(line: string): string[] {
+  let cells = line.trim();
+  if (cells.startsWith("|")) cells = cells.slice(1);
+  if (cells.endsWith("|")) cells = cells.slice(0, -1);
+  return cells.split("|").map((c) => c.trim());
+}
+
+function isTableSeparator(line: string): boolean {
+  return /^\s*\|?\s*:?-{3,}.*\|/.test(line);
+}
+
 function paragraphsToHtml(text: string): string {
-  const blocks = text
-    .split(/\n{2,}/)
-    .map((b) => b.trim())
-    .filter(Boolean);
-  if (blocks.length === 0) return "<p><em>Not generated yet.</em></p>";
-  return blocks
-    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, "<br/>")}</p>`)
-    .join("\n");
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  if (!text.trim()) return "<p><em>Not generated yet.</em></p>";
+
+  const html: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) {
+      i += 1;
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{2,4})\s+(.+)$/);
+    if (heading) {
+      const level = Math.min(heading[1].length, 4);
+      html.push(`<h${level}>${inlineHtml(heading[2])}</h${level}>`);
+      i += 1;
+      continue;
+    }
+
+    const figure = trimmed.match(/^\[FIGURE:\s*(.+?)\]\s*$/i);
+    if (figure) {
+      html.push(
+        `<figure><p><em>Illustration:</em> ${inlineHtml(figure[1])}</p></figure>`
+      );
+      i += 1;
+      continue;
+    }
+
+    const image = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
+    if (image) {
+      html.push(
+        `<figure><img src="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}" /><figcaption>${inlineHtml(image[1] || "Illustration")}</figcaption></figure>`
+      );
+      i += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith(">")) {
+      const quote: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith(">")) {
+        quote.push(lines[i].replace(/^\s*>\s?/, ""));
+        i += 1;
+      }
+      html.push(`<blockquote>${inlineHtml(quote.join(" "))}</blockquote>`);
+      continue;
+    }
+
+    if (trimmed.includes("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      const headers = splitExportRow(trimmed);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].includes("|") && !isTableSeparator(lines[i])) {
+        if (lines[i].trim()) rows.push(splitExportRow(lines[i]));
+        i += 1;
+      }
+      html.push(
+        "<table>",
+        "<thead><tr>",
+        ...headers.map((h) => `<th>${inlineHtml(h)}</th>`),
+        "</tr></thead><tbody>",
+        ...rows.map(
+          (row) =>
+            `<tr>${row.map((cell) => `<td>${inlineHtml(cell)}</td>`).join("")}</tr>`
+        ),
+        "</tbody></table>"
+      );
+      continue;
+    }
+
+    const unordered = trimmed.match(/^[-*+]\s+(.+)$/);
+    const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (unordered || ordered) {
+      const items: string[] = [];
+      const isOrdered = Boolean(ordered);
+      while (i < lines.length) {
+        const item = isOrdered
+          ? lines[i].trim().match(/^\d+[.)]\s+(.+)$/)
+          : lines[i].trim().match(/^[-*+]\s+(.+)$/);
+        if (!item) break;
+        items.push(item[1]);
+        i += 1;
+      }
+      const tag = isOrdered ? "ol" : "ul";
+      html.push(
+        `<${tag}>`,
+        ...items.map((item) => `<li>${inlineHtml(item)}</li>`),
+        `</${tag}>`
+      );
+      continue;
+    }
+
+    const para: string[] = [];
+    while (i < lines.length && lines[i].trim()) {
+      const next = lines[i].trim();
+      if (
+        /^(#{2,4})\s+/.test(next) ||
+        /^\[FIGURE:/i.test(next) ||
+        /^!\[/.test(next) ||
+        next.startsWith(">") ||
+        /^[-*+]\s+/.test(next) ||
+        /^\d+[.)]\s+/.test(next)
+      ) {
+        break;
+      }
+      para.push(next);
+      i += 1;
+    }
+    if (para.length) {
+      html.push(`<p>${inlineHtml(para.join(" "))}</p>`);
+    }
+  }
+
+  return html.join("\n") || "<p><em>Not generated yet.</em></p>";
 }
 
 export function buildMarkdownManuscript(book: ExportBook): string {

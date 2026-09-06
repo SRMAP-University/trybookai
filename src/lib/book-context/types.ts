@@ -108,6 +108,7 @@ export function buildAssembledUserPrompt(parts: {
   sectionTitle: string;
   sectionNumber: number;
   sectionsPerChapter: number;
+  outputHint?: string;
 }): AssembledContext {
   const core = clipToBudget(parts.core, CONTEXT_BUDGETS.core);
   const current = clipToBudget(parts.current, CONTEXT_BUDGETS.current);
@@ -128,7 +129,8 @@ export function buildAssembledUserPrompt(parts: {
     immediate || "(start of chapter — no prior scene)",
     "",
     `Write section "${parts.sectionTitle}" (Section ${parts.sectionNumber} of ${parts.sectionsPerChapter}).`,
-    "Output only the section prose — no headings, no reasoning notes.",
+    parts.outputHint ??
+      "Output only the section manuscript. Do not repeat the chapter or section title. No reasoning notes.",
   ].join("\n");
 
   return {

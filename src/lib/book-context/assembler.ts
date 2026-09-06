@@ -8,6 +8,10 @@ import {
   type AssembledContext,
   type BookOutlineLike,
 } from "@/lib/book-context/types";
+import {
+  resolveContentFormat,
+  sectionOutputHint,
+} from "@/lib/book-generator/content-format";
 
 /**
  * Assemble hierarchical context for writing a section.
@@ -74,6 +78,15 @@ export async function assembleSectionContext(
     bible?.themes ? `Themes: ${formatList(bible.themes)}` : null,
     book.forbiddenTopics ? `Avoid: ${book.forbiddenTopics}` : null,
   ].filter(Boolean);
+
+  const format = resolveContentFormat({
+    genre: book.genre,
+    templateId: book.templateId,
+    description: book.description,
+    customInstructions: book.customInstructions,
+    includeExamples: book.includeExamples,
+  });
+  styleParts.push(format.instructions);
 
   const systemStyle = styleParts.join("\n");
   const core = [
@@ -232,6 +245,7 @@ export async function assembleSectionContext(
     sectionTitle: section.title,
     sectionNumber: section.number,
     sectionsPerChapter,
+    outputHint: sectionOutputHint(format),
   });
 
   return { ...assembled, systemStyle };
