@@ -1,5 +1,12 @@
 import PDFDocument from "pdfkit";
 import epub from "epub-gen-memory";
+import {
+  blocksToHtml,
+  escapeHtml,
+  parseManuscriptBlocks,
+  tokenizeInline,
+  type ManuscriptBlock,
+} from "@/lib/book-content-blocks";
 
 export type ExportFormat = "md" | "pdf" | "epub";
 
@@ -69,146 +76,214 @@ function copyrightLine(user: ExportBrandUser): string {
   return `© ${new Date().getFullYear()} ${name}. All rights reserved.`;
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+const PDF_CONTENT_WIDTH = 468;
+const PDF_LEFT = 72;
+const PDF_BOTTOM = 72;
+
+function ensureSpace(doc: PDFKit.PDFDocument, needed: number) {
+  if (doc.y + needed > doc.page.height - PDF_BOTTOM) {
+    doc.addPage();
+    doc.x = PDF_LEFT;
+    doc.y = 72;
+  }
 }
 
-function inlineHtml(text: string): string {
-  return escapeHtml(text)
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+function writeRichText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  options?: {
+    fontSize?: number;
+    color?: string;
+    align?: "left" | "center" | "justify";
+    indent?: number;
+    italic?: boolean;
+    bold?: boolean;
+  }
+) {
+  const fontSize = options?.fontSize ?? 11;
+  const color = options?.color ?? "#333333";
+  const indent = options?.indent ?? 0;
+  const width = PDF_CONTENT_WIDTH - indent;
+  const spans = tokenizeInline(text);
+  const x = PDF_LEFT + indent;
+
+  spans.forEach((span, index) => {
+    let font = "Times-Roman";
+    if (span.bold || options?.bold) font = "Times-Bold";
+    else if (span.italic || options?.italic) font = "Times-Italic";
+    else if (span.code) font = "Courier";
+    doc.font(font).fontSize(fontSize).fillColor(color);
+    doc.text(span.text, x, doc.y, {
+      width,
+      align: options?.align ?? "left",
+      continued: index < spans.length - 1,
+      lineGap: 2,
+    });
+  });
+  if (!spans.length) {
+    doc.font("Times-Roman").fontSize(fontSize).fillColor(color);
+    doc.text("", x, doc.y, { width });
+  }
 }
 
-function splitExportRow(line: string): string[] {
-  let cells = line.trim();
-  if (cells.startsWith("|")) cells = cells.slice(1);
-  if (cells.endsWith("|")) cells = cells.slice(0, -1);
-  return cells.split("|").map((c) => c.trim());
+function writePdfTable(
+  doc: PDFKit.PDFDocument,
+  headers: string[],
+  rows: string[][]
+) {
+  const cols = Math.max(headers.length, ...rows.map((r) => r.length), 1);
+  const colW = PDF_CONTENT_WIDTH / cols;
+  const pad = 5;
+  const fontSize = 9;
+
+  const cellHeight = (text: string, bold: boolean) => {
+    doc.font(bold ? "Times-Bold" : "Times-Roman").fontSize(fontSize);
+    return (
+      doc.heightOfString(text || " ", { width: colW - pad * 2, lineGap: 1 }) +
+      pad * 2
+    );
+  };
+
+  const drawRow = (cells: string[], bold: boolean, fill: string) => {
+    const height = Math.max(
+      18,
+      ...Array.from({ length: cols }, (_, i) => cellHeight(cells[i] ?? "", bold))
+    );
+    ensureSpace(doc, height + 2);
+    const y = doc.y;
+    for (let i = 0; i < cols; i += 1) {
+      const x = PDF_LEFT + i * colW;
+      doc.save();
+      doc.rect(x, y, colW, height).fillAndStroke(fill, "#d0d5dd");
+      doc.restore();
+      doc
+        .font(bold ? "Times-Bold" : "Times-Roman")
+        .fontSize(fontSize)
+        .fillColor("#222222");
+      doc.text(cells[i] ?? "", x + pad, y + pad, {
+        width: colW - pad * 2,
+        lineGap: 1,
+      });
+    }
+    doc.x = PDF_LEFT;
+    doc.y = y + height;
+  };
+
+  drawRow(headers, true, "#f3f6fa");
+  for (const row of rows) {
+    drawRow(row, false, "#ffffff");
+  }
 }
 
-function isTableSeparator(line: string): boolean {
-  return /^\s*\|?\s*:?-{3,}.*\|/.test(line);
-}
-
-function paragraphsToHtml(text: string): string {
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  if (!text.trim()) return "<p><em>Not generated yet.</em></p>";
-
-  const html: string[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const trimmed = lines[i].trim();
-    if (!trimmed) {
-      i += 1;
-      continue;
-    }
-
-    const heading = trimmed.match(/^(#{2,4})\s+(.+)$/);
-    if (heading) {
-      const level = Math.min(heading[1].length, 4);
-      html.push(`<h${level}>${inlineHtml(heading[2])}</h${level}>`);
-      i += 1;
-      continue;
-    }
-
-    const figure = trimmed.match(/^\[FIGURE:\s*(.+?)\]\s*$/i);
-    if (figure) {
-      html.push(
-        `<figure><p><em>Illustration:</em> ${inlineHtml(figure[1])}</p></figure>`
-      );
-      i += 1;
-      continue;
-    }
-
-    const image = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
-    if (image) {
-      html.push(
-        `<figure><img src="${escapeHtml(image[2])}" alt="${escapeHtml(image[1])}" /><figcaption>${inlineHtml(image[1] || "Illustration")}</figcaption></figure>`
-      );
-      i += 1;
-      continue;
-    }
-
-    if (trimmed.startsWith(">")) {
-      const quote: string[] = [];
-      while (i < lines.length && lines[i].trim().startsWith(">")) {
-        quote.push(lines[i].replace(/^\s*>\s?/, ""));
-        i += 1;
-      }
-      html.push(`<blockquote>${inlineHtml(quote.join(" "))}</blockquote>`);
-      continue;
-    }
-
-    if (trimmed.includes("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
-      const headers = splitExportRow(trimmed);
-      i += 2;
-      const rows: string[][] = [];
-      while (i < lines.length && lines[i].includes("|") && !isTableSeparator(lines[i])) {
-        if (lines[i].trim()) rows.push(splitExportRow(lines[i]));
-        i += 1;
-      }
-      html.push(
-        "<table>",
-        "<thead><tr>",
-        ...headers.map((h) => `<th>${inlineHtml(h)}</th>`),
-        "</tr></thead><tbody>",
-        ...rows.map(
-          (row) =>
-            `<tr>${row.map((cell) => `<td>${inlineHtml(cell)}</td>`).join("")}</tr>`
-        ),
-        "</tbody></table>"
-      );
-      continue;
-    }
-
-    const unordered = trimmed.match(/^[-*+]\s+(.+)$/);
-    const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
-    if (unordered || ordered) {
-      const items: string[] = [];
-      const isOrdered = Boolean(ordered);
-      while (i < lines.length) {
-        const item = isOrdered
-          ? lines[i].trim().match(/^\d+[.)]\s+(.+)$/)
-          : lines[i].trim().match(/^[-*+]\s+(.+)$/);
-        if (!item) break;
-        items.push(item[1]);
-        i += 1;
-      }
-      const tag = isOrdered ? "ol" : "ul";
-      html.push(
-        `<${tag}>`,
-        ...items.map((item) => `<li>${inlineHtml(item)}</li>`),
-        `</${tag}>`
-      );
-      continue;
-    }
-
-    const para: string[] = [];
-    while (i < lines.length && lines[i].trim()) {
-      const next = lines[i].trim();
-      if (
-        /^(#{2,4})\s+/.test(next) ||
-        /^\[FIGURE:/i.test(next) ||
-        /^!\[/.test(next) ||
-        next.startsWith(">") ||
-        /^[-*+]\s+/.test(next) ||
-        /^\d+[.)]\s+/.test(next)
-      ) {
-        break;
-      }
-      para.push(next);
-      i += 1;
-    }
-    if (para.length) {
-      html.push(`<p>${inlineHtml(para.join(" "))}</p>`);
-    }
+function writePdfBlocks(doc: PDFKit.PDFDocument, content: string) {
+  const blocks = parseManuscriptBlocks(content.trim() || "Not generated yet.");
+  if (!blocks.length) {
+    writeRichText(doc, "Not generated yet.", {
+      italic: true,
+      color: "#697386",
+    });
+    return;
   }
 
-  return html.join("\n") || "<p><em>Not generated yet.</em></p>";
+  for (const block of blocks) {
+    writePdfBlock(doc, block);
+  }
+}
+
+function writePdfBlock(doc: PDFKit.PDFDocument, block: ManuscriptBlock) {
+  if (block.type === "heading") {
+    const size = block.level <= 2 ? 14 : block.level === 3 ? 12 : 11;
+    ensureSpace(doc, 28);
+    doc.moveDown(0.35);
+    writeRichText(doc, block.text, {
+      fontSize: size,
+      color: "#111111",
+      bold: true,
+    });
+    doc.moveDown(0.35);
+    return;
+  }
+
+  if (block.type === "quote") {
+    ensureSpace(doc, 24);
+    writeRichText(doc, block.text, {
+      italic: true,
+      color: "#555555",
+      indent: 18,
+    });
+    doc.moveDown(0.45);
+    return;
+  }
+
+  if (block.type === "list") {
+    for (let i = 0; i < block.items.length; i += 1) {
+      ensureSpace(doc, 18);
+      const marker = block.ordered ? `${i + 1}. ` : "•  ";
+      writeRichText(doc, `${marker}${block.items[i]}`, { indent: 14 });
+      doc.moveDown(0.15);
+    }
+    doc.moveDown(0.25);
+    return;
+  }
+
+  if (block.type === "table") {
+    doc.moveDown(0.2);
+    writePdfTable(doc, block.headers, block.rows);
+    doc.moveDown(0.45);
+    return;
+  }
+
+  if (block.type === "figure") {
+    const caption = block.caption || "Illustration";
+    doc.font("Times-Italic").fontSize(10);
+    const boxH = Math.max(
+      48,
+      doc.heightOfString(`Illustration\n${caption}`, {
+        width: PDF_CONTENT_WIDTH - 24,
+      }) + 24
+    );
+    ensureSpace(doc, boxH + 8);
+    const y = doc.y;
+    doc.save();
+    doc.roundedRect(PDF_LEFT, y, PDF_CONTENT_WIDTH, boxH, 6).fill("#f4f7fb");
+    doc
+      .roundedRect(PDF_LEFT, y, PDF_CONTENT_WIDTH, boxH, 6)
+      .strokeColor("#d8dee8")
+      .stroke();
+    doc.restore();
+    doc
+      .font("Times-Bold")
+      .fontSize(8)
+      .fillColor("#697386")
+      .text("ILLUSTRATION", PDF_LEFT + 12, y + 10, {
+        width: PDF_CONTENT_WIDTH - 24,
+      });
+    doc
+      .font("Times-Italic")
+      .fontSize(10)
+      .fillColor("#0a2540")
+      .text(caption, PDF_LEFT + 12, y + 24, {
+        width: PDF_CONTENT_WIDTH - 24,
+      });
+    doc.y = y + boxH + 8;
+    doc.x = PDF_LEFT;
+    return;
+  }
+
+  if (block.type === "rule") {
+    ensureSpace(doc, 16);
+    doc
+      .moveTo(PDF_LEFT, doc.y + 4)
+      .lineTo(PDF_LEFT + PDF_CONTENT_WIDTH, doc.y + 4)
+      .strokeColor("#d8dee8")
+      .stroke();
+    doc.moveDown(0.6);
+    return;
+  }
+
+  ensureSpace(doc, 20);
+  writeRichText(doc, block.text);
+  doc.moveDown(0.45);
 }
 
 export function buildMarkdownManuscript(book: ExportBook): string {
@@ -262,14 +337,6 @@ export function buildMarkdownManuscript(book: ExportBook): string {
   }
 
   return lines.join("\n");
-}
-
-function writeWrappedText(
-  doc: PDFKit.PDFDocument,
-  text: string,
-  options?: PDFKit.Mixins.TextOptions
-) {
-  doc.text(text, { width: 468, align: "left", ...options });
 }
 
 export async function buildPdfBuffer(book: ExportBook): Promise<Buffer> {
@@ -330,9 +397,8 @@ export async function buildPdfBuffer(book: ExportBook): Promise<Buffer> {
 
     if (book.description) {
       doc.moveDown(0.5);
-      doc.font("Times-Roman").fontSize(11).fillColor("#333333");
-      writeWrappedText(doc, book.description);
-      doc.moveDown(1);
+      writePdfBlocks(doc, book.description);
+      doc.moveDown(0.5);
     }
 
     if (user.includeBrandInExport && user.dedicationDefault) {
@@ -356,37 +422,46 @@ export async function buildPdfBuffer(book: ExportBook): Promise<Buffer> {
       doc.moveDown(0.5);
 
       if (chapter.summary) {
-        doc.font("Times-Italic").fontSize(10).fillColor("#555555");
-        writeWrappedText(doc, chapter.summary);
-        doc.font("Times-Roman");
+        writeRichText(doc, chapter.summary, {
+          fontSize: 10,
+          italic: true,
+          color: "#555555",
+        });
         doc.moveDown(0.75);
       }
 
       for (const section of chapter.sections) {
         doc.moveDown(0.4);
-        doc
-          .font("Times-Bold")
-          .fontSize(13)
-          .fillColor("#222222")
-          .text(section.title, { width: 468 });
+        writeRichText(doc, section.title, {
+          fontSize: 13,
+          bold: true,
+          color: "#222222",
+        });
         doc.moveDown(0.35);
-        doc.font("Times-Roman").fontSize(11).fillColor("#333333");
-        writeWrappedText(doc, section.content?.trim() || "Not generated yet.");
-        doc.moveDown(0.5);
+        writePdfBlocks(doc, section.content?.trim() || "Not generated yet.");
+        doc.moveDown(0.35);
       }
     }
 
     if (user.includeBrandInExport) {
       doc.addPage();
-      doc.font("Times-Roman").fontSize(10).fillColor("#555555");
-      writeWrappedText(doc, copyrightLine(user));
+      writeRichText(doc, copyrightLine(user), {
+        fontSize: 10,
+        color: "#555555",
+      });
       if (user.exportFooter) {
         doc.moveDown(0.5);
-        writeWrappedText(doc, user.exportFooter);
+        writeRichText(doc, user.exportFooter, {
+          fontSize: 10,
+          color: "#555555",
+        });
       }
       if (user.websiteUrl) {
         doc.moveDown(0.5);
-        writeWrappedText(doc, user.websiteUrl);
+        writeRichText(doc, user.websiteUrl, {
+          fontSize: 10,
+          color: "#555555",
+        });
       }
     }
 
@@ -414,7 +489,7 @@ export async function buildEpubBuffer(book: ExportBook): Promise<Buffer> {
     frontParts.push(`<blockquote>${escapeHtml(user.brandTagline)}</blockquote>`);
   }
   if (book.description) {
-    frontParts.push(paragraphsToHtml(book.description));
+    frontParts.push(blocksToHtml(book.description));
   }
   if (user.includeBrandInExport && user.dedicationDefault) {
     frontParts.push(
@@ -439,7 +514,7 @@ export async function buildEpubBuffer(book: ExportBook): Promise<Buffer> {
     for (const section of chapter.sections) {
       parts.push(`<h2>${escapeHtml(section.title)}</h2>`);
       parts.push(
-        paragraphsToHtml(section.content?.trim() || "Not generated yet.")
+        blocksToHtml(section.content?.trim() || "Not generated yet.")
       );
     }
     content.push({

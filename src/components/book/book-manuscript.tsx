@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ImageIcon } from "lucide-react";
+import { parseManuscriptBlocks } from "@/lib/book-content-blocks";
 import {
   layoutClassName,
   resolveManuscriptLayout,
@@ -15,14 +16,6 @@ type BookManuscriptProps = {
   compact?: boolean;
   className?: string;
 };
-
-type Block =
-  | { type: "heading"; level: 2 | 3 | 4; text: string }
-  | { type: "paragraph"; text: string }
-  | { type: "list"; ordered: boolean; items: string[] }
-  | { type: "table"; headers: string[]; rows: string[][] }
-  | { type: "figure"; caption: string; src?: string }
-  | { type: "quote"; text: string };
 
 function inlineMarkdown(text: string) {
   const parts: ReactNode[] = [];
@@ -63,118 +56,11 @@ function inlineMarkdown(text: string) {
   return parts;
 }
 
-function splitRow(line: string): string[] {
-  let cells = line.trim();
-  if (cells.startsWith("|")) cells = cells.slice(1);
-  if (cells.endsWith("|")) cells = cells.slice(0, -1);
-  return cells.split("|").map((c) => c.trim());
-}
-
-function isSeparator(line: string): boolean {
-  return /^\s*\|?\s*:?-{3,}.*\|/.test(line);
-}
-
-function parseFigure(line: string): { caption: string; src?: string } | null {
-  const marker = line.match(/^\[FIGURE:\s*(.+?)\]\s*$/i);
-  if (marker) return { caption: marker[1].trim() };
-  const md = line.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/);
-  if (md) return { caption: md[1].trim() || "Illustration", src: md[2].trim() };
-  return null;
-}
-
-function parseBlocks(content: string): Block[] {
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
-  const blocks: Block[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      i += 1;
-      continue;
-    }
-
-    const heading = trimmed.match(/^(#{2,4})\s+(.+)$/);
-    if (heading) {
-      const level = heading[1].length as 2 | 3 | 4;
-      blocks.push({ type: "heading", level, text: heading[2].trim() });
-      i += 1;
-      continue;
-    }
-
-    const figure = parseFigure(trimmed);
-    if (figure) {
-      blocks.push({ type: "figure", ...figure });
-      i += 1;
-      continue;
-    }
-
-    if (trimmed.startsWith(">")) {
-      const quote: string[] = [];
-      while (i < lines.length && lines[i].trim().startsWith(">")) {
-        quote.push(lines[i].replace(/^\s*>\s?/, ""));
-        i += 1;
-      }
-      blocks.push({ type: "quote", text: quote.join(" ") });
-      continue;
-    }
-
-    if (trimmed.includes("|") && i + 1 < lines.length && isSeparator(lines[i + 1])) {
-      const headers = splitRow(trimmed);
-      i += 2;
-      const rows: string[][] = [];
-      while (i < lines.length && lines[i].includes("|") && !isSeparator(lines[i])) {
-        if (lines[i].trim()) rows.push(splitRow(lines[i]));
-        i += 1;
-      }
-      blocks.push({ type: "table", headers, rows });
-      continue;
-    }
-
-    const unordered = trimmed.match(/^[-*+]\s+(.+)$/);
-    const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
-    if (unordered || ordered) {
-      const items: string[] = [];
-      const isOrdered = Boolean(ordered);
-      while (i < lines.length) {
-        const item = isOrdered
-          ? lines[i].trim().match(/^\d+[.)]\s+(.+)$/)
-          : lines[i].trim().match(/^[-*+]\s+(.+)$/);
-        if (!item) break;
-        items.push(item[1]);
-        i += 1;
-      }
-      blocks.push({ type: "list", ordered: isOrdered, items });
-      continue;
-    }
-
-    const para: string[] = [];
-    while (i < lines.length && lines[i].trim()) {
-      const next = lines[i].trim();
-      if (
-        /^(#{2,4})\s+/.test(next) ||
-        parseFigure(next) ||
-        next.startsWith(">") ||
-        /^[-*+]\s+/.test(next) ||
-        /^\d+[.)]\s+/.test(next) ||
-        (next.includes("|") && i + 1 < lines.length && isSeparator(lines[i + 1]))
-      ) {
-        break;
-      }
-      para.push(next);
-      i += 1;
-    }
-    if (para.length) {
-      blocks.push({ type: "paragraph", text: para.join(" ") });
-    }
-  }
-
-  return blocks;
-}
-
-function headingClass(level: 2 | 3 | 4, layout: ManuscriptLayout, compact: boolean) {
+function headingClass(
+  level: 1 | 2 | 3 | 4,
+  layout: ManuscriptLayout,
+  compact: boolean
+) {
   const base =
     layout === "literary"
       ? "font-serif italic tracking-[-0.02em]"
@@ -185,11 +71,11 @@ function headingClass(level: 2 | 3 | 4, layout: ManuscriptLayout, compact: boole
           : "font-sans font-semibold tracking-[-0.02em]";
 
   if (compact) {
-    if (level === 2) return cn(base, "text-[14px] text-[#0a2540]");
+    if (level <= 2) return cn(base, "text-[14px] text-[#0a2540]");
     if (level === 3) return cn(base, "text-[13px] text-[#0a2540]");
     return cn(base, "text-[12px] text-[#425466]");
   }
-  if (level === 2) return cn(base, "text-[20px] text-[#0a2540]");
+  if (level <= 2) return cn(base, "text-[20px] text-[#0a2540]");
   if (level === 3) return cn(base, "text-[16px] text-[#0a2540]");
   return cn(base, "text-[14px] text-[#425466]");
 }
@@ -202,7 +88,7 @@ export function BookManuscript({
   className,
 }: BookManuscriptProps) {
   const layout = resolveManuscriptLayout({ genre, templateId } satisfies ContentFormatInput);
-  const blocks = parseBlocks(content || "");
+  const blocks = parseManuscriptBlocks(content || "");
   const body =
     layout === "youth"
       ? compact
@@ -233,20 +119,30 @@ export function BookManuscript({
     >
       {blocks.map((block, index) => {
         if (block.type === "heading") {
-          const headingProps = {
-            key: index,
-            className: cn(
-              headingClass(block.level, layout, compact),
-              index === 0 ? "mt-0" : compact ? "mt-4" : "mt-6"
-            ),
-          };
-          if (block.level === 2) {
-            return <h2 {...headingProps}>{inlineMarkdown(block.text)}</h2>;
+          const className = cn(
+            headingClass(block.level, layout, compact),
+            index === 0 ? "mt-0" : compact ? "mt-4" : "mt-6"
+          );
+          const children = inlineMarkdown(block.text);
+          if (block.level <= 2) {
+            return (
+              <h2 key={index} className={className}>
+                {children}
+              </h2>
+            );
           }
           if (block.level === 3) {
-            return <h3 {...headingProps}>{inlineMarkdown(block.text)}</h3>;
+            return (
+              <h3 key={index} className={className}>
+                {children}
+              </h3>
+            );
           }
-          return <h4 {...headingProps}>{inlineMarkdown(block.text)}</h4>;
+          return (
+            <h4 key={index} className={className}>
+              {children}
+            </h4>
+          );
         }
 
         if (block.type === "quote") {
@@ -353,6 +249,12 @@ export function BookManuscript({
                 </div>
               </div>
             </figure>
+          );
+        }
+
+        if (block.type === "rule") {
+          return (
+            <hr key={index} className="border-0 border-t border-[#e6ebf1]" />
           );
         }
 
