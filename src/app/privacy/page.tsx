@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
-import { getAppUrl } from "@/lib/book-public";
 import { SUPPORT_EMAIL } from "@/lib/legal";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy — BookAI",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Privacy Policy",
   description:
-    "BookAI's privacy policy explains how we collect, use, and protect your personal information.",
-  alternates: { canonical: `${getAppUrl()}/privacy` },
-  robots: { index: true, follow: true },
-};
+    "How BookAI collects, uses, and protects personal information when you write and publish books with AI.",
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

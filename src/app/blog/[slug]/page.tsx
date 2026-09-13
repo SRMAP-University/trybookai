@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { getAppUrl } from "@/lib/book-public";
-import { getAllBlogSlugs, getBlogPost } from "@/lib/blogs";
-import { blogPostingJsonLd, getDefaultOgImage } from "@/lib/seo";
+import { getAllBlogSlugs, getBlogPost, getRelatedBlogPosts } from "@/lib/blogs";
+import { JsonLd } from "@/components/seo/json-ld";
+import { blogPostingJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 
 export function generateStaticParams() {
   return getAllBlogSlugs().map((slug) => ({ slug }));
@@ -18,14 +19,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const post = getBlogPost(slug);
-  if (!post) return { robots: { index: false } };
+  if (!post) return { robots: { index: false, follow: false } };
 
   const url = `${getAppUrl()}/blog/${slug}`;
-  const image = getDefaultOgImage();
+  const image = `${url}/opengraph-image`;
   return {
     title: post.title,
     description: post.description,
     authors: [{ name: post.author }],
+    keywords: post.tags,
     alternates: { canonical: url },
     openGraph: {
       title: post.title,
@@ -36,7 +38,7 @@ export async function generateMetadata({
       modifiedTime: post.updatedAt ?? post.publishedAt,
       authors: [post.author],
       tags: post.tags,
-      images: [{ url: image, alt: post.title }],
+      images: [{ url: image, width: 1200, height: 630, alt: post.title }],
     },
     twitter: {
       card: "summary_large_image",
@@ -59,25 +61,40 @@ export default async function BlogPostPage({
 
   const url = `${getAppUrl()}/blog/${slug}`;
   const paragraphs = post.content.split("\n\n");
-  const jsonLd = blogPostingJsonLd({
-    title: post.title,
-    description: post.description,
-    url,
-    author: post.author,
-    publishedAt: post.publishedAt,
-    updatedAt: post.updatedAt,
-    tags: post.tags,
-  });
+  const related = getRelatedBlogPosts(slug);
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      <JsonLd
+        data={blogPostingJsonLd({
+          title: post.title,
+          description: post.description,
+          url,
+          author: post.author,
+          publishedAt: post.publishedAt,
+          updatedAt: post.updatedAt,
+          tags: post.tags,
+          image: `${url}/opengraph-image`,
+        })}
+      />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Blog", path: "/blog" },
+          { name: post.title, path: `/blog/${slug}` },
+        ])}
       />
       <Navbar />
       <main className="min-h-screen bg-white pt-[72px]">
         <article className="mx-auto max-w-[720px] px-6 py-14">
+          <nav aria-label="Breadcrumb" className="mb-6 text-[13px] text-[#697386]">
+            <Link href="/blog" className="hover:text-[#635bff]">
+              Blog
+            </Link>
+            <span className="mx-2">/</span>
+            <span className="text-[#0a2540]">{post.title}</span>
+          </nav>
+
           <div className="flex flex-wrap gap-2">
             {post.tags.map((tag) => (
               <span
@@ -131,12 +148,35 @@ export default async function BlogPostPage({
             })}
           </div>
 
-          <div className="mt-12 border-t border-[#e6ebf1] pt-8">
+          {related.length > 0 ? (
+            <aside className="mt-12 border-t border-[#e6ebf1] pt-8">
+              <h2 className="text-[18px] font-semibold text-[#0a2540]">
+                Keep reading
+              </h2>
+              <ul className="mt-4 space-y-3">
+                {related.map((item) => (
+                  <li key={item.slug}>
+                    <Link
+                      href={`/blog/${item.slug}`}
+                      className="text-[15px] font-medium text-[#635bff] hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+                    <p className="mt-1 text-[13px] text-[#697386]">
+                      {item.description}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          ) : null}
+
+          <div className="mt-10">
             <Link
               href="/blog"
               className="text-[14px] font-medium text-[#635bff] hover:underline"
             >
-              ← Back to all posts
+              ← All posts
             </Link>
           </div>
         </article>

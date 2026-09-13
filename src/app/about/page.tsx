@@ -3,21 +3,14 @@ import Link from "next/link";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { CTA } from "@/components/marketing/cta";
-import { getAppUrl } from "@/lib/book-public";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "About — BookAI",
+export const metadata: Metadata = buildPageMetadata({
+  title: "About",
   description:
-    "BookAI helps authors and publishers generate full-length books, audiobooks, and branded manuscripts with AI. Learn about our mission and product.",
-  alternates: { canonical: `${getAppUrl()}/about` },
-  openGraph: {
-    title: "About — BookAI",
-    description:
-      "BookAI helps authors and publishers generate full-length books, audiobooks, and branded manuscripts with AI.",
-    url: `${getAppUrl()}/about`,
-    type: "website",
-  },
-};
+    "BookAI helps authors and publishers generate full-length books, audiobooks, and branded manuscripts with AI. Learn about the product and mission.",
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

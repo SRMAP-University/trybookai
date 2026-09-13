@@ -4,26 +4,22 @@ import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { getAppUrl } from "@/lib/book-public";
 import { BLOG_POSTS } from "@/lib/blogs";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbJsonLd, buildPageMetadata, itemListJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Blog",
-  description:
-    "Tips, guides, and strategies for writing and publishing books with AI. Browse the BookAI blog.",
-  alternates: { canonical: `${getAppUrl()}/blog` },
-  openGraph: {
-    title: "Blog — BookAI",
+  ...buildPageMetadata({
+    title: "Blog",
     description:
-      "Tips, guides, and strategies for writing and publishing books with AI.",
-    url: `${getAppUrl()}/blog`,
-    type: "website",
+      "Guides for writing a book with AI, publishing ethically, creating audiobooks, and marketing your manuscript.",
+    path: "/blog",
+  }),
+  alternates: {
+    canonical: `${getAppUrl()}/blog`,
+    types: {
+      "application/rss+xml": `${getAppUrl()}/blog/rss.xml`,
+    },
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Blog — BookAI",
-    description:
-      "Tips, guides, and strategies for writing and publishing books with AI.",
-  },
-  robots: { index: true, follow: true },
 };
 
 export default function BlogPage() {
@@ -32,8 +28,27 @@ export default function BlogPage() {
       new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
 
+  const base = getAppUrl();
+
   return (
     <>
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Blog", path: "/blog" },
+        ])}
+      />
+      <JsonLd
+        data={itemListJsonLd({
+          name: "BookAI Blog",
+          description: "Guides for AI authors and publishers.",
+          url: `${base}/blog`,
+          items: posts.map((post) => ({
+            name: post.title,
+            url: `${base}/blog/${post.slug}`,
+          })),
+        })}
+      />
       <Navbar />
       <main className="min-h-screen bg-white pt-[72px]">
         <div className="mx-auto max-w-[960px] px-6 py-14">

@@ -10,6 +10,8 @@ import {
 } from "@/lib/pwa";
 import {
   DEFAULT_DESCRIPTION,
+  OG_IMAGE_HEIGHT,
+  OG_IMAGE_WIDTH,
   SITE_KEYWORDS,
   SITE_NAME,
   getDefaultOgImage,
@@ -41,9 +43,6 @@ export const metadata: Metadata = {
   creator: SITE_NAME,
   publisher: SITE_NAME,
   category: "productivity",
-  alternates: {
-    canonical: getAppUrl(),
-  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -54,9 +53,9 @@ export const metadata: Metadata = {
     images: [
       {
         url: getDefaultOgImage(),
-        width: 192,
-        height: 192,
-        alt: SITE_NAME,
+        width: OG_IMAGE_WIDTH,
+        height: OG_IMAGE_HEIGHT,
+        alt: `${SITE_NAME} — AI Book Generator`,
       },
     ],
   },
@@ -96,6 +95,9 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
+  ...(process.env.GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } }
+    : {}),
 };
 
 export const viewport: Viewport = {

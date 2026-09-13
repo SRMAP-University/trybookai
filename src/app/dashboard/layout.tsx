@@ -1,10 +1,16 @@
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/shell";
-
-export const dynamic = "force-dynamic";
 import type { DashboardUser } from "@/components/dashboard/user-context";
 import { auth } from "@/lib/auth";
 import { isTrialActive } from "@/lib/billing";
 import { db } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+  robots: { index: false, follow: false },
+};
 
 export default async function DashboardLayout({
   children,

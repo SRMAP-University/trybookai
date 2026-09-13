@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
-import { getAppUrl } from "@/lib/book-public";
+import { genreToSlug, getAppUrl } from "@/lib/book-public";
 import { BookCover } from "@/components/dashboard/book-cover";
 import { BookAudioPanel } from "@/components/dashboard/book-audio-panel";
 import type { BookAudioItem } from "@/components/dashboard/book-audio-panel";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
 import { BookManuscript } from "@/components/book/book-manuscript";
+import { JsonLd } from "@/components/seo/json-ld";
+import { bookJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 
 type Props = { params: Promise<{ slug: string }> };
 
-async function getPublicBook(slug: string) {
+const getPublicBook = cache(async function getPublicBook(slug: string) {
   return db.book.findFirst({
     where: { slug, isPublic: true },
     include: {
@@ -55,13 +58,13 @@ async function getPublicBook(slug: string) {
       },
     },
   });
-}
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const book = await getPublicBook(slug);
   if (!book) {
-    return { title: "Book not found — BookAI", robots: { index: false } };
+    return { title: "Book not found", robots: { index: false, follow: false } };
   }
 
   const author =
@@ -71,16 +74,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     "BookAI author";
   const description =
     book.description?.slice(0, 160) ||
-    `${book.title} — an AI-generated ${book.genre ?? "book"} by ${author} on BookAI.`;
+    `Read ${book.title}, an AI-generated ${book.genre ?? "book"} by ${author} on BookAI.`;
   const url = `${getAppUrl()}/books/${book.slug}`;
   const coverUrl = book.coverImage
     ? `${getAppUrl()}/api/books/cover/${book.slug}`
-    : undefined;
+    : `${getAppUrl()}/books/${book.slug}/opengraph-image`;
 
   return {
-    title: `${book.title} — BookAI`,
+    title: `${book.title} by ${author}`,
     description,
     authors: [{ name: author }],
+    keywords: [
+      book.title,
+      author,
+      book.genre ?? "AI book",
+      "AI generated book",
+      "read online",
+    ],
     alternates: { canonical: url },
     openGraph: {
       title: book.title,
@@ -88,13 +98,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url,
       type: "book",
       authors: [author],
-      ...(coverUrl ? { images: [{ url: coverUrl, width: 512, height: 768 }] } : {}),
+      images: [{ url: coverUrl, width: 512, height: 768, alt: `${book.title} cover` }],
     },
     twitter: {
-      card: coverUrl ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: book.title,
       description,
-      ...(coverUrl ? { images: [coverUrl] } : {}),
+      images: [coverUrl],
     },
     robots: { index: true, follow: true },
   };
@@ -115,45 +125,56 @@ export default async function PublicBookPage({ params }: Props) {
     (c) => c.status === "COMPLETED"
   );
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Book",
-    name: book.title,
-    description: book.description ?? undefined,
-    genre: book.genre ?? undefined,
-    inLanguage: book.language,
-    url,
-    identifier: book.slug,
-    ...(book.coverImage
-      ? { image: `${getAppUrl()}/api/books/cover/${book.slug}` }
-      : {}),
-    numberOfPages: book.currentPages || undefined,
-    author: {
-      "@type": "Person",
-      name: author,
-      url: book.user.websiteUrl || undefined,
-    },
-    publisher: {
-      "@type": "Organization",
-      name: book.user.brandName || "BookAI",
-    },
-    dateModified: book.updatedAt.toISOString(),
-    datePublished: book.createdAt.toISOString(),
-  };
+  const coverUrl = book.coverImage
+    ? `${getAppUrl()}/api/books/cover/${book.slug}`
+    : undefined;
+  const crumbs = [
+    { name: "Home", path: "/" },
+    { name: "Public books", path: "/books" },
+    ...(book.genre
+      ? [{ name: book.genre, path: `/books/genre/${genreToSlug(book.genre)}` }]
+      : []),
+    { name: book.title, path: `/books/${book.slug}` },
+  ];
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      <JsonLd
+        data={bookJsonLd({
+          title: book.title,
+          description: book.description,
+          genre: book.genre,
+          language: book.language,
+          url,
+          slug: book.slug,
+          coverUrl,
+          pageCount: book.currentPages,
+          author,
+          authorUrl: book.user.websiteUrl,
+          publisher: book.user.brandName || "BookAI",
+          datePublished: book.createdAt.toISOString(),
+          dateModified: book.updatedAt.toISOString(),
+        })}
       />
+      <JsonLd data={breadcrumbJsonLd(crumbs)} />
       <Navbar />
       <main className="min-h-screen bg-white pt-[72px]">
         <article className="mx-auto max-w-[720px] px-6 py-14">
-          <nav className="mb-8 text-[13px] text-[#697386]">
+          <nav aria-label="Breadcrumb" className="mb-8 text-[13px] text-[#697386]">
             <Link href="/books" className="hover:text-[#635bff]">
               Public books
             </Link>
+            {book.genre ? (
+              <>
+                <span className="mx-2">/</span>
+                <Link
+                  href={`/books/genre/${genreToSlug(book.genre)}`}
+                  className="hover:text-[#635bff]"
+                >
+                  {book.genre}
+                </Link>
+              </>
+            ) : null}
             <span className="mx-2">/</span>
             <span className="text-[#0a2540]">{book.title}</span>
           </nav>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { CTA } from "@/components/marketing/cta";
-import { getAppUrl } from "@/lib/book-public";
+import { buildPageMetadata } from "@/lib/seo";
 import {
   BookOpen,
   Wand2,
@@ -14,26 +14,12 @@ import {
   Globe,
 } from "lucide-react";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Features",
   description:
-    "Explore BookAI's AI book writing features: long-form manuscript generation, audiobooks, custom branding, exports, and public book pages.",
-  alternates: { canonical: `${getAppUrl()}/features` },
-  openGraph: {
-    title: "Features — BookAI",
-    description:
-      "Explore BookAI's AI book writing features: long-form manuscript generation, audiobooks, custom branding, exports, and public book pages.",
-    url: `${getAppUrl()}/features`,
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Features — BookAI",
-    description:
-      "Explore BookAI's AI book writing features: long-form manuscript generation, audiobooks, custom branding, exports, and public book pages.",
-  },
-  robots: { index: true, follow: true },
-};
+    "AI book writing features in BookAI: long-form manuscript generation, chapter outlines, cover art, audiobooks, branding, and PDF/EPUB export.",
+  path: "/features",
+});
 
 const features = [
   {

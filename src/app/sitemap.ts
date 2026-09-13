@@ -1,69 +1,92 @@
 import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
-import { getAppUrl } from "@/lib/book-public";
 import { BLOG_POSTS } from "@/lib/blogs";
+import { genreToSlug, getAppUrl } from "@/lib/book-public";
+
+const STATIC_UPDATED = new Date("2026-09-13");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getAppUrl();
 
-  const books = await db.book.findMany({
-    where: { isPublic: true },
-    select: { slug: true, updatedAt: true },
-    orderBy: { updatedAt: "desc" },
-    take: 5000,
-  });
+  const [books, genreRows] = await Promise.all([
+    db.book.findMany({
+      where: { isPublic: true },
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 5000,
+    }),
+    db.book.groupBy({
+      by: ["genre"],
+      where: { isPublic: true, genre: { not: null } },
+    }),
+  ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: base, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },
+    { url: base, lastModified: STATIC_UPDATED, changeFrequency: "weekly", priority: 1 },
     {
       url: `${base}/books`,
-      lastModified: new Date(),
+      lastModified: books[0]?.updatedAt ?? STATIC_UPDATED,
       changeFrequency: "daily",
       priority: 0.9,
     },
     {
       url: `${base}/features`,
-      lastModified: new Date(),
+      lastModified: STATIC_UPDATED,
       changeFrequency: "monthly",
       priority: 0.85,
     },
     {
-      url: `${base}/about`,
-      lastModified: new Date(),
+      url: `${base}/faq`,
+      lastModified: STATIC_UPDATED,
       changeFrequency: "monthly",
-      priority: 0.7,
+      priority: 0.8,
     },
     {
       url: `${base}/blog`,
-      lastModified: new Date(),
+      lastModified: STATIC_UPDATED,
       changeFrequency: "weekly",
       priority: 0.85,
     },
     {
+      url: `${base}/about`,
+      lastModified: STATIC_UPDATED,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
       url: `${base}/download`,
-      lastModified: new Date(),
+      lastModified: STATIC_UPDATED,
       changeFrequency: "monthly",
       priority: 0.75,
     },
     {
       url: `${base}/privacy`,
-      lastModified: new Date(),
+      lastModified: STATIC_UPDATED,
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: `${base}/terms`,
-      lastModified: new Date(),
+      lastModified: STATIC_UPDATED,
       changeFrequency: "yearly",
       priority: 0.3,
     },
     {
       url: `${base}/refund`,
-      lastModified: new Date(),
+      lastModified: STATIC_UPDATED,
       changeFrequency: "yearly",
       priority: 0.3,
     },
   ];
+
+  const genreRoutes: MetadataRoute.Sitemap = genreRows
+    .filter((row): row is { genre: string } => Boolean(row.genre))
+    .map((row) => ({
+      url: `${base}/books/genre/${genreToSlug(row.genre)}`,
+      lastModified: STATIC_UPDATED,
+      changeFrequency: "weekly" as const,
+      priority: 0.75,
+    }));
 
   const bookRoutes: MetadataRoute.Sitemap = books.map((book) => ({
     url: `${base}/books/${book.slug}`,
@@ -79,7 +102,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...staticRoutes, ...bookRoutes, ...blogRoutes];
+  return [...staticRoutes, ...genreRoutes, ...bookRoutes, ...blogRoutes];
 }
-
-

@@ -10,22 +10,16 @@ import {
   getAndroidApkUrl,
   getAndroidDownloadPageUrl,
 } from "@/lib/app-download";
+import { buildPageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Install BookAI",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Install the app",
   description:
-    "Install BookAI as a web app on your phone or desktop, or download the Android APK.",
-  alternates: { canonical: `${getAppUrl()}/download` },
-  openGraph: {
-    title: "Install BookAI",
-    description:
-      "Install BookAI as a web app on your phone or desktop, or download the Android APK.",
-    url: `${getAppUrl()}/download`,
-    type: "website",
-  },
-};
+    "Install BookAI as a web app on your phone or desktop, or download the Android APK to write books on the go.",
+  path: "/download",
+});
 
 export default async function DownloadPage() {
   const apkUrl = getAndroidApkUrl();

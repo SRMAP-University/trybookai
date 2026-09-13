@@ -30,3 +30,15 @@ export function getAppUrl(): string {
     "http://localhost:3000"
   );
 }
+
+export function genreToSlug(genre: string): string {
+  return slugifyTitle(genre);
+}
+
+export function displayGenreFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}

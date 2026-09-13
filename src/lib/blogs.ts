@@ -193,3 +193,18 @@ export function getBlogPost(slug: string): BlogPost | undefined {
 export function getAllBlogSlugs(): string[] {
   return BLOG_POSTS.map((post) => post.slug);
 }
+
+export function getRelatedBlogPosts(slug: string, limit = 3): BlogPost[] {
+  const current = getBlogPost(slug);
+  const others = BLOG_POSTS.filter((post) => post.slug !== slug);
+  if (!current) return others.slice(0, limit);
+
+  const scored = others
+    .map((post) => ({
+      post,
+      score: post.tags.filter((tag) => current.tags.includes(tag)).length,
+    }))
+    .sort((a, b) => b.score - a.score || b.post.publishedAt.localeCompare(a.post.publishedAt));
+
+  return scored.slice(0, limit).map((item) => item.post);
+}

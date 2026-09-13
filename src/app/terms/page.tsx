@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
-import { getAppUrl } from "@/lib/book-public";
 import { LEGAL, SUPPORT_EMAIL } from "@/lib/legal";
 import { PLANS, PREMIUM_TRIAL, UNLIMITED_FAIR_USE } from "@/lib/constants";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Terms of Service — BookAI",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Terms of Service",
   description:
-    "BookAI's terms of service outline the rules and responsibilities for using our AI book writing platform.",
-  alternates: { canonical: `${getAppUrl()}/terms` },
-  robots: { index: true, follow: true },
-};
+    "Rules and responsibilities for using BookAI's AI book writing platform, including accounts, content, and subscriptions.",
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

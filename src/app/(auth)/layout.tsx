@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BookOpen, Sparkles, Layers, FileDown } from "lucide-react";
 import "./auth.css";
+
+export const metadata: Metadata = {
+  title: "Account",
+  robots: { index: false, follow: false },
+};
 
 const showcaseFeatures = [
   { title: "Outlines", icon: Layers },

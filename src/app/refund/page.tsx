@@ -2,17 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
-import { getAppUrl } from "@/lib/book-public";
 import { LEGAL, SUPPORT_EMAIL } from "@/lib/legal";
 import { PLANS, PREMIUM_TRIAL } from "@/lib/constants";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Refund & Cancellation Policy — BookAI",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Refund & Cancellation Policy",
   description:
     "BookAI refund and cancellation policy for subscriptions, free trials, and one-time purchases.",
-  alternates: { canonical: `${getAppUrl()}${LEGAL.refund}` },
-  robots: { index: true, follow: true },
-};
+  path: LEGAL.refund,
+});
 
 export default function RefundPage() {
   return (

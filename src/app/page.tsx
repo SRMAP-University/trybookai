@@ -5,11 +5,14 @@ import { LandingExperience } from "@/components/marketing/landing-experience";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { Pricing } from "@/components/marketing/pricing";
 import { CTA } from "@/components/marketing/cta";
+import { FaqSection } from "@/components/marketing/faq-section";
 import { Footer } from "@/components/marketing/footer";
 import { AppDownloadDrawer } from "@/components/app-download-drawer";
 import { getRecentLandingCovers } from "@/lib/landing-covers";
+import { JsonLd } from "@/components/seo/json-ld";
 import {
   buildPageMetadata,
+  faqPageJsonLd,
   organizationJsonLd,
   softwareApplicationJsonLd,
   websiteJsonLd,
@@ -20,25 +23,26 @@ export const revalidate = 120;
 export const metadata: Metadata = buildPageMetadata({
   title: "BookAI — AI Book Generator",
   description:
-    "Generate full-length books with AI — outline, manuscript, cover art, audiobooks, and export-ready files.",
+    "Write a full-length book with AI. BookAI outlines chapters, drafts the manuscript, generates a cover, narrates an audiobook, and exports PDF or EPUB.",
   path: "/",
+  absolute: true,
 });
 
 export default async function Home() {
   const covers = await getRecentLandingCovers(6);
-  const jsonLd = [organizationJsonLd(), websiteJsonLd(), softwareApplicationJsonLd()];
 
   return (
     <div className="landing-root min-h-screen overflow-x-hidden">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <JsonLd data={organizationJsonLd()} />
+      <JsonLd data={websiteJsonLd()} />
+      <JsonLd data={softwareApplicationJsonLd()} />
+      <JsonLd data={faqPageJsonLd()} />
       <Navbar />
       <main>
         <LandingExperience covers={covers} />
         <HowItWorks />
         <Pricing />
+        <FaqSection />
         <CTA />
       </main>
       <Footer />
