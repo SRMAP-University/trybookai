@@ -129,7 +129,7 @@
 }
 
 .landing-book-stage {
-  contain: layout paint;
+  overflow: visible;
 }
 
 @keyframes landing-write {

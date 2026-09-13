@@ -18,10 +18,10 @@ export function BookCover({
 }: BookCoverProps) {
   const aspectClass =
     aspect === "detail"
-      ? "aspect-[2/3] max-w-[220px]"
+      ? "aspect-[3/4] max-w-[220px]"
       : aspect === "compact"
-        ? "aspect-[2/3] w-[88px] shrink-0"
-        : "aspect-[2/3] w-full";
+        ? "aspect-[3/4] w-[88px] shrink-0"
+        : "aspect-[3/4] w-full";
 
   if (coverImage) {
     return (

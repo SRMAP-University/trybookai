@@ -43,7 +43,7 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
 
   return (
     <>
-      <section className="relative overflow-hidden px-6 pb-16 pt-[88px] md:pb-20 md:pt-[104px]">
+      <section className="relative overflow-x-hidden px-6 pb-16 pt-[88px] md:pb-20 md:pt-[104px]">
         <div className="relative mx-auto max-w-[1100px] text-center">
           <motion.p
             className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#111]/50"
@@ -72,9 +72,9 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
           </motion.p>
 
           {/* Floating cover stage — main visual */}
-          <div className="landing-book-stage relative mx-auto mt-6 h-[200px] max-w-[760px] sm:mt-8 sm:h-[240px] md:h-[280px]">
-            <div className="absolute inset-x-[12%] bottom-1 h-6 rounded-[100%] bg-[#111]/8" />
-            <div className="absolute inset-0 flex items-end justify-center pb-2">
+          <div className="landing-book-stage relative mx-auto mt-6 h-[240px] max-w-[760px] sm:mt-8 sm:h-[280px] md:h-[320px]">
+            <div className="absolute inset-x-[12%] bottom-4 h-6 rounded-[100%] bg-[#111]/8" />
+            <div className="absolute inset-0 flex items-end justify-center pb-8">
               {heroCovers.map((book, i) => {
                 const base = FAN[i].rotate;
                 return (
