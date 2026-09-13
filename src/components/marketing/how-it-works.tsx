@@ -79,11 +79,7 @@ function JourneyVisual({
     return (
       <div className="relative flex h-[120px] w-[120px] items-center justify-center">
         <div className="absolute inset-0 rounded-full bg-[#fff0e0]" />
-        <motion.div
-          className="absolute h-3 w-3 rounded-full bg-[#f97316]"
-          animate={{ scale: [1, 1.35, 1], opacity: [0.9, 0.5, 0.9] }}
-          transition={{ duration: 2.2, repeat: Infinity }}
-        />
+        <div className="landing-pulse-dot absolute h-3 w-3 rounded-full bg-[#f97316]" />
         <svg viewBox="0 0 80 80" className="relative h-16 w-16 text-[#111]/70">
           <path
             d="M28 52c8-18 18-28 28-34-2 12-6 24-14 34-6 8-14 12-22 14 6-4 8-8 8-14z"
@@ -138,11 +134,7 @@ function JourneyVisual({
               <div className="h-0.5 w-full bg-[#0e6245]/25" />
               <div className="h-0.5 w-[90%] bg-[#0e6245]/20" />
               <div className="h-0.5 w-full bg-[#0e6245]/20" />
-              <motion.div
-                className="h-0.5 origin-left bg-[#0e6245]/40"
-                animate={{ width: ["20%", "95%", "40%"] }}
-                transition={{ duration: 2.4, repeat: Infinity }}
-              />
+              <div className="landing-write-bar h-0.5 w-full bg-[#0e6245]/40" />
             </div>
           </div>
         </div>

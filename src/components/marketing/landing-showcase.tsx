@@ -132,19 +132,13 @@ export function LandingShowcase() {
             {/* Mini page stack illustration */}
             <div className="mt-6 flex items-end gap-2 pl-1">
               {[40, 56, 72, 48, 64].map((h, i) => (
-                <motion.div
+                <div
                   key={i}
-                  className="w-7 rounded-t-sm bg-white/15"
-                  style={{ height: h }}
-                  animate={
-                    reduce
-                      ? undefined
-                      : { height: [h, h + 8, h], opacity: [0.5, 0.85, 0.5] }
-                  }
-                  transition={{
-                    duration: 2.2 + i * 0.2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
+                  className="landing-audio-bar w-7 rounded-t-sm bg-white/15"
+                  style={{
+                    height: h,
+                    animationDelay: `${i * 0.12}s`,
+                    transformOrigin: "bottom",
                   }}
                 />
               ))}

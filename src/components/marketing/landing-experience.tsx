@@ -29,7 +29,7 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
   const heroCovers = covers.slice(0, 6);
-  const shelfCovers = covers.slice(0, 8);
+  const shelfCovers = covers.slice(0, 6);
 
   function handlePromptSubmit(e: FormEvent) {
     e.preventDefault();
@@ -73,7 +73,7 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
 
           {/* Floating cover stage — main visual */}
           <div className="landing-book-stage relative mx-auto mt-6 h-[200px] max-w-[760px] sm:mt-8 sm:h-[240px] md:h-[280px]">
-            <div className="absolute inset-x-[8%] bottom-0 h-8 rounded-[100%] bg-[#111]/10 blur-xl" />
+            <div className="absolute inset-x-[12%] bottom-1 h-6 rounded-[100%] bg-[#111]/8" />
             <div className="absolute inset-0 flex items-end justify-center pb-2">
               {heroCovers.map((book, i) => {
                 const base = FAN[i].rotate;
@@ -84,48 +84,33 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
                     initial={
                       reduce
                         ? false
-                        : {
-                            opacity: 0,
-                            y: 48,
-                            rotate: base,
-                            marginLeft: i === 0 ? 0 : -34,
-                          }
+                        : { opacity: 0, y: FAN[i].y + 28, rotate: base }
                     }
                     animate={{
                       opacity: 1,
                       y: FAN[i].y,
-                      rotate: reduce
-                        ? base
-                        : [base - 2.5, base + 2.5, base - 2.5],
-                      marginLeft: i === 0 ? 0 : -34,
+                      rotate: base,
                     }}
                     transition={{
-                      opacity: { duration: 0.55, delay: 0.12 + i * 0.05 },
-                      y: { duration: 0.7, delay: 0.12 + i * 0.05 },
-                      rotate: {
-                        duration: 5 + i * 0.55,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay: 0.8,
-                      },
+                      duration: 0.45,
+                      delay: 0.08 + i * 0.04,
                     }}
-                    style={{ zIndex: FAN[i].z }}
+                    style={{
+                      zIndex: FAN[i].z,
+                      marginLeft: i === 0 ? 0 : -34,
+                    }}
                   >
                     {FAN[i].bubble && (
-                      <motion.div
-                        className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[120%]"
-                        initial={reduce ? false : { opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.7 + i * 0.08 }}
-                      >
+                      <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[120%]">
                         <CoverBubble book={book} index={i} />
-                      </motion.div>
+                      </div>
                     )}
                     <BookCoverCard
                       book={book}
                       index={i}
                       variant="art"
-                      className="aspect-[3/4] w-full shadow-[0_20px_50px_rgba(0,0,0,0.22)]"
+                      priority={i < 3}
+                      className="aspect-[3/4] w-full shadow-[0_16px_36px_rgba(0,0,0,0.18)]"
                     />
                   </motion.div>
                 );
@@ -146,7 +131,7 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
               onChange={(e) => setPrompt(e.target.value)}
               rows={2}
               placeholder="A mystery set in a lighthouse…"
-              className="w-full resize-none rounded-[22px] border border-[#e8e8e6] bg-white/90 px-5 py-4 text-[15px] leading-relaxed text-[#111] shadow-[0_12px_40px_rgba(0,0,0,0.06)] outline-none backdrop-blur placeholder:text-[#9a9a9a] transition-[border-color,box-shadow] focus:border-[#111] focus:shadow-[0_12px_40px_rgba(0,0,0,0.1)]"
+              className="w-full resize-none rounded-[22px] border border-[#e8e8e6] bg-white px-5 py-4 text-[15px] leading-relaxed text-[#111] shadow-[0_12px_40px_rgba(0,0,0,0.06)] outline-none placeholder:text-[#9a9a9a] transition-[border-color,box-shadow] focus:border-[#111] focus:shadow-[0_12px_40px_rgba(0,0,0,0.1)]"
             />
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
               <button type="submit" className="landing-btn-dark">
@@ -177,18 +162,9 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
         </div>
         <div className="mt-10 flex gap-4 overflow-x-auto px-6 pb-4 scrollbar-none sm:justify-center sm:overflow-visible sm:px-6">
           {shelfCovers.map((book, i) => (
-            <motion.div
+            <div
               key={book.id}
-              className="w-[140px] shrink-0 sm:w-[160px]"
-              initial={reduce ? false : { opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.35 }}
-              transition={{
-                duration: 0.55,
-                delay: i * 0.05,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              whileHover={reduce ? undefined : { y: -10 }}
+              className="w-[140px] shrink-0 transition-transform duration-200 ease-out hover:-translate-y-2 sm:w-[160px]"
             >
               {book.slug && !book.isSample ? (
                 <Link href={`/books/${book.slug}`} className="block">
@@ -207,7 +183,7 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
                   className="aspect-[3/4] w-full"
                 />
               )}
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
@@ -277,14 +253,10 @@ function HeroWorkspace({
               <div className="mt-3 space-y-1.5">
                 <div className="h-1 w-full rounded bg-[#111]/10" />
                 <div className="h-1 w-full rounded bg-[#111]/10" />
-                <motion.div
-                  className="h-1 origin-left rounded bg-[#0e6245]/35"
-                  animate={reduce ? undefined : { width: ["30%", "100%", "55%"] }}
-                  transition={{ duration: 2.8, repeat: Infinity }}
-                />
+                <div className="landing-write-bar h-1 w-full rounded bg-[#0e6245]/35" />
                 <div className="h-1 w-[80%] rounded bg-[#111]/8" />
               </div>
-              <span className="absolute bottom-3 right-3 h-2 w-2 animate-pulse rounded-full bg-[#22c55e]" />
+              <span className="absolute bottom-3 right-3 h-2 w-2 rounded-full bg-[#22c55e]" />
             </div>
           </div>
         </div>
@@ -307,21 +279,16 @@ function HeroWorkspace({
               className="aspect-[3/4] w-full shadow-[0_20px_48px_rgba(0,0,0,0.4)]"
             />
           </div>
-          <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-3 rounded-2xl bg-white/10 px-3 py-2.5 backdrop-blur-sm">
+          <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-3 rounded-2xl bg-white/10 px-3 py-2.5">
             <div className="flex items-end gap-1">
               {bars.map((h, i) => (
-                <motion.span
+                <span
                   key={i}
-                  className="w-1 rounded-full bg-white/80"
-                  style={{ height: h }}
-                  animate={
-                    reduce ? undefined : { height: [h, h + 8, Math.max(6, h - 4), h] }
-                  }
-                  transition={{
-                    duration: 1 + (i % 5) * 0.12,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: i * 0.04,
+                  className="landing-audio-bar w-1 rounded-full bg-white/80"
+                  style={{
+                    height: h,
+                    animationDelay: `${i * 0.06}s`,
+                    animationDuration: `${1 + (i % 4) * 0.14}s`,
                   }}
                 />
               ))}

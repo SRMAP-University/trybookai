@@ -56,11 +56,13 @@ export function BookCoverCard({
   className = "",
   variant = "art",
   index = 0,
+  priority = false,
 }: {
   book: LandingCoverBook;
   className?: string;
   variant?: "art" | "book";
   index?: number;
+  priority?: boolean;
 }) {
   const art = COVER_ART[book.id] ?? {
     gradient: `linear-gradient(145deg, ${["#4c3d99", "#0a2540", "#0e6245", "#9a6700"][index % 4]} 0%, #635bff 100%)`,
@@ -80,6 +82,11 @@ export function BookCoverCard({
           src={book.coverImage}
           alt={`${book.title} cover`}
           className="h-full w-full object-cover"
+          width={240}
+          height={320}
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "low"}
+          decoding="async"
         />
         {variant === "book" && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-4 pt-10">

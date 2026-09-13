@@ -15,7 +15,7 @@ import {
   websiteJsonLd,
 } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 export const metadata: Metadata = buildPageMetadata({
   title: "BookAI — AI Book Generator",
@@ -25,7 +25,7 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 export default async function Home() {
-  const covers = await getRecentLandingCovers(10);
+  const covers = await getRecentLandingCovers(6);
   const jsonLd = [organizationJsonLd(), websiteJsonLd(), softwareApplicationJsonLd()];
 
   return (
