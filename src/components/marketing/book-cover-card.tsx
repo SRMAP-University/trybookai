@@ -81,7 +81,7 @@ export function BookCoverCard({
         <img
           src={book.coverImage}
           alt={`${book.title} cover`}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
           width={240}
           height={320}
           loading={priority ? "eager" : "lazy"}

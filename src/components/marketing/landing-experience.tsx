@@ -12,12 +12,12 @@ import {
 } from "@/components/marketing/book-cover-card";
 
 const FAN = [
-  { rotate: -22, y: 18, bubble: true, z: 1 },
-  { rotate: -13, y: 4, bubble: false, z: 2 },
+  { rotate: -22, y: 6, bubble: true, z: 1 },
+  { rotate: -13, y: 0, bubble: false, z: 2 },
   { rotate: -5, y: -8, bubble: true, z: 3 },
   { rotate: 5, y: -8, bubble: false, z: 4 },
-  { rotate: 13, y: 4, bubble: true, z: 5 },
-  { rotate: 22, y: 18, bubble: false, z: 6 },
+  { rotate: 13, y: 0, bubble: true, z: 5 },
+  { rotate: 22, y: 6, bubble: false, z: 6 },
 ] as const;
 
 type LandingExperienceProps = {
@@ -43,7 +43,7 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
 
   return (
     <>
-      <section className="relative overflow-x-hidden px-6 pb-16 pt-[88px] md:pb-20 md:pt-[104px]">
+      <section className="relative px-6 pb-16 pt-[88px] md:pb-20 md:pt-[104px]">
         <div className="relative mx-auto max-w-[1100px] text-center">
           <motion.p
             className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#111]/50"
@@ -72,9 +72,9 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
           </motion.p>
 
           {/* Floating cover stage — main visual */}
-          <div className="landing-book-stage relative mx-auto mt-6 h-[240px] max-w-[760px] sm:mt-8 sm:h-[280px] md:h-[320px]">
-            <div className="absolute inset-x-[12%] bottom-4 h-6 rounded-[100%] bg-[#111]/8" />
-            <div className="absolute inset-0 flex items-end justify-center pb-8">
+          <div className="landing-book-stage relative mx-auto mt-10 max-w-[800px] px-2 pt-14 pb-16 sm:mt-12">
+            <div className="pointer-events-none absolute inset-x-[16%] bottom-8 h-6 rounded-[100%] bg-[#111]/8" />
+            <div className="relative flex items-end justify-center">
               {heroCovers.map((book, i) => {
                 const base = FAN[i].rotate;
                 return (
@@ -82,12 +82,9 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
                     key={book.id}
                     className="relative w-[84px] shrink-0 sm:w-[104px] md:w-[118px]"
                     initial={
-                      reduce
-                        ? false
-                        : { opacity: 0, y: FAN[i].y + 28, rotate: base }
+                      reduce ? false : { y: FAN[i].y + 16, rotate: base }
                     }
                     animate={{
-                      opacity: 1,
                       y: FAN[i].y,
                       rotate: base,
                     }}
@@ -262,7 +259,7 @@ function HeroWorkspace({
         </div>
 
         {/* Cover + audio side */}
-        <div className="relative flex min-h-[220px] items-center justify-center gap-4 border-t border-[#e8e8e6] bg-[#0a2540] p-6 md:min-h-[280px] md:border-l md:border-t-0">
+        <div className="relative flex min-h-[280px] items-start justify-center gap-4 border-t border-[#e8e8e6] bg-[#0a2540] px-6 pb-24 pt-10 md:min-h-[320px] md:border-l md:border-t-0">
           <div className="relative w-[88px] shrink-0 -rotate-6 sm:w-[104px]">
             <BookCoverCard
               book={coverA}

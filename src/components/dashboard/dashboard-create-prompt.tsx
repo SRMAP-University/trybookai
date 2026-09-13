@@ -257,7 +257,7 @@ export function DashboardCreatePrompt({
           </div>
 
           {coverA && coverB ? (
-            <div className="relative mb-4 hidden h-[108px] w-[118px] shrink-0 lg:block">
+            <div className="relative mb-4 hidden h-[148px] w-[132px] shrink-0 overflow-visible lg:block">
               <Link
                 href={coverA.href}
                 className="absolute left-0 top-1 z-0 w-[68px] -rotate-6 transition-transform hover:-translate-y-0.5 hover:rotate-[-8deg]"

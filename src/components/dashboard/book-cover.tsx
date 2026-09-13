@@ -36,7 +36,7 @@ export function BookCover({
         <img
           src={coverImage}
           alt={`${title} cover`}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
         />
       </div>
     );
