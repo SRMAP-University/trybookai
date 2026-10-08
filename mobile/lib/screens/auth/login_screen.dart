@@ -59,16 +59,22 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final busy = auth.loading || _googleLoading;
+    final bottom = MediaQuery.paddingOf(context).bottom;
 
     return AuthScaffold(
+      brandLine: 'Pick up the manuscript where you left it.',
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(24, 28, 24, 24 + bottom),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const AuthHero(headline: 'Sign in'),
+              const AuthHero(
+                headline: 'Welcome back',
+                subtitle: 'Sign in to continue writing.',
+              ),
               const SizedBox(height: 28),
               GoogleSignInButton(
                 onPressed: busy ? null : _google,
@@ -77,38 +83,36 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 20),
               const AuthOrDivider(),
               const SizedBox(height: 20),
-              TextFormField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                autofillHints: const [AutofillHints.email],
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator: (v) =>
-                    v != null && v.contains('@') ? null : 'Enter a valid email',
+              AuthLabeledField(
+                label: 'Email',
+                child: TextFormField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
+                  textInputAction: TextInputAction.next,
+                  decoration: authInputDecoration(hintText: 'you@email.com'),
+                  validator: (v) => v != null && v.contains('@')
+                      ? null
+                      : 'Enter a valid email',
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               AuthPasswordField(
                 controller: _password,
+                hint: 'Your password',
+                onSubmitted: (_) => _submit(),
                 validator: (v) =>
                     v != null && v.length >= 8 ? null : 'Min 8 characters',
               ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: auth.loading ? null : _submit,
-                child: auth.loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Sign in'),
+              const SizedBox(height: 22),
+              AuthPrimaryButton(
+                label: 'Sign in',
+                loading: auth.loading,
+                onPressed: _submit,
               ),
               const SizedBox(height: 16),
               const AuthLegalNotice(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => context.go('/register'),
                 child: const Text.rich(

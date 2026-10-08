@@ -65,20 +65,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final busy = auth.loading || _googleLoading;
+    final bottom = MediaQuery.paddingOf(context).bottom;
 
     return AuthScaffold(
+      brandLine: 'Start a book you can actually finish.',
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => context.go('/login'),
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: EdgeInsets.fromLTRB(24, 28, 24, 24 + bottom),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const AuthHero(headline: 'Create account'),
+              const AuthHero(
+                headline: 'Create your account',
+                subtitle: 'A manuscript workspace, ready in a minute.',
+              ),
               const SizedBox(height: 28),
               GoogleSignInButton(
                 onPressed: busy ? null : _google,
@@ -87,50 +93,50 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 20),
               const AuthOrDivider(),
               const SizedBox(height: 20),
-              TextFormField(
-                controller: _name,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.name],
-                decoration: const InputDecoration(labelText: 'Name'),
-                validator: (v) =>
-                    v != null && v.trim().isNotEmpty ? null : 'Required',
+              AuthLabeledField(
+                label: 'Name',
+                child: TextFormField(
+                  controller: _name,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.name],
+                  decoration: authInputDecoration(hintText: 'Your name'),
+                  validator: (v) =>
+                      v != null && v.trim().isNotEmpty ? null : 'Required',
+                ),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.email],
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator: (v) =>
-                    v != null && v.contains('@') ? null : 'Enter a valid email',
+              const SizedBox(height: 16),
+              AuthLabeledField(
+                label: 'Email',
+                child: TextFormField(
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                  decoration: authInputDecoration(hintText: 'you@email.com'),
+                  validator: (v) => v != null && v.contains('@')
+                      ? null
+                      : 'Enter a valid email',
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               AuthPasswordField(
                 controller: _password,
+                onSubmitted: (_) => _submit(),
                 validator: (v) =>
                     v != null && v.length >= 8 ? null : 'Min 8 characters',
               ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: auth.loading ? null : _submit,
-                child: auth.loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Create account'),
+              const SizedBox(height: 22),
+              AuthPrimaryButton(
+                label: 'Create account',
+                loading: auth.loading,
+                onPressed: _submit,
               ),
               const SizedBox(height: 16),
               const AuthLegalNotice(
                 actionLabel: 'By creating an account',
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => context.go('/login'),
                 child: const Text.rich(
