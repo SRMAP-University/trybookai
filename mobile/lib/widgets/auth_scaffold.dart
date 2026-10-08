@@ -84,38 +84,40 @@ class AuthHero extends StatelessWidget {
   const AuthHero({
     super.key,
     required this.headline,
-    required this.subtitle,
+    this.subtitle,
   });
 
   final String headline;
-  final String subtitle;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const BookAiLogo(height: 40),
-        const SizedBox(height: 28),
+        const BookAiLogo(height: 36),
+        const SizedBox(height: 20),
         Text(
           headline,
           style: GoogleFonts.fraunces(
-            fontSize: 32,
-            height: 1.15,
+            fontSize: 28,
+            height: 1.2,
             fontWeight: FontWeight.w600,
-            letterSpacing: -0.8,
+            letterSpacing: -0.6,
             color: AppColors.navy,
           ),
         ),
-        const SizedBox(height: 10),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            fontSize: 15,
-            height: 1.45,
-            color: AppColors.textMuted,
+        if (subtitle != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            subtitle!,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: AppColors.textMuted,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

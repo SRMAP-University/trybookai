@@ -136,13 +136,13 @@ class AuthLegalNotice extends StatelessWidget {
           WidgetSpan(
             alignment: PlaceholderAlignment.baseline,
             baseline: TextBaseline.alphabetic,
-            child: _link('Privacy Policy', '/privacy'),
+            child: _link('Privacy', '/privacy'),
           ),
           const TextSpan(text: ', and '),
           WidgetSpan(
             alignment: PlaceholderAlignment.baseline,
             baseline: TextBaseline.alphabetic,
-            child: _link('Refund Policy', '/refund'),
+            child: _link('Refunds', '/refund'),
           ),
           const TextSpan(text: '.'),
         ],
