@@ -233,6 +233,9 @@ export function BookEditor({ book }: { book: Book }) {
   // Only one section shows raw Markdown at a time; the rest render formatted.
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const pendingFocusRef = useRef<TextRange | null>(null);
+  // Touch screens pick paragraphs by tap instead of native text selection.
+  const coarsePointerRef = useRef(false);
+  const pickedBlockRef = useRef<HTMLElement | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const suggestionIdRef = useRef(0);
   const suggestionOpenRef = useRef(false);
@@ -419,7 +422,36 @@ export function BookEditor({ book }: { book: Book }) {
   }, [editingSectionId]);
 
   const handleRenderedPointerUp = useCallback(
-    (sectionId: string, container: HTMLElement) => {
+    (sectionId: string, container: HTMLElement, target: EventTarget | null) => {
+      if (coarsePointerRef.current) {
+        if (!canEdit || suggestion?.sectionId === sectionId) return;
+        const block =
+          target instanceof Element
+            ? target.closest<HTMLElement>(
+                "p, li, h1, h2, h3, h4, blockquote, td, th, figcaption"
+              )
+            : null;
+        if (!block || !container.contains(block) || block === pickedBlockRef.current) {
+          setSelection(null);
+          return;
+        }
+        const source = contentsRef.current[sectionId] ?? "";
+        const a = sourceOffsetFromDom(container, block, 0, source);
+        const b = sourceOffsetFromDom(container, block, block.childNodes.length, source);
+        if (a === null || b === null || a === b) return;
+        pickedBlockRef.current?.removeAttribute("data-picked");
+        block.setAttribute("data-picked", "");
+        pickedBlockRef.current = block;
+        setActiveSectionId(sectionId);
+        setSelection({
+          sectionId,
+          start: Math.min(a, b),
+          end: Math.max(a, b),
+          source: "rendered",
+        });
+        return;
+      }
+
       const domSelection = window.getSelection();
       // Drag-selections are handled by the selectionchange listener.
       if (!canEdit || (domSelection && !domSelection.isCollapsed)) return;
@@ -467,7 +499,7 @@ export function BookEditor({ book }: { book: Book }) {
         ) {
           // A click elsewhere in the manuscript drops a formatted-text selection;
           // focusing the AI box or find bar keeps it.
-          if (anchorEl?.closest("[data-manuscript]")) {
+          if (!coarsePointerRef.current && anchorEl?.closest("[data-manuscript]")) {
             setSelection((prev) => (prev?.source === "rendered" ? null : prev));
           }
           return;
@@ -880,6 +912,16 @@ export function BookEditor({ book }: { book: Book }) {
   }, [suggestion]);
 
   useEffect(() => {
+    coarsePointerRef.current = window.matchMedia("(pointer: coarse)").matches;
+  }, []);
+
+  useEffect(() => {
+    if (selection?.source === "rendered" || suggestion) return;
+    pickedBlockRef.current?.removeAttribute("data-picked");
+    pickedBlockRef.current = null;
+  }, [selection, suggestion]);
+
+  useEffect(() => {
     if (saveStatus === "saved") return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", warn);
@@ -1170,6 +1212,18 @@ export function BookEditor({ book }: { book: Book }) {
             )}
             {selection ? (
               <>
+                {selection.source === "rendered" && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() =>
+                      startEditing(selection.sectionId, selection.start)
+                    }
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-medium text-[#0a2540] transition-colors hover:bg-[#f6f9fc]"
+                  >
+                    Edit
+                  </button>
+                )}
                 {SELECTION_ACTIONS.map((item) => (
                   <button
                     key={item.action}

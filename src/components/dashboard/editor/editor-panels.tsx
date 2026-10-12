@@ -169,7 +169,11 @@ export const RenderedSection = memo(function RenderedSection({
   title: string;
   canEdit: boolean;
   className: string;
-  onPointerUp: (sectionId: string, container: HTMLElement) => void;
+  onPointerUp: (
+    sectionId: string,
+    container: HTMLElement,
+    target: EventTarget | null
+  ) => void;
   onRequestEdit: (sectionId: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -180,7 +184,7 @@ export const RenderedSection = memo(function RenderedSection({
       ref={ref}
       tabIndex={canEdit ? 0 : undefined}
       aria-label={canEdit ? `${title}. Press Enter to edit.` : undefined}
-      onMouseUp={() => ref.current && onPointerUp(sectionId, ref.current)}
+      onMouseUp={(e) => ref.current && onPointerUp(sectionId, ref.current, e.target)}
       onKeyDown={(e) => {
         if (canEdit && e.key === "Enter") {
           e.preventDefault();
@@ -188,7 +192,10 @@ export const RenderedSection = memo(function RenderedSection({
         }
       }}
       className={cn(
-        "rounded-lg outline-none transition-colors",
+        // Touch screens pick whole paragraphs instead of native selection,
+        // so the system copy/share menu never covers the AI actions.
+        "rounded-lg outline-none transition-colors pointer-coarse:select-none pointer-coarse:[-webkit-touch-callout:none]",
+        "[&_[data-picked]]:rounded-md [&_[data-picked]]:bg-[#f0efff] [&_[data-picked]]:shadow-[0_0_0_6px_#f0efff]",
         canEdit &&
           "-mx-3 cursor-text px-3 py-1 hover:bg-[#f8fafc] focus-visible:ring-2 focus-visible:ring-[#635bff]/30"
       )}
