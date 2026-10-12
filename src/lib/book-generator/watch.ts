@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { isGenerationActive } from "@/lib/book-generator/background";
 import { subscribeBookEvents } from "@/lib/book-generator/events";
 import { computeBookProgress } from "@/lib/book-generator/progress";
-import { resolveGenerationShape } from "@/lib/book-generator/shape";
+import { countWords, sectionWordTarget, WORDS_PER_PAGE } from "@/lib/book-generator/core";
 import type { StreamEmitter } from "@/lib/book-generator/streaming";
 
 const POLL_MS = 500;
@@ -232,12 +232,12 @@ export async function watchGenerationStream(
         syncDraftFromDb(book);
       }
 
-      const draftWordCount = payload.partialContent
-        ? payload.partialContent.split(/\s+/).filter(Boolean).length
-        : 0;
-      const shape = resolveGenerationShape(book);
-      const { wordsPerPage, pagesPerSection } = shape;
-      const targetSectionWords = pagesPerSection * wordsPerPage;
+      const draftWordCount = countWords(payload.partialContent);
+      const wordsPerPage = book.wordsPerPage || WORDS_PER_PAGE;
+      const targetSectionWords = sectionWordTarget(
+        book,
+        book.chapters.reduce((sum, c) => sum + c.sections.length, 0)
+      );
 
       const computed = await computeBookProgress(bookId, {
         activeSectionId: currentSectionId,

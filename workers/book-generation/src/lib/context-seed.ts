@@ -3,8 +3,14 @@ import { asStringArray, newRowId } from "./context-utils";
 
 type OutlineLike = {
   synopsis?: string;
-  chapters?: Array<{ title?: string; summary?: string }>;
+  characters?: Array<{ name?: string; role?: string; description?: string }>;
+  settings?: Array<{ name?: string; description?: string }>;
 };
+
+function castProfile(member: { role?: string; description?: string }): string | null {
+  const parts = [member.role, member.description].map((p) => p?.trim()).filter(Boolean);
+  return parts.length ? parts.join(" — ") : null;
+}
 
 /** Seed BookBible + StoryState + ChapterState after outline save. */
 export async function seedBibleFromOutline(sql: Sql, bookId: string) {
@@ -77,16 +83,39 @@ export async function seedBibleFromOutline(sql: Sql, bookId: string) {
   `;
   const existingNames = new Set(existingChars.map((c) => c.name.toLowerCase()));
 
-  for (const name of characterNames) {
-    if (existingNames.has(name.toLowerCase())) continue;
+  // Outline cast first (it carries profiles), then any extra names the user listed.
+  const cast = [
+    ...(outline?.characters ?? []).map((c) => ({
+      name: c.name?.trim() ?? "",
+      profile: castProfile(c),
+    })),
+    ...characterNames.map((name) => ({ name, profile: null })),
+  ];
+  for (const member of cast) {
+    if (!member.name || existingNames.has(member.name.toLowerCase())) continue;
     await sql`
       INSERT INTO "BibleCharacter" (
         id, "bibleId", name, aliases, profile, status, "createdAt", "updatedAt"
       ) VALUES (
-        ${newRowId()}, ${bibleId}, ${name}, ${sql.json([] as never)}, NULL, 'active', NOW(), NOW()
+        ${newRowId()}, ${bibleId}, ${member.name}, ${sql.json([] as never)},
+        ${member.profile}, 'active', NOW(), NOW()
       )
     `;
-    existingNames.add(name.toLowerCase());
+    existingNames.add(member.name.toLowerCase());
+  }
+
+  const existingPlaces = await sql<{ name: string }[]>`
+    SELECT name FROM "BibleLocation" WHERE "bibleId" = ${bibleId}
+  `;
+  const placeNames = new Set(existingPlaces.map((p) => p.name.toLowerCase()));
+  for (const place of outline?.settings ?? []) {
+    const name = place.name?.trim();
+    if (!name || placeNames.has(name.toLowerCase())) continue;
+    await sql`
+      INSERT INTO "BibleLocation" (id, "bibleId", name, description, "createdAt", "updatedAt")
+      VALUES (${newRowId()}, ${bibleId}, ${name}, ${place.description?.trim() || null}, NOW(), NOW())
+    `;
+    placeNames.add(name.toLowerCase());
   }
 
   const story = await sql<{ id: string }[]>`
@@ -110,24 +139,21 @@ export async function seedBibleFromOutline(sql: Sql, bookId: string) {
     `;
   }
 
-  const chapters = await sql<{ id: string; summary: string | null }[]>`
-    SELECT id, summary FROM "Chapter" WHERE "bookId" = ${bookId}
+  // ChapterState holds what has been written; the plan stays in Book.outline.
+  const chapters = await sql<{ id: string }[]>`
+    SELECT id FROM "Chapter" WHERE "bookId" = ${bookId}
   `;
   for (const ch of chapters) {
-    const st = await sql<{ id: string }[]>`
-      SELECT id FROM "ChapterState" WHERE "chapterId" = ${ch.id} LIMIT 1
+    await sql`
+      INSERT INTO "ChapterState" (
+        id, "chapterId", summary, "charactersPresent", events, "newFacts", "openThreads", "createdAt", "updatedAt"
+      ) VALUES (
+        ${newRowId()}, ${ch.id}, NULL,
+        ${sql.json([] as never)}, ${sql.json([] as never)},
+        ${sql.json([] as never)}, ${sql.json([] as never)},
+        NOW(), NOW()
+      )
+      ON CONFLICT ("chapterId") DO NOTHING
     `;
-    if (!st[0]) {
-      await sql`
-        INSERT INTO "ChapterState" (
-          id, "chapterId", summary, "charactersPresent", events, "newFacts", "openThreads", "createdAt", "updatedAt"
-        ) VALUES (
-          ${newRowId()}, ${ch.id}, ${ch.summary},
-          ${sql.json([] as never)}, ${sql.json([] as never)},
-          ${sql.json([] as never)}, ${sql.json([] as never)},
-          NOW(), NOW()
-        )
-      `;
-    }
   }
 }

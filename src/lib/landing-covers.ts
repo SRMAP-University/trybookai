@@ -22,21 +22,31 @@ const SAMPLE_AS_LANDING: LandingCoverBook[] = SAMPLE_BOOKS.map((b) => ({
 export async function getRecentLandingCovers(
   limit = 4
 ): Promise<LandingCoverBook[]> {
-  const recent = await db.book.findMany({
-    where: {
-      coverImage: { not: null },
-    },
-    orderBy: [{ updatedAt: "desc" }],
-    take: limit,
-    select: {
-      id: true,
-      title: true,
-      genre: true,
-      coverImage: true,
-      slug: true,
-      isPublic: true,
-    },
-  });
+  const recent = await db.book
+    .findMany({
+      where: {
+        coverImage: { not: null },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        genre: true,
+        coverImage: true,
+        slug: true,
+        isPublic: true,
+      },
+    })
+    .catch((error) => {
+      // Builds without a database (Vercel previews) render the sample covers;
+      // the page's revalidation picks up real ones.
+      console.warn(
+        "[landing] database unavailable; using sample covers:",
+        error instanceof Error ? error.message : error
+      );
+      return [];
+    });
 
   const books: LandingCoverBook[] = recent.map((b) => ({
     id: b.id,

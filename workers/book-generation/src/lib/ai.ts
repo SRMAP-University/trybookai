@@ -1,3 +1,5 @@
+import { stripReasoning, type LlmResult } from "../../../../src/lib/book-generator/core";
+
 const CF_MODEL_MAP: Record<string, string> = {
   "llama-3.3": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
   "deepseek-r1": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
@@ -63,10 +65,22 @@ export function extractText(result: unknown): string {
 
 /** Strip DeepSeek-style thinking blocks from model output. */
 export function stripThinking(text: string): string {
-  return text
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+  return stripReasoning(text)
     .replace(/^\s*thinking:[\s\S]*?(?=\n\n|\n[A-Z])/i, "")
     .trim();
+}
+
+/** finish_reason when the provider reports one, else a usage-based guess. */
+function wasTruncated(result: unknown, maxTokens: number): boolean {
+  const obj = (result ?? {}) as {
+    finish_reason?: string;
+    choices?: Array<{ finish_reason?: string }>;
+    usage?: { completion_tokens?: number };
+  };
+  const reason = obj.choices?.[0]?.finish_reason ?? obj.finish_reason;
+  if (reason) return reason === "length";
+  const used = obj.usage?.completion_tokens;
+  return typeof used === "number" && used >= maxTokens - 4;
 }
 
 export function extractJsonPayload(text: string): string {
@@ -79,26 +93,42 @@ export function extractJsonPayload(text: string): string {
   return cleaned;
 }
 
+type AiOptions = { max_tokens?: number; temperature?: number };
+
+export async function runAiDetailed(
+  ai: Ai,
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  options: AiOptions = {}
+): Promise<LlmResult> {
+  const maxTokens = options.max_tokens ?? 4096;
+  const result = await ai.run(model as Parameters<Ai["run"]>[0], {
+    messages,
+    max_tokens: maxTokens,
+    temperature: options.temperature ?? 0.7,
+  });
+  return {
+    text: stripThinking(extractText(result)),
+    truncated: wasTruncated(result, maxTokens),
+  };
+}
+
 export async function runAi(
   ai: Ai,
   model: string,
   messages: Array<{ role: string; content: string }>,
-  options: { max_tokens?: number; temperature?: number } = {}
+  options: AiOptions = {}
 ): Promise<string> {
-  const result = await ai.run(model as Parameters<Ai["run"]>[0], {
-    messages,
-    max_tokens: options.max_tokens ?? 4096,
-    temperature: options.temperature ?? 0.7,
-  });
-  return stripThinking(extractText(result));
+  return (await runAiDetailed(ai, model, messages, options)).text;
 }
 
 async function runGroqAi(
   apiKey: string,
   model: string,
   messages: Array<{ role: string; content: string }>,
-  options: { max_tokens?: number; temperature?: number } = {}
-): Promise<string> {
+  options: AiOptions = {}
+): Promise<LlmResult> {
+  const maxTokens = options.max_tokens ?? 4096;
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -108,9 +138,10 @@ async function runGroqAi(
     body: JSON.stringify({
       model,
       messages,
-      max_tokens: options.max_tokens ?? 4096,
+      max_tokens: maxTokens,
       temperature: options.temperature ?? 0.7,
     }),
+    signal: AbortSignal.timeout(180_000),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -119,9 +150,12 @@ async function runGroqAi(
     );
   }
   const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   };
-  return stripThinking(data.choices?.[0]?.message?.content ?? "");
+  return {
+    text: stripThinking(data.choices?.[0]?.message?.content ?? ""),
+    truncated: wasTruncated(data, maxTokens),
+  };
 }
 
 type AiEnv = {
@@ -133,13 +167,13 @@ type AiEnv = {
  * Run outline/prose with Super Fast when Book.model is a Groq id; otherwise Workers AI.
  * On Super Fast failure (or missing key), fall back to Normal (Workers AI).
  */
-export async function runGenerationAi(
+export async function runGenerationAiDetailed(
   env: AiEnv,
   bookModel: string | null | undefined,
   messages: Array<{ role: string; content: string }>,
-  options: { max_tokens?: number; temperature?: number } = {},
+  options: AiOptions = {},
   purpose: "outline" | "prose" = "prose"
-): Promise<string> {
+): Promise<LlmResult> {
   const cfModel =
     purpose === "prose" ? resolveCfModel(bookModel) : OUTLINE_CF_MODEL;
 
@@ -149,22 +183,32 @@ export async function runGenerationAi(
       if (!key) {
         throw new Error("GROQ_API_KEY is not configured");
       }
-      const text = await runGroqAi(
+      const result = await runGroqAi(
         key,
         GROQ_MODEL_MAP[bookModel!],
         messages,
         options
       );
-      if (text.trim()) return text;
+      if (result.text.trim()) return result;
       throw new Error("empty response");
     } catch (error) {
       console.warn(
         "[ai] Super Fast failed; falling back to Normal:",
         error instanceof Error ? error.message : error
       );
-      return runAi(env.AI, CF_MODEL_MAP["llama-3.3"], messages, options);
+      return runAiDetailed(env.AI, CF_MODEL_MAP["llama-3.3"], messages, options);
     }
   }
 
-  return runAi(env.AI, cfModel, messages, options);
+  return runAiDetailed(env.AI, cfModel, messages, options);
+}
+
+export async function runGenerationAi(
+  env: AiEnv,
+  bookModel: string | null | undefined,
+  messages: Array<{ role: string; content: string }>,
+  options: AiOptions = {},
+  purpose: "outline" | "prose" = "prose"
+): Promise<string> {
+  return (await runGenerationAiDetailed(env, bookModel, messages, options, purpose)).text;
 }

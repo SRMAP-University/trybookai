@@ -1,9 +1,6 @@
-import { db, withDbRetry } from "@/lib/db";
+import { db } from "@/lib/db";
 import { DEFAULT_AI_MODEL } from "@/lib/ai-models";
-import {
-  extractModelText,
-  streamChatCompletion,
-} from "@/lib/book-generator/llm";
+import { streamChatCompletionDetailed } from "@/lib/book-generator/llm";
 import { generateOutline } from "@/lib/book-generator/index";
 import {
   clearGenerationCancellation,
@@ -11,12 +8,15 @@ import {
   isGenerationCancellationRequested,
   validateGenerationEligibility,
 } from "@/lib/book-generator/background";
+import { applyBookProgress } from "@/lib/book-generator/progress";
+import { writeSection } from "@/lib/book-generator/section-writer";
 import {
-  applyBookProgress,
-  creditSectionPages,
-} from "@/lib/book-generator/progress";
-import { resolveGenerationShape } from "@/lib/book-generator/shape";
-import { resolveContentFormat } from "@/lib/book-generator/content-format";
+  countWords,
+  endsCleanly,
+  sectionWordTarget,
+  WORDS_PER_PAGE,
+  type LlmCall,
+} from "@/lib/book-generator/core";
 import {
   createBookEventEmitter,
   mergeEmitters,
@@ -26,12 +26,7 @@ import {
   nextPushMilestone,
   notifyBookProgress,
 } from "@/lib/push";
-import {
-  assembleSectionContext,
-  extractAndUpdateCanon,
-  hasIncompleteSections,
-  refreshChapterCanon,
-} from "@/lib/book-context";
+import { hasIncompleteSections } from "@/lib/book-context";
 
 async function throwIfCancelled(bookId: string) {
   const requested = isGenerationCancellationRequested(bookId);
@@ -123,27 +118,23 @@ async function streamGenerateSection(
 ) {
   const section = await db.section.findUniqueOrThrow({
     where: { id: sectionId },
-    include: {
-      chapter: {
-        include: {
-          book: true,
-          sections: { orderBy: { number: "asc" } },
-        },
-      },
-    },
+    include: { chapter: { include: { book: true } } },
   });
 
   const { chapter } = section;
   const { book } = chapter;
-  const shape = resolveGenerationShape(book);
-  const { sectionsPerChapter, wordsPerPage, pagesPerSection } = shape;
+  const wordsPerPage = book.wordsPerPage || WORDS_PER_PAGE;
+  const totalSections = await db.section.count({
+    where: { chapter: { bookId: book.id } },
+  });
+  const targetWords = sectionWordTarget(book, totalSections);
 
   await updateJobProgress(jobId, {
     currentSectionId: section.id,
     partialContent: "",
   });
 
-  emit({
+  const sectionStart: StreamEvent = {
     type: "section_start",
     sectionId: section.id,
     chapterId: chapter.id,
@@ -151,7 +142,8 @@ async function streamGenerateSection(
     chapterTitle: chapter.title,
     sectionNumber: section.number,
     sectionTitle: section.title,
-  });
+  };
+  emit(sectionStart);
 
   await db.chapter.update({
     where: { id: chapter.id },
@@ -173,35 +165,6 @@ async function streamGenerateSection(
     status: "GENERATING",
   });
 
-  const targetWords = pagesPerSection * wordsPerPage;
-  const assembled = await assembleSectionContext(book.id, section.id).catch(
-    (error) => {
-      console.warn(
-        "[stream] assemble failed:",
-        error instanceof Error ? error.message : error
-      );
-      return null;
-    }
-  );
-
-  const styleParts = [
-    `Point of view: ${book.pov}`,
-    `Tense: ${book.tense}`,
-    `Language: ${book.language}`,
-    `Tone: ${book.tone ?? "professional"}`,
-    book.style ? `Style guide: ${book.style}` : null,
-    book.customInstructions
-      ? `Custom instructions: ${book.customInstructions}`
-      : null,
-    resolveContentFormat({
-      genre: book.genre,
-      templateId: book.templateId,
-      description: book.description,
-      customInstructions: book.customInstructions,
-      includeExamples: book.includeExamples,
-    }).instructions,
-  ].filter(Boolean);
-
   let draftContent = "";
   let lastPersist = 0;
   let persistInFlight: Promise<void> | null = null;
@@ -221,7 +184,6 @@ async function streamGenerateSection(
           break;
         }
         lastPersist = now;
-        const draftWordCount = snapshot.split(/\s+/).filter(Boolean).length;
         try {
           // Job payload only during stream — avoids stacking section + progress writes.
           await updateJobProgress(jobId, {
@@ -231,7 +193,7 @@ async function streamGenerateSection(
           // Persist book.progress so dashboard / jobs widget update without a full refresh.
           const result = await applyBookProgress(book.id, {
             activeSectionId: section.id,
-            draftWordCount,
+            draftWordCount: countWords(snapshot),
             targetSectionWords: targetWords,
             wordsPerPage,
           });
@@ -258,115 +220,62 @@ async function streamGenerateSection(
     return persistInFlight;
   };
 
-  const raw = await streamChatCompletion({
-    model: book.model || DEFAULT_AI_MODEL,
-    temperature: book.creativity ?? 0.7,
-    max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
-    onToken: (text) => {
-      if (!text) return;
-      draftContent += text;
-      emit({ type: "token", sectionId: section.id, text });
+  const model = book.model || DEFAULT_AI_MODEL;
+  const call: LlmCall = async (messages, options) => {
+    // A second call while text is on screen is a continuation pass.
+    if (draftContent) {
+      const separator = endsCleanly(draftContent) ? "\n\n" : " ";
+      draftContent += separator;
+      emit({ type: "token", sectionId: section.id, text: separator });
+    }
+    const result = await streamChatCompletionDetailed({
+      model,
+      messages,
+      temperature: options.temperature,
+      max_tokens: options.max_tokens,
+      onToken: (text) => {
+        if (!text) return;
+        draftContent += text;
+        emit({ type: "token", sectionId: section.id, text });
 
-      if (Date.now() - lastPersist >= 8000) {
-        void persistDraft(draftContent);
-      }
-    },
-    messages: [
-      {
-        role: "system",
-        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Follow FORMAT RULES in the writing requirements. Output only the section manuscript — no preamble, no thinking notes.
-
-Writing requirements:
-${assembled?.systemStyle ?? styleParts.join("\n")}`,
-      },
-      {
-        role: "user",
-        content:
-          assembled?.userPrompt ??
-          `Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
-      },
-    ],
-  });
-
-  const content = extractModelText(raw) || extractModelText(draftContent);
-  const wordCount = content.split(/\s+/).filter(Boolean).length;
-  const pageCount = Math.min(
-    pagesPerSection,
-    Math.max(1, Math.ceil(wordCount / wordsPerPage))
-  );
-
-  // Wait for any in-flight throttle, then write the final section once.
-  await (persistInFlight as Promise<void> | null)?.catch(() => undefined);
-
-  await withDbRetry("section.update", () =>
-    db.section.update({
-      where: { id: sectionId },
-      data: { content, wordCount, pageCount },
-    })
-  );
-  await updateJobProgress(jobId, {
-    currentSectionId: section.id,
-    partialContent: content,
-  });
-
-  await extractAndUpdateCanon({
-    bookId: book.id,
-    chapterId: chapter.id,
-    sectionId,
-    sectionTitle: section.title,
-    content,
-  }).catch((error) => {
-    console.warn(
-      "[stream] extract canon failed:",
-      error instanceof Error ? error.message : error
-    );
-  });
-
-  const allSections = await db.section.findMany({
-    where: { chapterId: chapter.id },
-  });
-  const chapterComplete = allSections.every((s) =>
-    s.id === sectionId ? true : s.wordCount > 0
-  );
-
-  if (chapterComplete) {
-    const chapterContent = allSections
-      .sort((a, b) => a.number - b.number)
-      .map((s) => (s.id === sectionId ? content : s.content))
-      .join("\n\n");
-    const chapterPages = allSections.reduce(
-      (sum, s) => sum + (s.id === sectionId ? pageCount : s.pageCount),
-      0
-    );
-    await db.chapter.update({
-      where: { id: chapter.id },
-      data: {
-        content: chapterContent,
-        pageCount: chapterPages,
-        status: "COMPLETED",
+        if (Date.now() - lastPersist >= 8000) {
+          void persistDraft(draftContent);
+        }
       },
     });
-    await refreshChapterCanon(book.id, chapter.id).catch(() => undefined);
-  }
+    // Let any in-flight draft write finish before the final section write.
+    await (persistInFlight as Promise<void> | null)?.catch(() => undefined);
+    return result;
+  };
 
-  await creditSectionPages(book.userId, pageCount);
+  const result = await writeSection(sectionId, {
+    call,
+    onRevisionStart: () => {
+      // The revision replaces the streamed draft, so restart the live view.
+      draftContent = "";
+      emit(sectionStart);
+    },
+  });
 
-  const result = await applyBookProgress(book.id, { wordsPerPage });
+  await updateJobProgress(jobId, {
+    currentSectionId: section.id,
+    partialContent: result.content,
+  });
 
   emit({
     type: "section_done",
     sectionId: section.id,
     chapterId: chapter.id,
-    wordCount,
-    pageCount,
+    wordCount: result.wordCount,
+    pageCount: result.pageCount,
   });
-  if (result) {
+  if (result.progress) {
     emit({
       type: "progress",
-      progress: result.progress,
-      currentPages: result.currentPages,
-      targetPages: result.targetPages,
-      status: result.allDone ? "COMPLETED" : "GENERATING",
+      progress: result.progress.progress,
+      currentPages: result.progress.currentPages,
+      targetPages: result.progress.targetPages,
+      status: result.progress.allDone ? "COMPLETED" : "GENERATING",
     });
   }
 }
@@ -499,7 +408,6 @@ export async function runBookGeneration(
     });
 
     for (const chapter of refreshed.chapters) {
-      let reachedTarget = false;
       for (const section of chapter.sections) {
         await throwIfCancelled(bookId);
         if (sectionNeedsGeneration(section)) {
@@ -513,12 +421,7 @@ export async function runBookGeneration(
 
           const pageCheck = await db.book.findUnique({
             where: { id: bookId },
-            select: {
-              currentPages: true,
-              targetPages: true,
-              progress: true,
-              title: true,
-            },
+            select: { progress: true, title: true },
           });
           if (pageCheck) {
             const milestone = nextPushMilestone(
@@ -535,14 +438,9 @@ export async function runBookGeneration(
                 phase: "progress",
               });
             }
-            if (pageCheck.currentPages >= pageCheck.targetPages) {
-              reachedTarget = true;
-              break;
-            }
           }
         }
       }
-      if (reachedTarget) break;
     }
 
     if (await hasIncompleteSections(bookId)) {

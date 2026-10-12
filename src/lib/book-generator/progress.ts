@@ -109,9 +109,9 @@ export async function computeBookProgress(
   const allDone =
     // Never treat mid-stream draft estimates as completion — that triggers
     // extra incomplete-section queries and can race the Neon pool.
-    !options.activeSectionId &&
-    (completedSections === sections.length ||
-      (book.targetPages > 0 && currentPages >= book.targetPages));
+    // Reaching the page target early isn't completion: every planned section
+    // must be written, or the book ends without its final chapters.
+    !options.activeSectionId && completedSections === sections.length;
 
   return {
     progress: allDone ? 100 : progress,

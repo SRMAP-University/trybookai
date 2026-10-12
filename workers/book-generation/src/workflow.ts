@@ -47,7 +47,11 @@ export class BookGenerationWorkflow extends WorkflowEntrypoint<
       await Promise.all([
         step.do(
           "outline",
-          { retries: { limit: 2, delay: "10 seconds", backoff: "linear" } },
+          {
+            retries: { limit: 2, delay: "10 seconds", backoff: "linear" },
+            // Large books plan section batches after the chapter arc.
+            timeout: "15 minutes",
+          },
           async () => {
             return withSql(this.env, async (sql) =>
               generateOutlineStep(sql, this.env.AI, this.env, bookId, jobId)
@@ -77,7 +81,11 @@ export class BookGenerationWorkflow extends WorkflowEntrypoint<
       for (const section of sections) {
         const result = await step.do(
           `section:${section.id}`,
-          { retries: { limit: 2, delay: "15 seconds", backoff: "linear" } },
+          {
+            retries: { limit: 2, delay: "15 seconds", backoff: "linear" },
+            // Draft + continuation passes + continuity ledger can take several calls.
+            timeout: "15 minutes",
+          },
           async () => {
             return withSql(this.env, async (sql) =>
               writeSectionStep(

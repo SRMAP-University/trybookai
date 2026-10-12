@@ -13,6 +13,8 @@ Durable book generation for BookAI. Vercel inserts a `GenerationJob` (`QUEUED`) 
 
 Cancel: Vercel sets `Book.status = PAUSED` and fails active jobs; each step calls `assertNotPaused` and stops.
 
+Prompts, outline planning, length control and continuity logic live in `src/lib/book-generator/core/` at the repo root and are shared with the Next.js runner. The worker imports them by relative path, so deploy from a full checkout of the repo.
+
 ## Setup
 
 ```bash
