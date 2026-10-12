@@ -1,14 +1,20 @@
+import {
+  DEFAULT_TTS_MODEL,
+  DEFAULT_VOICE_ID,
+  DEFAULT_VOICE_NAME,
+  ELEVENLABS_TTS_MODELS,
+  ELEVENLABS_VOICES,
+  FALLBACK_TTS_MODEL,
+  type ElevenLabsVoice,
+} from "@/lib/elevenlabs-voices";
+
+export { DEFAULT_TTS_MODEL, DEFAULT_VOICE_ID, DEFAULT_VOICE_NAME };
+
 const ELEVEN_BASE = "https://api.elevenlabs.io/v1";
+const ELEVEN_BASE_V2 = "https://api.elevenlabs.io/v2";
 
-/** Default narrator — Rachel */
-export const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
-export const DEFAULT_VOICE_NAME = "Rachel";
-
-/** Multilingual TTS; good quality / cost balance */
-export const DEFAULT_TTS_MODEL = "eleven_multilingual_v2";
-
-/** Soft character limit per TTS request (API allows more; keep chunks manageable). */
-export const TTS_CHUNK_CHARS = 2500;
+/** Account voices and models change rarely; refresh hourly. */
+const CATALOGUE_TTL_MS = 60 * 60 * 1000;
 
 function getApiKey(): string {
   const key = process.env.ELEVENLABS_API_KEY?.trim();
@@ -24,6 +30,179 @@ export function isElevenLabsConfigured(): boolean {
   return Boolean(process.env.ELEVENLABS_API_KEY?.trim());
 }
 
+export class ElevenLabsError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "ElevenLabsError";
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ── Catalogue: models and voices available to this account ────────────────
+
+let modelCache: { at: number; ids: Set<string> } | null = null;
+
+/** Model ids this account can use for text-to-speech (GET /v1/models). */
+async function availableTtsModels(): Promise<Set<string> | null> {
+  if (modelCache && Date.now() - modelCache.at < CATALOGUE_TTL_MS) {
+    return modelCache.ids;
+  }
+  try {
+    const res = await fetch(`${ELEVEN_BASE}/models`, {
+      headers: { "xi-api-key": getApiKey() },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const models = (await res.json()) as Array<{
+      model_id?: string;
+      can_do_text_to_speech?: boolean;
+    }>;
+    const ids = new Set(
+      models
+        .filter((m) => m.model_id && m.can_do_text_to_speech !== false)
+        .map((m) => m.model_id as string)
+    );
+    modelCache = { at: Date.now(), ids };
+    return ids;
+  } catch {
+    return null;
+  }
+}
+
+/** Our supported models, newest first, limited to what the account offers. */
+export async function listTtsModels() {
+  const available = await availableTtsModels();
+  return available
+    ? ELEVENLABS_TTS_MODELS.filter((m) => available.has(m.id))
+    : [...ELEVENLABS_TTS_MODELS];
+}
+
+/** The requested model if the account has it, else the best one it does have. */
+export async function resolveTtsModel(requested?: string | null): Promise<string> {
+  const wanted = requested || DEFAULT_TTS_MODEL;
+  const available = await availableTtsModels();
+  if (!available || available.has(wanted)) return wanted;
+  return ELEVENLABS_TTS_MODELS.find((m) => available.has(m.id))?.id ?? wanted;
+}
+
+type V2Voice = {
+  voice_id: string;
+  name?: string;
+  category?: string;
+  description?: string | null;
+  preview_url?: string | null;
+  labels?: Record<string, string> | null;
+  is_legacy?: boolean;
+};
+
+let voiceCache: { at: number; voices: ElevenLabsVoice[] } | null = null;
+
+function toVoice(v: V2Voice): ElevenLabsVoice {
+  const labels = v.labels ?? {};
+  const gender = (labels.gender ?? "").toLowerCase();
+  const describe = labels.description ?? labels.descriptive ?? "";
+  return {
+    id: v.voice_id,
+    name: v.name ?? "Voice",
+    gender: gender === "male" || gender === "female" ? gender : "neutral",
+    style: labels.accent ? capitalize(labels.accent) : capitalize(describe) || "Voice",
+    description:
+      v.description?.trim() ||
+      [describe, labels.use_case].filter(Boolean).map(capitalize).join(" · ") ||
+      capitalize(v.category ?? "voice"),
+    accent: labels.accent,
+    age: labels.age,
+    useCase: labels.use_case,
+    previewUrl: v.preview_url ?? undefined,
+    category: v.category,
+  };
+}
+
+function capitalize(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, " ") : "";
+}
+
+/**
+ * Voices this account can narrate with (GET /v2/voices): defaults, saved
+ * library voices and clones. Retired "legacy" voices are left out. Falls back
+ * to the built-in list when the API can't be reached.
+ */
+export async function listVoices(): Promise<{
+  voices: ElevenLabsVoice[];
+  live: boolean;
+}> {
+  if (voiceCache && Date.now() - voiceCache.at < CATALOGUE_TTL_MS) {
+    return { voices: voiceCache.voices, live: true };
+  }
+  try {
+    const found: V2Voice[] = [];
+    let token: string | null = null;
+    for (let page = 0; page < 5; page++) {
+      const params = new URLSearchParams({
+        page_size: "100",
+        include_total_count: "false",
+        sort: "name",
+        sort_direction: "asc",
+      });
+      if (token) params.set("next_page_token", token);
+      const res = await fetch(`${ELEVEN_BASE_V2}/voices?${params}`, {
+        headers: { "xi-api-key": getApiKey() },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new ElevenLabsError(`voices ${res.status}`, res.status);
+      const data = (await res.json()) as {
+        voices?: V2Voice[];
+        has_more?: boolean;
+        next_page_token?: string | null;
+      };
+      found.push(...(data.voices ?? []));
+      token = data.has_more ? (data.next_page_token ?? null) : null;
+      if (!token) break;
+    }
+    const current = found.filter((v) => !v.is_legacy);
+    const voices = (current.length ? current : found).map(toVoice);
+    if (!voices.length) return { voices: ELEVENLABS_VOICES, live: false };
+    voiceCache = { at: Date.now(), voices };
+    return { voices, live: true };
+  } catch (error) {
+    console.warn(
+      "[elevenlabs] voice list unavailable; using built-in voices:",
+      error instanceof Error ? error.message : error
+    );
+    return { voices: ELEVENLABS_VOICES, live: false };
+  }
+}
+
+/** Best narrator among the account's voices: narration/audiobook voices first. */
+export function pickNarrationVoice(voices: ElevenLabsVoice[]): ElevenLabsVoice {
+  const score = (v: ElevenLabsVoice) => {
+    const text = `${v.useCase ?? ""} ${v.description} ${v.style}`.toLowerCase();
+    return (
+      (/narrat|audiobook/.test(text) ? 4 : 0) +
+      (/story|book/.test(text) ? 2 : 0) +
+      (v.category === "premade" || v.category === "professional" ? 1 : 0) +
+      (v.id === DEFAULT_VOICE_ID ? 1 : 0)
+    );
+  };
+  return (
+    [...voices].sort((a, b) => score(b) - score(a))[0] ?? {
+      id: DEFAULT_VOICE_ID,
+      name: DEFAULT_VOICE_NAME,
+      gender: "male",
+      style: "British",
+      description: "Warm storyteller",
+    }
+  );
+}
+
+// ── Text to speech ─────────────────────────────────────────────────────────
+
 export type TtsOptions = {
   voiceId?: string;
   modelId?: string;
@@ -36,100 +215,162 @@ export type TtsOptions = {
   useSpeakerBoost?: boolean;
 };
 
+type ModelProfile = {
+  /** Characters per request: big enough for flow, well under the model limit. */
+  chunkChars: number;
+  /** Accepts previous_text / next_text for continuity across chunks. */
+  contextText: boolean;
+  /** v3-generation models take stability as 0 (creative), 0.5 or 1 (robust). */
+  discreteStability: boolean;
+  /** Supports the style / speaker-boost / speed voice settings. */
+  fullSettings: boolean;
+};
+
+function modelProfile(modelId: string): ModelProfile {
+  if (/^eleven_v[34]/.test(modelId)) {
+    return {
+      chunkChars: modelId.startsWith("eleven_v4") ? 4500 : 3000,
+      contextText: false,
+      discreteStability: true,
+      fullSettings: false,
+    };
+  }
+  return { chunkChars: 4000, contextText: true, discreteStability: false, fullSettings: true };
+}
+
 export async function textToSpeech(
   text: string,
   options: TtsOptions = {}
 ): Promise<Buffer> {
   const voiceId = options.voiceId || DEFAULT_VOICE_ID;
   const modelId = options.modelId || DEFAULT_TTS_MODEL;
+  const profile = modelProfile(modelId);
   const url = `${ELEVEN_BASE}/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
+  const stability = options.stability ?? 0.45;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "xi-api-key": getApiKey(),
-      "Content-Type": "application/json",
-      Accept: "audio/mpeg",
-    },
-    body: JSON.stringify({
-      text,
-      model_id: modelId,
-      voice_settings: {
-        stability: options.stability ?? 0.45,
-        similarity_boost: options.similarityBoost ?? 0.75,
-        style: options.style ?? 0.15,
-        use_speaker_boost: options.useSpeakerBoost ?? true,
-        speed: options.speed ?? 1,
-      },
-      ...(options.previousText
-        ? { previous_text: options.previousText }
-        : {}),
-      ...(options.nextText ? { next_text: options.nextText } : {}),
-    }),
+  const body = JSON.stringify({
+    text,
+    model_id: modelId,
+    voice_settings: profile.fullSettings
+      ? {
+          stability,
+          similarity_boost: options.similarityBoost ?? 0.75,
+          style: options.style ?? 0.15,
+          use_speaker_boost: options.useSpeakerBoost ?? true,
+          speed: options.speed ?? 1,
+        }
+      : {
+          stability: profile.discreteStability ? Math.round(stability * 2) / 2 : stability,
+          similarity_boost: options.similarityBoost ?? 0.75,
+        },
+    ...(profile.contextText && options.previousText
+      ? { previous_text: options.previousText }
+      : {}),
+    ...(profile.contextText && options.nextText ? { next_text: options.nextText } : {}),
   });
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(
-      `ElevenLabs TTS failed (${res.status}): ${body.slice(0, 400)}`
-    );
-  }
+  // Retry rate limits and transient server errors; fail fast on bad requests.
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "xi-api-key": getApiKey(),
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body,
+      signal: AbortSignal.timeout(180_000),
+    });
+    if (res.ok) return Buffer.from(await res.arrayBuffer());
 
-  return Buffer.from(await res.arrayBuffer());
+    const detail = (await res.text()).slice(0, 400);
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt >= 3) {
+      throw new ElevenLabsError(`ElevenLabs TTS failed (${res.status}): ${detail}`, res.status);
+    }
+    const waitSeconds = Number(res.headers.get("retry-after"));
+    await sleep(Number.isFinite(waitSeconds) && waitSeconds > 0 ? waitSeconds * 1000 : 2000 * 2 ** attempt);
+  }
+}
+
+function splitLongParagraph(paragraph: string, maxChars: number): string[] {
+  const parts: string[] = [];
+  let remaining = paragraph;
+  while (remaining.length > maxChars) {
+    let splitAt = remaining.lastIndexOf(". ", maxChars);
+    if (splitAt < maxChars * 0.4) splitAt = remaining.lastIndexOf(" ", maxChars);
+    splitAt = splitAt < maxChars * 0.3 ? maxChars : splitAt + 1;
+    parts.push(remaining.slice(0, splitAt).trim());
+    remaining = remaining.slice(splitAt).trim();
+  }
+  if (remaining) parts.push(remaining);
+  return parts;
 }
 
 /**
- * Split long text into sentence-aware chunks under `maxChars`.
+ * Split narration into chunks under `maxChars`, keeping paragraphs whole
+ * where possible so pauses between paragraphs survive.
  */
-export function chunkTextForTts(
-  text: string,
-  maxChars = TTS_CHUNK_CHARS
-): string[] {
-  const cleaned = text.replace(/\s+/g, " ").trim();
-  if (!cleaned) return [];
-  if (cleaned.length <= maxChars) return [cleaned];
+export function chunkTextForTts(text: string, maxChars = 4000): string[] {
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .flatMap((p) => splitLongParagraph(p, maxChars));
 
   const chunks: string[] = [];
-  let remaining = cleaned;
-
-  while (remaining.length > maxChars) {
-    let splitAt = remaining.lastIndexOf(". ", maxChars);
-    if (splitAt < maxChars * 0.4) {
-      splitAt = remaining.lastIndexOf(" ", maxChars);
-    }
-    if (splitAt < maxChars * 0.3) {
-      splitAt = maxChars;
+  let current = "";
+  for (const paragraph of paragraphs) {
+    if (current && current.length + paragraph.length + 2 > maxChars) {
+      chunks.push(current);
+      current = paragraph;
     } else {
-      splitAt += 1; // include period / space
+      current = current ? `${current}\n\n${paragraph}` : paragraph;
     }
-    chunks.push(remaining.slice(0, splitAt).trim());
-    remaining = remaining.slice(splitAt).trim();
   }
-  if (remaining) chunks.push(remaining);
+  if (current) chunks.push(current);
   return chunks;
 }
 
+async function narrateWithModel(text: string, options: TtsOptions, modelId: string) {
+  const chunks = chunkTextForTts(text, modelProfile(modelId).chunkChars);
+  if (chunks.length === 0) throw new Error("No text to narrate");
+  const buffers: Buffer[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    buffers.push(
+      await textToSpeech(chunks[i], {
+        ...options,
+        modelId,
+        previousText: i > 0 ? chunks[i - 1].slice(-300) : undefined,
+        nextText: i < chunks.length - 1 ? chunks[i + 1].slice(0, 300) : undefined,
+      })
+    );
+  }
+  return Buffer.concat(buffers);
+}
+
+/**
+ * Narrate text of any length. Uses the requested model when the account has
+ * it; if ElevenLabs rejects the model or its settings, retries on the stable
+ * long-form model rather than failing the audiobook.
+ */
 export async function textToSpeechLong(
   text: string,
   options: TtsOptions = {}
 ): Promise<Buffer> {
-  const chunks = chunkTextForTts(text);
-  if (chunks.length === 0) {
-    throw new Error("No text to narrate");
+  const modelId = await resolveTtsModel(options.modelId);
+  try {
+    return await narrateWithModel(text, options, modelId);
+  } catch (error) {
+    const rejected =
+      error instanceof ElevenLabsError && [400, 403, 404, 422].includes(error.status);
+    if (!rejected || modelId === FALLBACK_TTS_MODEL) throw error;
+    console.warn(
+      `[elevenlabs] ${modelId} rejected the request; narrating with ${FALLBACK_TTS_MODEL}:`,
+      error.message
+    );
+    return narrateWithModel(text, options, FALLBACK_TTS_MODEL);
   }
-
-  const buffers: Buffer[] = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const audio = await textToSpeech(chunks[i], {
-      ...options,
-      previousText: i > 0 ? chunks[i - 1].slice(-200) : undefined,
-      nextText:
-        i < chunks.length - 1 ? chunks[i + 1].slice(0, 200) : undefined,
-    });
-    buffers.push(audio);
-  }
-
-  return Buffer.concat(buffers);
 }
 
 export async function generateMusic(

@@ -17,6 +17,8 @@ export type LlmResult = {
   text: string;
   /** Provider reported a max-token stop. False when the provider doesn't say. */
   truncated: boolean;
+  /** Model that actually answered (differs from the requested one after a fallback). */
+  model?: string;
 };
 
 export type LlmCall = (

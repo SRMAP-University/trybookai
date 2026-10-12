@@ -116,6 +116,7 @@ export async function runAiDetailed(
     ...workersAiOptions(model),
   });
   return {
+    model,
     text: stripThinking(extractText(result)),
     truncated: wasTruncated(result, maxTokens),
   };
@@ -182,6 +183,7 @@ async function runGroqAi(
     choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   };
   return {
+    model,
     text: stripThinking(data.choices?.[0]?.message?.content ?? ""),
     truncated: wasTruncated(data, maxTokens),
   };

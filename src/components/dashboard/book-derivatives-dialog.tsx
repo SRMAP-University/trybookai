@@ -29,12 +29,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_VOICE_SETTINGS,
-  ELEVENLABS_TTS_MODELS,
-  ELEVENLABS_VOICES,
   VOICE_SETTING_PRESETS,
   type VoiceSettingsConfig,
 } from "@/lib/elevenlabs-voices";
-import { DEFAULT_VOICE_ID } from "@/lib/elevenlabs";
+import {
+  useNarrationCatalogue,
+  voiceSummary,
+  VoicePreviewButton,
+} from "@/components/dashboard/narration-voices";
 
 export type AudioDerivativeType = "AUDIOBOOK" | "PODCAST" | "MUSIC" | "SONG";
 
@@ -191,16 +193,22 @@ export function BookDerivativesDialog({
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<"pick" | "customize">("pick");
   const [selected, setSelected] = useState<DerivativeOption | null>(null);
-  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE_ID);
+  const catalogue = useNarrationCatalogue(open);
+  // Empty until the user picks: follows the account's recommended narrator.
+  const [pickedVoiceId, setVoiceId] = useState("");
   const [settings, setSettings] = useState<VoiceSettingsConfig>({
     ...DEFAULT_VOICE_SETTINGS,
   });
   const [activePreset, setActivePreset] = useState("narration");
 
+  const voiceId = pickedVoiceId || catalogue.defaultVoiceId;
   const selectedVoice = useMemo(
-    () => ELEVENLABS_VOICES.find((v) => v.id === voiceId) ?? ELEVENLABS_VOICES[0],
-    [voiceId]
+    () => catalogue.voices.find((v) => v.id === voiceId) ?? catalogue.voices[0],
+    [catalogue.voices, voiceId]
   );
+  const modelId = catalogue.models.some((m) => m.id === settings.modelId)
+    ? settings.modelId
+    : catalogue.defaultModelId;
 
   function resetAndClose(nextOpen: boolean) {
     if (!nextOpen) {
@@ -260,7 +268,7 @@ export function BookDerivativesDialog({
       await onStartAudio(selected.audioType, regenerate, {
         voiceId: selectedVoice.id,
         voiceName: selectedVoice.name,
-        voiceSettings: settings,
+        voiceSettings: { ...settings, modelId },
       });
       resetAndClose(false);
     } catch (error) {
@@ -370,22 +378,26 @@ export function BookDerivativesDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ELEVENLABS_VOICES.map((voice) => (
+                    {catalogue.voices.map((voice) => (
                       <SelectItem key={voice.id} value={voice.id}>
-                        {voice.name} · {voice.style} · {voice.gender}
+                        {voice.name}
+                        {voiceSummary(voice) ? ` · ${voiceSummary(voice)}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="mt-1.5 text-[12px] text-[#697386]">
-                  {selectedVoice.description}
-                </p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <VoicePreviewButton voice={selectedVoice} />
+                  <p className="text-[12px] text-[#697386]">
+                    {selectedVoice.description}
+                  </p>
+                </div>
               </div>
 
               <div>
                 <Label className="text-[13px] text-[#0a2540]">Model</Label>
                 <Select
-                  value={settings.modelId}
+                  value={modelId}
                   onValueChange={(modelId) =>
                     modelId && patchSettings({ modelId })
                   }
@@ -394,7 +406,7 @@ export function BookDerivativesDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ELEVENLABS_TTS_MODELS.map((model) => (
+                    {catalogue.models.map((model) => (
                       <SelectItem key={model.id} value={model.id}>
                         {model.name}
                       </SelectItem>
@@ -403,7 +415,7 @@ export function BookDerivativesDialog({
                 </Select>
                 <p className="mt-1.5 text-[12px] text-[#697386]">
                   {
-                    ELEVENLABS_TTS_MODELS.find((m) => m.id === settings.modelId)
+                    catalogue.models.find((m) => m.id === modelId)
                       ?.description
                   }
                 </p>
@@ -421,7 +433,7 @@ export function BookDerivativesDialog({
                         setSettings({
                           ...DEFAULT_VOICE_SETTINGS,
                           ...preset.settings,
-                          modelId: settings.modelId,
+                          modelId,
                         });
                       }}
                       className={cn(
