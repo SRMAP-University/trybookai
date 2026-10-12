@@ -45,22 +45,27 @@ export function LandingExperience({ covers }: LandingExperienceProps) {
     <>
       <section className="relative px-6 pb-16 pt-[88px] md:pb-20 md:pt-[104px]">
         <div className="relative mx-auto max-w-[1100px] text-center">
-          <motion.p
-            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#111]/50"
-            initial={reduce ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            BookAI
-          </motion.p>
-          <motion.h1
-            className="mx-auto mt-3 max-w-[720px] text-[32px] font-bold leading-[1.08] tracking-[-0.04em] text-[#111] sm:text-[40px] md:text-[48px]"
-            initial={reduce ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.05 }}
-          >
-            From one idea to a finished book.
-          </motion.h1>
+          {/* Kicker lives inside the h1 so the primary keyword is in the heading. */}
+          <h1>
+            <motion.span
+              className="block text-[11px] font-semibold uppercase tracking-[0.2em] text-[#111]/50"
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              AI book generator
+            </motion.span>
+            {/* Transform-only entrance: the headline is the LCP text, so it must
+                not ship as opacity:0 in the server HTML. */}
+            <motion.span
+              className="mx-auto mt-3 block max-w-[720px] text-[32px] font-bold leading-[1.08] tracking-[-0.04em] text-[#111] sm:text-[40px] md:text-[48px]"
+              initial={reduce ? false : { y: 16 }}
+              animate={{ y: 0 }}
+              transition={{ duration: 0.6, delay: 0.05 }}
+            >
+              From one idea to a finished book.
+            </motion.span>
+          </h1>
           <motion.p
             className="mx-auto mt-3 max-w-[440px] text-[14px] leading-relaxed text-[#6b6b6b] sm:text-[15px]"
             initial={reduce ? false : { opacity: 0, y: 10 }}

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Features",
+  title: "AI Book Writer Features: Outlines, Covers, Audiobooks",
   description:
     "AI book writing features in BookAI: long-form manuscript generation, chapter outlines, cover art, audiobooks, branding, and PDF/EPUB export.",
   path: "/features",
@@ -44,7 +44,7 @@ const features = [
     icon: Download,
     title: "Professional exports",
     description:
-      "Export your manuscript to Markdown or DOCX with optional branding, copyright, dedication, and custom front matter.",
+      "Export your manuscript to PDF, EPUB, or Markdown with optional branding, copyright, dedication, and custom front matter.",
   },
   {
     icon: Palette,

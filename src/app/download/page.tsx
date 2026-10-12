@@ -15,7 +15,7 @@ import { buildPageMetadata } from "@/lib/seo";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "Install the app",
+  title: "Download the BookAI App for Android and Web",
   description:
     "Install BookAI as a web app on your phone or desktop, or download the Android APK to write books on the go.",
   path: "/download",

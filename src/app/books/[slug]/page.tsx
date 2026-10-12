@@ -12,7 +12,7 @@ import type { BookAudioItem } from "@/components/dashboard/book-audio-panel";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
 import { BookManuscript } from "@/components/book/book-manuscript";
 import { JsonLd } from "@/components/seo/json-ld";
-import { bookJsonLd, breadcrumbJsonLd } from "@/lib/seo";
+import { bookJsonLd, breadcrumbJsonLd, truncateForMeta } from "@/lib/seo";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -72,9 +72,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     book.user.brandName ||
     book.user.name ||
     "BookAI author";
-  const description =
-    book.description?.slice(0, 160) ||
-    `Read ${book.title}, an AI-generated ${book.genre ?? "book"} by ${author} on BookAI.`;
+  const description = book.description
+    ? truncateForMeta(book.description)
+    : `Read ${book.title}, an AI-generated ${book.genre ?? "book"} by ${author} on BookAI.`;
+  // A book with no finished chapters renders only a placeholder — thin content.
+  const hasReadableChapters = book.chapters.some((c) => c.status === "COMPLETED");
   const url = `${getAppUrl()}/books/${book.slug}`;
   const coverUrl = book.coverImage
     ? `${getAppUrl()}/api/books/cover/${book.slug}`
@@ -106,7 +108,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       images: [coverUrl],
     },
-    robots: { index: true, follow: true },
+    robots: hasReadableChapters
+      ? { index: true, follow: true }
+      : { index: false, follow: true },
   };
 }
 

@@ -8,6 +8,38 @@ import { getAllBlogSlugs, getBlogPost, getRelatedBlogPosts } from "@/lib/blogs";
 import { JsonLd } from "@/components/seo/json-ld";
 import { blogPostingJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 
+const LINK_PATTERN = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+
+/** Render `[text](/path)` links inside a paragraph; internal paths use <Link>. */
+function renderInline(text: string) {
+  const nodes: React.ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(LINK_PATTERN)) {
+    const [raw, label, href] = match;
+    const start = match.index ?? 0;
+    if (start > last) nodes.push(text.slice(last, start));
+    nodes.push(
+      href.startsWith("/") ? (
+        <Link key={start} href={href} className="font-medium text-[#635bff] hover:underline">
+          {label}
+        </Link>
+      ) : (
+        <a
+          key={start}
+          href={href}
+          rel="noopener"
+          className="font-medium text-[#635bff] hover:underline"
+        >
+          {label}
+        </a>
+      )
+    );
+    last = start + raw.length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+}
+
 export function generateStaticParams() {
   return getAllBlogSlugs().map((slug) => ({ slug }));
 }
@@ -142,11 +174,32 @@ export default async function BlogPostPage({
               }
               return (
                 <p key={i} className="mb-4 text-[16px] leading-relaxed text-[#425466]">
-                  {paragraph}
+                  {renderInline(paragraph)}
                 </p>
               );
             })}
           </div>
+
+          <aside className="mt-12 rounded-xl border border-[#e6ebf1] bg-[#f6f9fc] p-6">
+            <h2 className="text-[18px] font-semibold text-[#0a2540]">
+              Write your book with BookAI
+            </h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-[#425466]">
+              Turn one premise into an outlined, full-length manuscript with a
+              cover and audiobook, then export to PDF or EPUB.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[14px]">
+              <Link href="/register" className="font-medium text-[#635bff] hover:underline">
+                Start writing for free →
+              </Link>
+              <Link href="/features" className="font-medium text-[#635bff] hover:underline">
+                See all features
+              </Link>
+              <Link href="/books" className="font-medium text-[#635bff] hover:underline">
+                Read books made with BookAI
+              </Link>
+            </div>
+          </aside>
 
           {related.length > 0 ? (
             <aside className="mt-12 border-t border-[#e6ebf1] pt-8">

@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { genre: slug } = await params;
   const genre = (await resolveGenre(slug)) ?? displayGenreFromSlug(slug);
   return buildPageMetadata({
-    title: `${genre} AI books`,
+    title: `Free ${genre} Books Written with AI`,
     description: `Read free ${genre.toLowerCase()} books generated with BookAI. Browse AI-written ${genre.toLowerCase()} manuscripts, outlines, and public chapters.`,
     path: `/books/genre/${slug}`,
     keywords: [

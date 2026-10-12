@@ -11,7 +11,7 @@ import {
 } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "FAQ",
+  title: "AI Book Generator FAQ",
   description:
     "Answers about BookAI: how AI book generation works, exports, audiobooks, the free plan, ownership, and public book pages.",
   path: "/faq",
