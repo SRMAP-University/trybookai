@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "@/components/marketing/marketing.css";
 import Link from "next/link";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";

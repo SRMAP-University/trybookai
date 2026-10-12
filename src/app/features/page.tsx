@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "@/components/marketing/marketing.css";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { CTA } from "@/components/marketing/cta";

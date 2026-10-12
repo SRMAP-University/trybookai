@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { LogoMark } from "@/components/marketing/landing-showcase";
+import "@/components/marketing/marketing.css";
 
 const navLinks = [
   { href: "/", label: "Home" },
