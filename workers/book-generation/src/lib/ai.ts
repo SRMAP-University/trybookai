@@ -1,27 +1,34 @@
-import { stripReasoning, type LlmResult } from "../../../../src/lib/book-generator/core";
+import {
+  CF_FALLBACK_MODEL,
+  CF_WRITER_MODEL,
+  stripReasoning,
+  workersAiOptions,
+  type LlmResult,
+} from "../../../../src/lib/book-generator/core";
 
+/** Book.model → Workers AI id. Retired ids ("llama-3.3", gpt-4o) use the default writer. */
 const CF_MODEL_MAP: Record<string, string> = {
-  "llama-3.3": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "nemotron-3-super": CF_WRITER_MODEL,
+  "llama-3.3": CF_WRITER_MODEL,
   "deepseek-r1": "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
   "qwen-32b": "@cf/qwen/qwen2.5-32b-instruct",
-  "gpt-4o": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "gpt-4o-mini": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "gpt-4o": CF_WRITER_MODEL,
+  "gpt-4o-mini": CF_WRITER_MODEL,
 };
 
 const GROQ_MODEL_MAP: Record<string, string> = {
   "groq-llama-3.3": "llama-3.3-70b-versatile",
 };
 
-export const OUTLINE_CF_MODEL = CF_MODEL_MAP["llama-3.3"];
+export const OUTLINE_CF_MODEL = CF_WRITER_MODEL;
 
 export function isGroqBookModel(modelId: string | null | undefined): boolean {
   return Boolean(modelId && GROQ_MODEL_MAP[modelId]);
 }
 
 export function resolveCfModel(modelId: string | null | undefined): string {
-  if (!modelId) return CF_MODEL_MAP["llama-3.3"];
-  if (isGroqBookModel(modelId)) return CF_MODEL_MAP["llama-3.3"];
-  return CF_MODEL_MAP[modelId] ?? CF_MODEL_MAP["llama-3.3"];
+  if (!modelId || isGroqBookModel(modelId)) return CF_WRITER_MODEL;
+  return CF_MODEL_MAP[modelId] ?? CF_WRITER_MODEL;
 }
 
 export function extractText(result: unknown): string {
@@ -106,11 +113,33 @@ export async function runAiDetailed(
     messages,
     max_tokens: maxTokens,
     temperature: options.temperature ?? 0.7,
+    ...workersAiOptions(model),
   });
   return {
     text: stripThinking(extractText(result)),
     truncated: wasTruncated(result, maxTokens),
   };
+}
+
+/** Retry on the fallback model when a call fails or comes back empty. */
+async function runAiWithFallback(
+  ai: Ai,
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  options: AiOptions
+): Promise<LlmResult> {
+  try {
+    const result = await runAiDetailed(ai, model, messages, options);
+    if (result.text.trim()) return result;
+    throw new Error("empty response");
+  } catch (error) {
+    if (model === CF_FALLBACK_MODEL) throw error;
+    console.warn(
+      `[ai] ${model} failed; falling back to ${CF_FALLBACK_MODEL}:`,
+      error instanceof Error ? error.message : error
+    );
+    return runAiDetailed(ai, CF_FALLBACK_MODEL, messages, options);
+  }
 }
 
 export async function runAi(
@@ -119,7 +148,7 @@ export async function runAi(
   messages: Array<{ role: string; content: string }>,
   options: AiOptions = {}
 ): Promise<string> {
-  return (await runAiDetailed(ai, model, messages, options)).text;
+  return (await runAiWithFallback(ai, model, messages, options)).text;
 }
 
 async function runGroqAi(
@@ -196,11 +225,11 @@ export async function runGenerationAiDetailed(
         "[ai] Super Fast failed; falling back to Normal:",
         error instanceof Error ? error.message : error
       );
-      return runAiDetailed(env.AI, CF_MODEL_MAP["llama-3.3"], messages, options);
+      return runAiWithFallback(env.AI, CF_WRITER_MODEL, messages, options);
     }
   }
 
-  return runAiDetailed(env.AI, cfModel, messages, options);
+  return runAiWithFallback(env.AI, cfModel, messages, options);
 }
 
 export async function runGenerationAi(

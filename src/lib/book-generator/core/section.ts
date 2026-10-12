@@ -215,6 +215,10 @@ export function composeSectionPrompt(input: SectionContextInput): ComposedSectio
   const planFor = (s: { number: number; title: string }) =>
     text(findOutlineSection(outlineChapter, s.number, s.title)?.summary);
   const sectionPlan = planFor(section);
+  const keyPoints = asStringArray(
+    (findOutlineSection(outlineChapter, section.number, section.title) as { keyPoints?: unknown } | null)
+      ?.keyPoints
+  ).slice(0, 6);
 
   const siblings = input.chapterSections.length
     ? input.chapterSections
@@ -366,12 +370,17 @@ export function composeSectionPrompt(input: SectionContextInput): ComposedSectio
 
   // ── PREVIOUS TEXT ───────────────────────────────────────────────────────
   const prev = input.previousText;
+  // Chapters are drafted in parallel: when the previous chapter isn't written
+  // yet, open from its planned ending instead.
+  const previousChapter = input.priorChapters.find((c) => c.number === chapter.number - 1);
   const immediate = prev?.content.trim()
     ? `PREVIOUS TEXT — the last lines of ${prev.fromPreviousChapter ? "the previous chapter" : "the previous section"}. Continue from here; do not repeat or paraphrase it:\n"""\n${tailText(
         prev.content,
         prev.fromPreviousChapter ? BUDGET.previousChapter : BUDGET.previousSameChapter
       )}\n"""`
-    : "PREVIOUS TEXT — none: this is the first section of the book.";
+    : flags.firstInChapter && previousChapter
+      ? `PREVIOUS TEXT — Chapter ${previousChapter.number} "${previousChapter.title}" is being written at the same time. Open this chapter so it follows naturally from that chapter's planned ending:\n${clipText(previousChapter.summary, 900) || "(no plan)"}`
+      : "PREVIOUS TEXT — none: this is the first section of the book.";
 
   // ── TASK ────────────────────────────────────────────────────────────────
   const beats = Math.min(8, Math.max(2, Math.round(targetWords / 350)));
@@ -380,20 +389,43 @@ export function composeSectionPrompt(input: SectionContextInput): ComposedSectio
     : format.wantsSubheadings
       ? "subsections (## headings)"
       : "parts";
+  const headings = format.wantsSubheadings;
+  const closesChapter = flags.lastInChapter || flags.lastOfBook;
+  const bookCraft = narrative
+    ? [
+        "- Dramatize the important moments as full scenes — action, dialogue, sensory detail and the viewpoint character's inner response. Summarize only the transitions between them.",
+        "- If time or place jumps inside the section, mark the break with a line containing only * * *.",
+        "- Don't end on a summary or a moral.",
+      ]
+    : [
+        "- Go deep, not wide: for every main idea explain why it matters and how to apply it, with a concrete example, scenario, number or case. Prefer one fully worked example over several shallow mentions.",
+        flags.firstInChapter && headings
+          ? "- Open the chapter with a short hook — a scenario, question or striking fact — before the first heading."
+          : null,
+        closesChapter && headings && format.layout === "practical"
+          ? '- Before closing, add a short "## Try This" exercise with 2–3 concrete steps the reader can take this week.'
+          : null,
+        closesChapter && headings
+          ? `- Finish ${flags.lastOfBook ? "the book" : "the chapter"} with a "## Key Takeaways" heading and 3–5 specific bullet points drawn from this ${flags.lastOfBook ? "book" : "chapter"}.`
+          : "- Don't end with a recap or a preview of the next section.",
+      ];
   const task = [
     `YOUR SECTION — Section ${position + 1} of ${siblings.length} in Chapter ${chapter.number}: "${section.title}"`,
     `Plan: ${sectionPlan || "Not specified — infer it from the title and the chapter plan."}`,
+    keyPoints.length
+      ? `${narrative ? "Beats to cover, in order" : "Must cover"}:\n${keyPoints.map((p) => `- ${p}`).join("\n")}`
+      : null,
     `Role: ${roleText(narrative, chapter.number, flags)}`,
-    `Length: about ${lengthPhrase(targetWords, book.language)}. Develop it across roughly ${beats} ${units}, ${narrative ? "showing rather than summarizing" : "with concrete explanation and examples"}.`,
+    `Length: about ${lengthPhrase(targetWords, book.language)} — stay within about 15% of that. Develop it across roughly ${beats} ${units}, ${narrative ? "showing rather than summarizing" : "with concrete explanation and examples"}.`,
     "",
     "Rules:",
     "- Begin exactly where the previous text stops. Don't recap earlier sections or re-introduce characters and ideas the reader already knows.",
     "- Cover this section's plan fully, then stop. Leave material planned for later sections to them.",
-    narrative
-      ? "- Don't end on a summary or a moral."
-      : "- Don't end with a recap or a preview of the next section.",
+    ...bookCraft,
     `- ${sectionOutputHint(format)}`,
-  ].join("\n");
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
 
   const systemStyle = buildStyleBlock(book, { bible: input.bible });
   const language = languageName(book.language);

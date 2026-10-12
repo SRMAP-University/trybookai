@@ -96,17 +96,18 @@ export async function assembleSectionContext(
     }),
   ]);
 
+  // Only the previous chapter's final section hands off; if it isn't written
+  // yet, the prompt uses that chapter's planned ending.
   const prevChapterEnd = prevInChapter?.content
     ? null
     : await db.section.findFirst({
-        where: {
-          chapter: { bookId, number: { lt: chapter.number } },
-          wordCount: { gt: 0 },
-        },
-        orderBy: [{ chapter: { number: "desc" } }, { number: "desc" }],
-        select: { content: true },
+        where: { chapter: { bookId, number: chapter.number - 1 } },
+        orderBy: { number: "desc" },
+        select: { content: true, wordCount: true },
       });
-  const previousContent = prevInChapter?.content ?? prevChapterEnd?.content ?? null;
+  const previousContent =
+    prevInChapter?.content ??
+    (prevChapterEnd && prevChapterEnd.wordCount > 0 ? prevChapterEnd.content : null);
   const openThreads = asStringArray(book.storyState?.openThreads);
 
   const composed = composeSectionPrompt({

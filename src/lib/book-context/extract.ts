@@ -1,3 +1,4 @@
+import { OUTLINE_AI_MODEL } from "@/lib/ai-models";
 import { createChatCompletion } from "@/lib/book-generator/llm";
 import {
   buildChapterSummaryMessages,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/book-generator/core";
 import { db } from "@/lib/db";
 
-const LEDGER_MODEL = "llama-3.3";
+const LEDGER_MODEL = OUTLINE_AI_MODEL;
 
 /** Ledger pass over a draft. Pure: nothing is stored until the final draft is chosen. */
 export async function extractSectionUpdate(input: {

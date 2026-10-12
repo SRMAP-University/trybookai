@@ -108,14 +108,16 @@ export async function assembleSectionContext(
     ORDER BY number DESC
     LIMIT 1
   `;
+  // Only the previous chapter's final section hands off; when chapters run in
+  // parallel it may not be written yet, and the prompt uses its planned ending.
   const [prevChapterEnd] = prevInChapter?.content
     ? [undefined]
-    : await sql<{ content: string | null }[]>`
-        SELECT s.content
+    : await sql<{ content: string | null; wordCount: number }[]>`
+        SELECT s.content, s."wordCount"
         FROM "Section" s
         INNER JOIN "Chapter" c ON c.id = s."chapterId"
-        WHERE c."bookId" = ${bookId} AND c.number < ${row.chapterNumber} AND s."wordCount" > 0
-        ORDER BY c.number DESC, s.number DESC
+        WHERE c."bookId" = ${bookId} AND c.number = ${row.chapterNumber - 1}
+        ORDER BY s.number DESC
         LIMIT 1
       `;
 
@@ -148,7 +150,9 @@ export async function assembleSectionContext(
   `;
 
   const next = chapters.find((c) => c.number > row.chapterNumber) ?? null;
-  const previousContent = prevInChapter?.content ?? prevChapterEnd?.content ?? null;
+  const previousContent =
+    prevInChapter?.content ??
+    (prevChapterEnd && prevChapterEnd.wordCount > 0 ? prevChapterEnd.content : null);
   const openThreads = asStringArray(story?.openThreads);
 
   const input: SectionContextInput = {

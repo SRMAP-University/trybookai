@@ -16,6 +16,9 @@ import {
   writeSectionStep,
 } from "./lib/generate";
 
+/** Chapters drafted at once after chapter 1. */
+const CHAPTER_LANES = 4;
+
 function isPausedError(error: unknown): boolean {
   if (error instanceof GenerationPausedError) return true;
   const name = (error as { name?: string } | null)?.name;
@@ -78,29 +81,52 @@ export class BookGenerationWorkflow extends WorkflowEntrypoint<
         );
       });
 
+      // Sections run in order within a chapter (each continues the last).
+      const chapters = new Map<number, typeof sections>();
       for (const section of sections) {
-        const result = await step.do(
-          `section:${section.id}`,
-          {
-            retries: { limit: 2, delay: "15 seconds", backoff: "linear" },
-            // Draft + continuation passes + continuity ledger can take several calls.
-            timeout: "15 minutes",
-          },
-          async () => {
-            return withSql(this.env, async (sql) =>
-              writeSectionStep(
-                sql,
-                this.env.AI,
-                this.env,
-                bookId,
-                jobId,
-                section.id
-              )
-            );
-          }
-        );
-        if (result && "allDone" in result && result.allDone) break;
+        const list = chapters.get(section.chapterNumber) ?? [];
+        list.push(section);
+        chapters.set(section.chapterNumber, list);
       }
+      const queue = [...chapters.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([number, list]) => ({ number, list }));
+
+      const writeChapter = async (list: typeof sections) => {
+        for (const section of list) {
+          await step.do(
+            `section:${section.id}`,
+            {
+              retries: { limit: 2, delay: "15 seconds", backoff: "linear" },
+              // Draft + continuation passes + continuity ledger can take several calls.
+              timeout: "15 minutes",
+            },
+            async () => {
+              return withSql(this.env, async (sql) =>
+                writeSectionStep(
+                  sql,
+                  this.env.AI,
+                  this.env,
+                  bookId,
+                  jobId,
+                  section.id
+                )
+              );
+            }
+          );
+        }
+      };
+
+      // Chapter 1 sets the voice, cast and terms the rest build on, so it is
+      // written first; the remaining chapters are drafted in parallel lanes.
+      if (queue[0]?.number === 1) await writeChapter(queue.shift()!.list);
+      await Promise.all(
+        Array.from({ length: Math.min(CHAPTER_LANES, queue.length) }, async () => {
+          for (let next = queue.shift(); next; next = queue.shift()) {
+            await writeChapter(next.list);
+          }
+        })
+      );
 
       const final = await step.do("finalize", async () => {
         return withSql(this.env, async (sql) =>

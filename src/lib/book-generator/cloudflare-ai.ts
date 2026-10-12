@@ -1,3 +1,5 @@
+import { workersAiOptions } from "@/lib/book-generator/core/models";
+
 type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
@@ -157,6 +159,7 @@ export async function runCloudflareAiStream(
       temperature: options.temperature ?? 0.7,
       max_tokens: options.max_tokens ?? 8192,
       stream: true,
+      ...workersAiOptions(model),
     }),
   });
 
@@ -229,6 +232,7 @@ export async function runCloudflareAiDetailed(
       messages: options.messages,
       temperature: options.temperature ?? 0.7,
       max_tokens: maxTokens,
+      ...workersAiOptions(model),
     }),
     signal: AbortSignal.timeout(300_000),
   });
@@ -249,10 +253,14 @@ export async function runCloudflareAiDetailed(
     );
   }
 
-  const usage = (data.result as { usage?: { completion_tokens?: number } } | null)
-    ?.usage;
-  const truncated =
-    typeof usage?.completion_tokens === "number" &&
-    usage.completion_tokens >= maxTokens - 4;
+  const result = data.result as {
+    usage?: { completion_tokens?: number };
+    choices?: Array<{ finish_reason?: string }>;
+  } | null;
+  const finishReason = result?.choices?.[0]?.finish_reason;
+  const used = result?.usage?.completion_tokens;
+  const truncated = finishReason
+    ? finishReason === "length"
+    : typeof used === "number" && used >= maxTokens - 4;
   return { text, truncated };
 }

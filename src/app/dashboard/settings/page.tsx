@@ -26,6 +26,7 @@ import {
   DEFAULT_AI_MODEL,
   STYLE_PRESETS,
 } from "@/lib/constants";
+import { normalizeModelId } from "@/lib/ai-models";
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -99,7 +100,7 @@ function SettingsPageContent() {
             defaultPov: data.defaultPov || "third",
             defaultTense: data.defaultTense || "past",
             defaultLanguage: data.defaultLanguage || "en",
-            defaultModel: data.defaultModel || DEFAULT_AI_MODEL,
+            defaultModel: normalizeModelId(data.defaultModel || DEFAULT_AI_MODEL),
             defaultAudience: data.defaultAudience || "General readers",
             defaultTargetPages: Number(data.defaultTargetPages) || 10,
             defaultWordsPerPage: Number(data.defaultWordsPerPage) || 300,

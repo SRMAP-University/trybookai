@@ -27,6 +27,7 @@ import {
   STYLE_PRESETS,
   PLANS,
 } from "@/lib/constants";
+import { normalizeModelId } from "@/lib/ai-models";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useDashboardUser } from "@/components/dashboard/user-context";
@@ -176,7 +177,7 @@ export function NewBookForm() {
           pov: data.defaultPov ?? prev.pov,
           tense: data.defaultTense ?? prev.tense,
           language: data.defaultLanguage ?? prev.language,
-          model: data.defaultModel ?? prev.model,
+          model: data.defaultModel ? normalizeModelId(data.defaultModel) : prev.model,
           creativity: data.defaultCreativity ?? prev.creativity,
           wordsPerPage: data.defaultWordsPerPage ?? prev.wordsPerPage,
           sectionsPerChapter:

@@ -143,7 +143,7 @@ function buildFormatInstructions(profile: {
       "- Write continuous literary prose for this section.",
       "- Do not use markdown headings, tables, or figure markers.",
       "- Do not invent a chapter title or section title — those already exist.",
-      "- Use paragraph breaks only. Dialogue is allowed.",
+      "- Use paragraph breaks; mark a scene break with a line containing only * * *. Dialogue is allowed.",
     ].join("\n");
   }
 
