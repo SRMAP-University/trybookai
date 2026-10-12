@@ -183,7 +183,8 @@ export function cleanSectionOutput(
 
   while (lines.length) {
     const line = lines[lines.length - 1].trim();
-    if (!line || /^([-*_])\1{2,}$/.test(line) || isTrailingMeta(line)) {
+    // Trailing rules or scene breaks ("---", "* * *") separate nothing.
+    if (!line || /^([-*_])(\s*\1){2,}$/.test(line) || isTrailingMeta(line)) {
       lines.pop();
       continue;
     }

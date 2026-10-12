@@ -77,10 +77,12 @@ export async function heartbeatJob(
   jobId: string,
   payload: Record<string, unknown>
 ) {
+  // Merge, don't replace: lastPushMilestone must survive per-section heartbeats
+  // (replacing it re-sent the 25% push after every section).
   await sql`
     UPDATE "GenerationJob"
     SET
-      payload = ${sql.json(payload as never)},
+      payload = COALESCE(payload, '{}'::jsonb) || ${sql.json(payload as never)}::jsonb,
       "updatedAt" = NOW()
     WHERE id = ${jobId}
   `;
@@ -338,9 +340,9 @@ export async function generateOutlineStep(
 export async function listPendingSections(
   sql: Sql,
   bookId: string
-): Promise<Array<{ id: string; title: string }>> {
-  const rows = await sql<{ id: string; title: string }[]>`
-    SELECT s.id, s.title
+): Promise<Array<{ id: string; title: string; chapterNumber: number }>> {
+  const rows = await sql<{ id: string; title: string; chapterNumber: number }[]>`
+    SELECT s.id, s.title, c.number AS "chapterNumber"
     FROM "Section" s
     INNER JOIN "Chapter" c ON c.id = s."chapterId"
     WHERE c."bookId" = ${bookId}

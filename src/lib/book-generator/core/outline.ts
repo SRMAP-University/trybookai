@@ -6,10 +6,16 @@
 
 import { isNarrativeBook } from "./format";
 import { tokensPerWord } from "./sizing";
-import { clipText, languageName, lengthPhrase, parseJsonLoose } from "./text";
+import { asStringArray, clipText, languageName, lengthPhrase, parseJsonLoose } from "./text";
 import type { ChatMessage, LlmCall } from "./types";
 
-export type OutlineSection = { number: number; title: string; summary: string };
+export type OutlineSection = {
+  number: number;
+  title: string;
+  summary: string;
+  /** What the section must develop: story beats, or concepts/examples/steps. */
+  keyPoints: string[];
+};
 export type OutlineChapter = {
   number: number;
   title: string;
@@ -47,21 +53,34 @@ const SINGLE_CALL_MAX_SECTIONS = 24;
 const SECTIONS_PER_BATCH = 24;
 const BATCH_CONCURRENCY = 3;
 /** Planned output size for one call; leaves headroom under the 8192 cap for retries. */
-const CALL_TOKEN_TARGET = 5500;
-/** Approximate output tokens per planned item, in English. */
-const TOKENS = { base: 900, chapter: 160, section: 150 } as const;
+const CALL_TOKEN_TARGET = 6000;
+/** Approximate output tokens per planned item, in English (sections carry key points). */
+const TOKENS = { base: 1200, chapter: 230, section: 240 } as const;
 
 const NARRATIVE_RULES = [
   "- Shape the chapters into one complete arc: establish the protagonist, world and central conflict early; escalate with complications and reversals through the middle; build to a climax near the end; resolve the central conflict in the final chapter.",
   "- Each section is one scene or sequence with a goal, an obstacle and an outcome that changes the situation. Name the characters involved.",
+  "- Chapters are drafted in parallel, so every chapter summary states where it opens (who, where, what situation) and exactly how it ends.",
   "- Keep names, relationships and facts consistent across the whole plan.",
 ];
 
 const TEACHING_RULES = [
-  "- Order chapters so understanding builds: foundations first, then methods and application, then advanced topics, ending with synthesis or an action plan.",
-  "- Each section owns a distinct sub-topic and names the specific concepts, steps, examples or cases it covers.",
-  "- Plan sections that naturally include comparisons, frameworks, tables, or visual explanations when those help the reader.",
+  "- Chapter 1 opens the book: why the subject matters to this reader, what they will be able to do, and how the book is organized. The final chapter closes with a synthesis and concrete next steps.",
+  "- Order chapters so understanding builds: foundations first, then methods and application, then advanced topics.",
+  "- Each section owns a distinct sub-topic and names the specific concepts, frameworks, steps, examples or cases it covers.",
+  "- Plan sections that naturally include worked examples, comparisons, frameworks, tables, or visual explanations when those help the reader.",
 ];
+
+/** About one key point per 300 words, so short sections aren't overstuffed. */
+function keyPointCount(req: OutlineRequest): number {
+  const words = (req.targetPages * req.wordsPerPage) / Math.max(1, req.chapterCount * req.sectionsPerChapter);
+  return Math.min(5, Math.max(2, Math.round(words / 300)));
+}
+
+const KEY_POINTS_RULE = (narrative: boolean, count: number) =>
+  narrative
+    ? `- keyPoints: ${count} story beats for the section, in order — concrete actions, revelations, decisions and turns, with the characters involved.`
+    : `- keyPoints: ${count} specific things the section must teach — named concepts, frameworks, steps, worked examples, data or cases. Never generic.`;
 
 const CAST_RULE =
   "- characters: the main recurring characters or real people (at most 8; an empty array if there are none). settings: key recurring places (at most 6; may be empty).";
@@ -69,6 +88,7 @@ const CAST_RULE =
 function sectionRules(req: OutlineRequest, narrative: boolean): string[] {
   return [
     '- Each section summary is 2–3 sentences saying concretely what happens or what is covered (names, events, concepts, examples) and where the section ends up. No vague teasers such as "explores" or "delves into".',
+    KEY_POINTS_RULE(narrative, keyPointCount(req)),
     '- Section titles are unique and specific. Do not reuse generic titles such as "Introduction" or "Conclusion" in every chapter.',
     "- No two sections may cover the same events or material; every section moves the book forward.",
     ...(narrative ? NARRATIVE_RULES : TEACHING_RULES),
@@ -95,7 +115,7 @@ function fullOutlineMessages(req: OutlineRequest, narrative: boolean): ChatMessa
     "You are an expert book architect. Another writer will draft this book one section at a time, seeing only your plan for each section, so the plan must be specific and internally consistent.",
     "",
     "Return only JSON with this shape:",
-    '{"title": string, "synopsis": string, "characters": [{"name": string, "role": string, "description": string}], "settings": [{"name": string, "description": string}], "chapters": [{"title": string, "summary": string, "sections": [{"title": string, "summary": string}]}]}',
+    '{"title": string, "synopsis": string, "characters": [{"name": string, "role": string, "description": string}], "settings": [{"name": string, "description": string}], "chapters": [{"title": string, "summary": string, "sections": [{"title": string, "summary": string, "keyPoints": [string]}]}]}',
     "",
     "Rules:",
     `- Exactly ${req.chapterCount} chapters, each with exactly ${req.sectionsPerChapter} sections.`,
@@ -145,7 +165,7 @@ function sectionBatchMessages(
     "You are an expert book architect planning the sections of specific chapters. The whole book's plan is given; another writer drafts each section from your plan alone.",
     "",
     "Return only JSON with this shape:",
-    '{"chapters": [{"number": number, "sections": [{"title": string, "summary": string}]}]}',
+    '{"chapters": [{"number": number, "sections": [{"title": string, "summary": string, "keyPoints": [string]}]}]}',
     "",
     "Rules:",
     `- Plan only the requested chapters, each with exactly ${req.sectionsPerChapter} sections, in order.`,
@@ -206,6 +226,9 @@ function normalizeSections(raw: unknown, expected: number): OutlineSection[] {
     .map((s) => ({
       title: str(s.title ?? s.name, 200),
       summary: str(s.summary ?? s.description, 900),
+      keyPoints: asStringArray(s.keyPoints ?? s.key_points ?? s.beats)
+        .map((point) => point.slice(0, 240))
+        .slice(0, 6),
     }))
     .filter((s) => s.title || s.summary)
     .slice(0, expected)
@@ -213,6 +236,7 @@ function normalizeSections(raw: unknown, expected: number): OutlineSection[] {
       number: i + 1,
       title: s.title || `Section ${i + 1}`,
       summary: s.summary,
+      keyPoints: s.keyPoints,
     }));
 }
 
@@ -389,7 +413,7 @@ function ensureSections(chapter: OutlineChapter): OutlineChapter {
   if (chapter.sections.length) return chapter;
   return {
     ...chapter,
-    sections: [{ number: 1, title: chapter.title, summary: chapter.summary }],
+    sections: [{ number: 1, title: chapter.title, summary: chapter.summary, keyPoints: [] }],
   };
 }
 

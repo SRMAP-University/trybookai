@@ -2,6 +2,7 @@ import {
   runCloudflareAiDetailed,
   runCloudflareAiStream,
 } from "@/lib/book-generator/cloudflare-ai";
+import { CF_FALLBACK_MODEL } from "@/lib/book-generator/core/models";
 import type { LlmResult } from "@/lib/book-generator/core/types";
 import {
   DEFAULT_AI_MODEL,
@@ -322,6 +323,25 @@ async function runGroqAiStream(
   return { text: full, truncated: finishReason === "length" };
 }
 
+/** Retry on the fallback model when a call fails or comes back empty. */
+async function runCloudflareWithFallback(
+  model: string,
+  options: { messages: ChatMessage[]; temperature: number; max_tokens: number }
+): Promise<LlmResult> {
+  try {
+    const result = await runCloudflareAiDetailed(model, options);
+    if (result.text.trim()) return result;
+    throw new Error("empty response");
+  } catch (error) {
+    if (model === CF_FALLBACK_MODEL) throw error;
+    console.warn(
+      `[llm] ${model} failed; falling back to ${CF_FALLBACK_MODEL}:`,
+      error instanceof Error ? error.message : error
+    );
+    return runCloudflareAiDetailed(CF_FALLBACK_MODEL, options);
+  }
+}
+
 export async function createChatCompletion(
   options: ChatCompletionOptions
 ): Promise<string> {
@@ -358,7 +378,7 @@ export async function createChatCompletionDetailed(
               max_tokens,
             })
         )
-      : await runCloudflareAiDetailed(runtimeModel, {
+      : await runCloudflareWithFallback(runtimeModel, {
           messages,
           temperature,
           max_tokens,

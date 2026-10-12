@@ -5,6 +5,7 @@
  */
 
 export * from "./types";
+export * from "./models";
 export * from "./text";
 export * from "./sizing";
 export * from "./format";

@@ -111,6 +111,7 @@ export function proseMaxTokens(
 ): number {
   return Math.min(
     ceiling,
-    Math.max(1024, Math.ceil(words * tokensPerWord(language) * 1.5))
+    // 2x headroom: models overshoot short targets, and a cut-off section loses its ending.
+    Math.max(1200, Math.ceil(words * tokensPerWord(language) * 2))
   );
 }
