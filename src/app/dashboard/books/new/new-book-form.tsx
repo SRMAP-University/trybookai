@@ -43,6 +43,7 @@ import {
 } from "./form-controls";
 import { BookPreviewCover, PreviewStats, genreColor } from "./book-preview";
 import type { TemplateCover } from "@/lib/template-covers";
+import { formatWords, readingTime } from "@/lib/reading-stats";
 
 type FormState = {
   title: string;
@@ -87,9 +88,6 @@ const CREATIVITY_OPTIONS = CREATIVITY_LEVELS.map((c) => ({
   label: c.label,
 }));
 
-/** Average adult silent-reading speed, for the length estimate. */
-const READING_WPM = 250;
-
 const initialForm: FormState = {
   title: "",
   description: "",
@@ -116,18 +114,6 @@ const initialForm: FormState = {
   startGeneration: true,
   generateAudiobook: false,
 };
-
-function formatWords(words: number) {
-  if (words < 1000) return String(words);
-  return `${(words / 1000).toFixed(words < 10_000 ? 1 : 0).replace(/\.0$/, "")}k`;
-}
-
-function readingTime(words: number) {
-  const minutes = Math.max(1, Math.round(words / READING_WPM));
-  if (minutes < 60) return `${minutes} min`;
-  const hours = minutes / 60;
-  return `${hours.toFixed(hours < 10 ? 1 : 0).replace(/\.0$/, "")} hr`;
-}
 
 export function NewBookForm({
   templateCovers = {},
@@ -258,21 +244,22 @@ export function NewBookForm({
       setForm((prev) => ({ ...prev, templateId: "" }));
       return;
     }
+    // Fit the template to the plan's per-book limit rather than letting the
+    // author fill in the whole form and only then hit the upgrade dialog.
+    const targetPages = Math.min(template.targetPages, maxBookPages);
     setForm((prev) => ({
       ...prev,
       templateId,
       genre: template.genre,
       tone: template.tone,
-      targetPages: template.targetPages,
+      targetPages,
       pov: template.pov,
       tense: template.tense,
       includeDialogue: template.includeDialogue,
       includeExamples: template.includeExamples,
       description: prev.description || template.description,
     }));
-    const isPreset = PAGE_PRESETS.some(
-      (p) => p.pages === Number(template.targetPages)
-    );
+    const isPreset = PAGE_PRESETS.some((p) => p.pages === targetPages);
     setCustomLength(!isPreset);
     if (typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches) {
       setShowAdvanced(true);
@@ -368,6 +355,10 @@ export function NewBookForm({
 
   const words = form.targetPages * form.wordsPerPage;
   const overPlan = form.targetPages > maxBookPages;
+  const template = BOOK_TEMPLATES.find((t) => t.id === form.templateId);
+  // The chosen template normally runs longer than this plan allows per book.
+  const templateTrimmed =
+    !overPlan && template !== undefined && template.targetPages > maxBookPages;
   const narrate = canGenerateAudio && form.generateAudiobook;
   const ctaLabel = form.startGeneration
     ? narrate
@@ -397,6 +388,7 @@ export function NewBookForm({
       <TemplatePicker
         selected={form.templateId}
         covers={templateCovers}
+        maxBookPages={maxBookPages}
         onSelect={applyTemplate}
       />
 
@@ -521,6 +513,19 @@ export function NewBookForm({
                 Your plan writes up to {maxBookPages} pages per book.{" "}
                 <UpgradeLink plan="PRO" className="font-medium hover:underline">
                   Upgrade for longer books
+                </UpgradeLink>
+              </p>
+            )}
+            {templateTrimmed && (
+              <p className="text-[12.5px] text-[#697386]">
+                The {template.name.toLowerCase()} template usually runs{" "}
+                {template.targetPages} pages; your plan writes up to{" "}
+                {maxBookPages} per book.{" "}
+                <UpgradeLink
+                  plan="PRO"
+                  className="font-medium text-[#635bff] hover:underline"
+                >
+                  Upgrade for the full length
                 </UpgradeLink>
               </p>
             )}
@@ -911,10 +916,13 @@ export function NewBookForm({
 function TemplatePicker({
   selected,
   covers,
+  maxBookPages,
   onSelect,
 }: {
   selected: string;
   covers: Record<string, TemplateCover>;
+  /** Templates show the length they will actually get on this plan. */
+  maxBookPages: number;
   onSelect: (templateId: string) => void;
 }) {
   const items = [
@@ -922,7 +930,7 @@ function TemplatePicker({
     ...BOOK_TEMPLATES.map((t) => ({
       id: t.id as string,
       name: t.name as string,
-      meta: `${t.targetPages}p · ${t.genre}`,
+      meta: `${Math.min(t.targetPages, maxBookPages)}p · ${t.genre}`,
       genre: t.genre as string | null,
     })),
   ];

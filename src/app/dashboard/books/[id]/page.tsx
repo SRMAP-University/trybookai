@@ -6,20 +6,25 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ChevronDown,
+  CircleCheck,
+  Clock,
   CopyPlus,
   Download,
+  Ellipsis,
   ExternalLink,
+  Eye,
   Globe,
   Headphones,
   ImageIcon,
   Loader2,
+  LoaderCircle,
   Lock,
   MessageSquareWarning,
   PenLine,
   Play,
   RefreshCw,
   RotateCcw,
-  X,
+  Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -27,6 +32,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BookCover } from "@/components/dashboard/book-cover";
@@ -52,6 +58,14 @@ import { GenerationSpeedDialog } from "@/components/dashboard/generation-speed-d
 import { PremiumUpgradeDialog } from "@/components/dashboard/premium-upgrade-dialog";
 import type { GenerationSpeed } from "@/lib/ai-models";
 import { BookManuscript } from "@/components/book/book-manuscript";
+import { serifDisplay } from "@/components/marketing/home/fonts";
+import {
+  AI_MODELS,
+  BOOK_LANGUAGES,
+  CREATIVITY_LEVELS,
+} from "@/lib/constants";
+import { countWords, formatWords, readingTime } from "@/lib/reading-stats";
+import { genreColor } from "@/app/dashboard/books/new/book-preview";
 
 interface Section {
   id: string;
@@ -114,13 +128,40 @@ interface BookEdition {
   createdAt: string;
 }
 
-const statusStyles: Record<string, string> = {
-  DRAFT: "text-[#697386]",
-  OUTLINING: "text-[#635bff]",
-  GENERATING: "text-[#9a6700] bg-[#fcf5e0] px-2 py-0.5 rounded",
-  COMPLETED: "text-[#0e6245] bg-[#cbf4c9] px-2 py-0.5 rounded",
-  FAILED: "text-[#df1b41] bg-[#fde8e8] px-2 py-0.5 rounded",
+const POV_LABELS: Record<string, string> = {
+  first: "First person",
+  second: "Second person",
+  third: "Third person",
+  omniscient: "Omniscient",
 };
+
+type ChapterState = "done" | "writing" | "pending";
+
+/** Secondary buttons on the dark hero stage. */
+const stageButton =
+  "h-10 rounded-full border border-white/15 bg-white/10 px-3 text-[13.5px] text-white hover:bg-white/20 hover:text-white sm:px-4";
+
+/**
+ * Whether a chapter is written, being written, or still to come. Streaming
+ * marks every chapter GENERATING, so fully written sections also count.
+ */
+function chapterState(
+  chapter: Chapter,
+  inProgress: boolean,
+  liveChapterId: string | undefined
+): ChapterState {
+  const written = chapter.sections.filter((s) => s.content?.trim()).length;
+  if (
+    chapter.status === "COMPLETED" ||
+    (chapter.sections.length > 0 && written === chapter.sections.length)
+  ) {
+    return "done";
+  }
+  if (inProgress && (liveChapterId ? liveChapterId === chapter.id : written > 0)) {
+    return "writing";
+  }
+  return "pending";
+}
 
 type LiveSection = {
   sectionId: string;
@@ -168,6 +209,7 @@ function BookDetailPageContent() {
   const [generating, setGenerating] = useState(false);
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [synopsisOpen, setSynopsisOpen] = useState(false);
   const [togglingVisibility, setTogglingVisibility] = useState(false);
   const [liveContent, setLiveContent] = useState("");
   const [liveSection, setLiveSection] = useState<LiveSection | null>(null);
@@ -933,6 +975,61 @@ function BookDetailPageContent() {
     );
   }
 
+  const inProgress =
+    generating || book.status === "GENERATING" || book.status === "OUTLINING";
+  const isComplete = book.status === "COMPLETED";
+  const canResume = book.status === "FAILED" || book.status === "PAUSED";
+  const canStart = (book.status === "DRAFT" || canResume) && !generating;
+  const canRegenerate =
+    book.status === "COMPLETED" ||
+    book.status === "DRAFT" ||
+    book.status === "FAILED";
+  const chapterCount = book.chapters.length;
+  const chapterStates = book.chapters.map((chapter) =>
+    chapterState(chapter, inProgress, liveSection?.chapterId)
+  );
+  const doneCount = chapterStates.filter((state) => state === "done").length;
+  // Counted only once finished: while writing, this would rerun per token.
+  const manuscriptWords = isComplete
+    ? book.chapters.reduce(
+        (total, chapter) =>
+          total +
+          chapter.sections.reduce((sum, s) => sum + countWords(s.content), 0),
+        0
+      )
+    : 0;
+  const progressLabel = inProgress
+    ? phaseMessage ??
+      (book.status === "OUTLINING" ? "Outlining chapters…" : "Writing…")
+    : book.status === "PAUSED"
+      ? "Paused"
+      : book.status === "FAILED"
+        ? "Stopped with an error"
+        : "Not started yet";
+  const languageLabel =
+    BOOK_LANGUAGES.find((l) => l.value === book.language)?.label ??
+    book.language;
+  const settings = [
+    {
+      label: "Voice",
+      value: `${POV_LABELS[book.pov] ?? book.pov}, ${book.tense}`,
+    },
+    {
+      label: "Model",
+      value: AI_MODELS.find((m) => m.value === book.model)?.label ?? book.model,
+    },
+    {
+      label: "Creativity",
+      value:
+        CREATIVITY_LEVELS.find((c) => c.value === book.creativity)?.label ??
+        String(book.creativity),
+    },
+    { label: "Language", value: languageLabel },
+    { label: "Audience", value: book.audience ?? "—" },
+    { label: "Dialogue", value: book.includeDialogue ? "On" : "Off" },
+    { label: "Examples", value: book.includeExamples ? "On" : "Off" },
+  ];
+
   return (
     <>
       <BookDerivativesDialog
@@ -986,538 +1083,742 @@ function BookDetailPageContent() {
         contentRef={liveRef}
       />
 
-      <div
-        className={cn(
-          "space-y-8"
-        )}
-      >
-      <div>
-        <Button variant="ghost" size="sm" className="-ml-2 mb-4 text-[#697386]" asChild>
-          <Link href="/dashboard">
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Back
+      <div className="space-y-8">
+        <nav className="hidden min-w-0 items-center gap-1.5 text-[13px] text-[#697386] sm:flex">
+          <Link
+            href="/dashboard/books"
+            className="inline-flex shrink-0 items-center gap-1 transition-colors hover:text-[#0a2540]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Your books
           </Link>
-        </Button>
+          <span className="text-[#c1c9d2]">/</span>
+          <span className="truncate text-[#0a2540]">{book.title}</span>
+        </nav>
 
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:items-start lg:text-left">
-            <div className="shrink-0 space-y-2">
-              <BookCover
-                title={book.title}
-                coverImage={book.coverImage}
-                generating={
-                  coverGenerating ||
-                  (!book.coverImage &&
-                    (book.status === "GENERATING" ||
-                      book.status === "OUTLINING" ||
-                      generating))
-                }
-                aspect="compact"
-                className="w-[132px] shadow-sm ring-1 ring-black/5 lg:w-[88px]"
+        {/* Hero: a dark stage lit by the book's own cover */}
+        <section className="relative isolate -mx-4 -mt-8 overflow-hidden bg-[#0a2540] px-5 pb-8 pt-16 text-white sm:mx-0 sm:mt-0 sm:rounded-3xl sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+          <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden">
+            {book.coverImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={book.coverImage}
+                alt=""
+                className="book-drift absolute inset-0 h-full w-full scale-125 object-cover opacity-80 blur-3xl saturate-150"
               />
-              {(book.chapters.length > 0 || book.coverImage) && (
-                <button
-                  type="button"
-                  onClick={regenerateCover}
-                  disabled={coverGenerating}
-                  className="flex w-full items-center justify-center gap-1 rounded-md border border-[#e6ebf1] bg-white px-2 py-1.5 text-[11px] font-medium text-[#697386] transition-colors hover:border-[#635bff]/30 hover:text-[#635bff] disabled:opacity-50"
-                >
-                  {coverGenerating ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <ImageIcon className="h-3 w-3" />
-                  )}
-                  {book.coverImage ? "New cover" : "Cover"}
-                </button>
-              )}
+            ) : (
+              <div
+                className="book-drift absolute inset-0 scale-125"
+                style={{
+                  background: `radial-gradient(circle at 30% 25%, ${genreColor(book.genre ?? "")} 0%, transparent 65%)`,
+                }}
+              />
+            )}
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,37,64,0.35)_0%,rgba(10,37,64,0.7)_55%,rgba(10,37,64,0.95)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.45)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.16),transparent_55%)] sm:bg-[radial-gradient(circle_at_14%_10%,rgba(255,255,255,0.16),transparent_45%)]" />
+          </div>
+
+          <Link
+            href="/dashboard/books"
+            aria-label="Your books"
+            className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:hidden"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+
+          <div className="grid items-center gap-6 text-center sm:grid-cols-[148px_minmax(0,1fr)] sm:text-left lg:grid-cols-[176px_minmax(0,1fr)] lg:gap-10">
+            <div className="book-rise relative mx-auto w-[150px] sm:mx-0 sm:w-full">
+              <div className="book-float relative">
+                <BookCover
+                  title={book.title}
+                  coverImage={book.coverImage}
+                  generating={coverGenerating || (!book.coverImage && inProgress)}
+                  aspect="card"
+                  className="w-full rounded-[3px_8px_8px_3px] shadow-[0_2px_6px_rgba(0,0,0,0.3),0_34px_60px_-24px_rgba(0,0,0,0.85)] ring-1 ring-white/10"
+                />
+                <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[3px_8px_8px_3px]">
+                  <div className="book-sheen absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                </div>
+              </div>
             </div>
-            <div className="min-w-0 w-full flex-1 pt-0.5">
-              <h1 className="text-[22px] font-semibold tracking-[-0.03em] text-[#0a2540] lg:text-[26px]">
+
+            <div className="min-w-0">
+              <StatusPill
+                status={book.status}
+                inProgress={inProgress}
+                liveChapter={liveSection?.chapterNumber}
+                chapterCount={chapterCount}
+              />
+              <h1
+                className={cn(
+                  serifDisplay.className,
+                  "mt-3 text-[34px] font-normal leading-[1.05] tracking-[-0.01em] text-white sm:text-[40px] lg:text-[48px]"
+                )}
+              >
                 {book.title}
               </h1>
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] lg:justify-start">
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13.5px] text-white/65 sm:justify-start">
                 {(book.edition ?? 1) > 1 && (
-                  <span className="rounded bg-[#f0efff] px-2 py-0.5 text-[11px] font-medium text-[#635bff]">
+                  <span className="rounded bg-white/10 px-2 py-0.5 text-[11.5px] font-medium text-[#c9c5ff]">
                     Edition {book.edition}
                   </span>
                 )}
-                <span
+                <span className="sm:hidden">
+                  {[book.genre, `${book.targetPages} pages`].filter(Boolean).join(" · ")}
+                </span>
+                <span className="hidden sm:inline">
+                  {[book.genre, book.tone, `${book.targetPages} pages`, languageLabel]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </div>
+              {book.description && (
+                <>
+                  <button
+                    type="button"
+                    aria-expanded={synopsisOpen}
+                    onClick={() => setSynopsisOpen((open) => !open)}
+                    className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-white/70 sm:hidden"
+                  >
+                    Synopsis
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 transition-transform duration-200",
+                        synopsisOpen && "rotate-180"
+                      )}
+                    />
+                  </button>
+                  <ExpandableDescription
+                    text={book.description}
+                    className={cn(
+                      "mt-3 max-w-[620px] text-left text-[14.5px] leading-relaxed text-white/75 sm:mt-4 sm:block [&>button:last-child]:text-[#c9c5ff]",
+                      synopsisOpen ? "block" : "hidden"
+                    )}
+                  />
+                </>
+              )}
+
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                {canStart && (
+                  <Button
+                    onClick={() => void startGeneration()}
+                    className="h-10 rounded-full bg-[#635bff] px-5 text-[14px] text-white hover:bg-[#7a73ff]"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    {canResume ? "Resume writing" : "Start writing"}
+                  </Button>
+                )}
+                {inProgress && dockOpen && (
+                  <Button
+                    onClick={() => setDockMinimized(false)}
+                    className="h-10 rounded-full bg-[#635bff] px-5 text-[14px] text-white hover:bg-[#7a73ff]"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Watch it write
+                  </Button>
+                )}
+                {isComplete && chapterCount > 0 && (
+                  <Button
+                    className="h-10 rounded-full bg-[#635bff] px-5 text-[14px] text-white hover:bg-[#7a73ff]"
+                    asChild
+                  >
+                    <a href={`/editor/${book.id}`} target="_blank" rel="noopener noreferrer">
+                      <PenLine className="h-3.5 w-3.5" />
+                      Open editor
+                    </a>
+                  </Button>
+                )}
+                {!isComplete && !inProgress && chapterCount > 0 && (
+                  <Button variant="ghost" className={stageButton} asChild>
+                    <a
+                      href={`/editor/${book.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Editor"
+                    >
+                      <PenLine className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Editor</span>
+                    </a>
+                  </Button>
+                )}
+                {isComplete && (
+                  <Button
+                    variant="ghost"
+                    aria-label="Create audio"
+                    onClick={() => setDerivativesOpen(true)}
+                    className={stageButton}
+                  >
+                    <Headphones className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Create audio</span>
+                  </Button>
+                )}
+                {inProgress && (
+                  <Button
+                    variant="ghost"
+                    onClick={stopGeneration}
+                    disabled={stopping}
+                    className="h-10 rounded-full border border-[#ff6b81]/40 bg-[#df1b41]/15 px-4 text-[13.5px] text-[#ffb3c0] hover:bg-[#df1b41]/25 hover:text-[#ffd0d7]"
+                  >
+                    {stopping ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Square className="h-3 w-3 fill-current" />
+                    )}
+                    Stop
+                  </Button>
+                )}
+                {!inProgress && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" aria-label="Export" className={stageButton}>
+                        <Download className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Export</span>
+                        <ChevronDown className="hidden h-3.5 w-3.5 opacity-70 sm:block" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-44">
+                      <ExportItems bookId={book.id} />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      aria-label="More actions"
+                      className={cn(stageButton, "w-10 px-0 sm:px-0")}
+                    >
+                      <Ellipsis className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-52">
+                    {inProgress && chapterCount > 0 && (
+                      <DropdownMenuItem asChild>
+                        <a href={`/editor/${book.id}`} target="_blank" rel="noopener noreferrer">
+                          <PenLine className="h-4 w-4" />
+                          Open editor
+                        </a>
+                      </DropdownMenuItem>
+                    )}
+                    {inProgress && (
+                      <DropdownMenuItem onSelect={() => void fetchBook()}>
+                        <RefreshCw className="h-4 w-4" />
+                        Refresh progress
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      disabled={creatingEdition}
+                      onSelect={() => void createEdition(true)}
+                    >
+                      {creatingEdition ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CopyPlus className="h-4 w-4" />
+                      )}
+                      New edition
+                    </DropdownMenuItem>
+                    {(chapterCount > 0 || book.coverImage) && (
+                      <DropdownMenuItem
+                        disabled={coverGenerating}
+                        onSelect={() => void regenerateCover()}
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                        {book.coverImage ? "New cover" : "Generate cover"}
+                      </DropdownMenuItem>
+                    )}
+                    {inProgress && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <ExportItems bookId={book.id} />
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setReviewMode("manual");
+                        setReviewOpen(true);
+                      }}
+                    >
+                      <MessageSquareWarning className="h-4 w-4" />
+                      Troubleshoot
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Progress while writing, stats once finished */}
+        {isComplete ? (
+          <section className="grid grid-cols-4 gap-2 sm:gap-3">
+            {[
+              { label: "Pages", value: String(book.currentPages || book.targetPages) },
+              { label: "Words", value: formatWords(manuscriptWords) },
+              { label: "Chapters", value: String(chapterCount) },
+              { label: "Read", value: readingTime(manuscriptWords) },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl bg-[#f6f9fc] px-2 py-2.5 text-center sm:px-4 sm:py-3 sm:text-left"
+              >
+                <p className="text-[11px] text-[#697386] sm:text-[12px]">{stat.label}</p>
+                <p className="mt-0.5 text-[17px] font-semibold tabular-nums tracking-[-0.02em] text-[#0a2540] sm:text-[22px]">
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </section>
+        ) : (
+          <section className="rounded-2xl border border-[#e6ebf1] bg-white p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 text-[13px]">
+              <span className="min-w-0 truncate font-medium text-[#0a2540]">
+                {progressLabel}
+              </span>
+              <span className="shrink-0 tabular-nums text-[#697386]">
+                {Math.round(book.progress)}% · {book.currentPages}
+                {book.targetPages > 0 ? ` of ${book.targetPages}` : ""} pages
+              </span>
+            </div>
+            {chapterCount > 0 ? (
+              <div className="mt-3 flex gap-1" aria-hidden>
+                {chapterStates.map((state, index) => (
+                  <span
+                    key={book.chapters[index].id}
+                    className={cn(
+                      "h-1.5 flex-1 rounded-full transition-colors duration-500",
+                      state === "done" && "bg-[#635bff]",
+                      state === "writing" && "animate-pulse bg-[#635bff]",
+                      state === "pending" && "bg-[#e6ebf1]"
+                    )}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Progress value={book.progress} className="mt-3 h-1.5" />
+            )}
+            {book.errorMessage && (
+              <p className="mt-3 text-[13px] text-[#df1b41]">{book.errorMessage}</p>
+            )}
+          </section>
+        )}
+
+        {isComplete && book.errorMessage && (
+          <div className="rounded-xl border border-[#f5c2cc] bg-[#fde8e8]/40 px-4 py-3">
+            <p className="text-[13px] text-[#df1b41]">{book.errorMessage}</p>
+          </div>
+        )}
+
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_272px]">
+          <div className="min-w-0 space-y-8">
+            {isComplete && (
+              <BookAudioPanel
+                audios={audios}
+                generatingType={audioGeneratingType}
+                phaseMessage={audioPhaseMessage}
+                onOpenStudio={() => setDerivativesOpen(true)}
+                onPickType={(type) => {
+                  if (type === "MUSIC") {
+                    void startAudioGeneration(type).catch((error) => {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Failed to start audio generation"
+                      );
+                    });
+                    return;
+                  }
+                  setDerivativesOpen(true);
+                }}
+              />
+            )}
+
+            <section>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 className="text-[17px] font-semibold tracking-[-0.02em] text-[#0a2540]">
+                  Chapters
+                </h2>
+                {chapterCount > 0 && (
+                  <span className="text-[13px] tabular-nums text-[#697386]">
+                    {doneCount} of {chapterCount} written
+                  </span>
+                )}
+              </div>
+
+              {chapterCount === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#e6ebf1] px-6 py-12 text-center text-[14px] text-[#697386]">
+                  {inProgress
+                    ? "Outlining chapters… they’ll appear here in a moment."
+                    : "No chapters yet. Start writing to create the outline."}
+                </div>
+              ) : (
+                <ol className="overflow-hidden rounded-2xl border border-[#e6ebf1] bg-white">
+                  {book.chapters.map((chapter, index) => {
+                    const state = chapterStates[index];
+                    const open = expanded === chapter.id;
+                    return (
+                      <li key={chapter.id} className="border-b border-[#eef1f5] last:border-0">
+                        <div className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#f8fafc]">
+                          <button
+                            type="button"
+                            aria-expanded={open}
+                            onClick={() => setExpanded(open ? null : chapter.id)}
+                            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          >
+                            <span className="w-6 shrink-0 font-mono text-[12px] tabular-nums text-[#a3acb9]">
+                              {String(chapter.number).padStart(2, "0")}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[14px] font-medium text-[#0a2540]">
+                                {chapter.title}
+                              </span>
+                              {chapter.summary && (
+                                <span className="mt-0.5 hidden truncate text-[12.5px] text-[#697386] sm:block">
+                                  {chapter.summary}
+                                </span>
+                              )}
+                            </span>
+                            <ChevronDown
+                              className={cn(
+                                "h-4 w-4 shrink-0 text-[#a3acb9] transition-transform duration-200",
+                                open && "rotate-180"
+                              )}
+                            />
+                          </button>
+                          {chapter.pageCount > 0 && (
+                            <span className="hidden shrink-0 text-[12px] tabular-nums text-[#697386] sm:inline">
+                              {chapter.pageCount} pp
+                            </span>
+                          )}
+                          {canRegenerate && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              aria-label={`Regenerate chapter ${chapter.number}`}
+                              className="h-7 w-7 p-0 text-[#697386] opacity-60 transition-opacity group-hover:opacity-100"
+                              disabled={regenerating === chapter.id}
+                              onClick={() => regenerate(chapter.id)}
+                            >
+                              {regenerating === chapter.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          )}
+                          <ChapterStateIcon state={state} inProgress={inProgress} />
+                        </div>
+
+                        {open && (
+                          <div className="space-y-4 border-t border-[#eef1f5] bg-[#f8fafc] px-4 py-4 sm:px-12">
+                            {chapter.sections.map((section) => (
+                              <div key={section.id}>
+                                <p className="text-[12px] font-medium text-[#697386]">
+                                  {section.title}
+                                  {section.pageCount > 0 && ` · ${section.pageCount} pages`}
+                                </p>
+                                <BookManuscript
+                                  className="mt-1"
+                                  compact
+                                  genre={book.genre}
+                                  templateId={book.templateId}
+                                  content={
+                                    section.content ??
+                                    (generating && liveSection?.sectionId === section.id
+                                      ? liveContent
+                                      : null) ??
+                                    ""
+                                  }
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </section>
+
+            {editions.length > 1 && (
+              <section>
+                <h2 className="mb-1 text-[17px] font-semibold tracking-[-0.02em] text-[#0a2540]">
+                  Editions
+                </h2>
+                <p className="mb-3 text-[13px] text-[#697386]">
+                  Each edition reuses the same premise and settings with a fresh
+                  manuscript.
+                </p>
+                <ul className="divide-y divide-[#eef1f5] overflow-hidden rounded-2xl border border-[#e6ebf1] bg-white">
+                  {editions.map((edition) => (
+                    <li key={edition.id}>
+                      <Link
+                        href={`/dashboard/books/${edition.id}`}
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#f8fafc]",
+                          edition.id === book.id && "bg-[#f8f7ff]"
+                        )}
+                      >
+                        <BookCover
+                          title={edition.title}
+                          coverImage={edition.coverImage}
+                          aspect="compact"
+                          className="w-[40px] shadow-sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13.5px] font-medium text-[#0a2540]">
+                            {edition.title}
+                          </p>
+                          <p className="text-[12px] capitalize text-[#697386]">
+                            Edition {edition.edition} · {edition.status.toLowerCase()}
+                          </p>
+                        </div>
+                        {edition.id === book.id && (
+                          <span className="shrink-0 text-[11.5px] font-medium text-[#635bff]">
+                            Viewing
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {(book.characters?.length || book.themes?.length || book.customInstructions) && (
+              <section className="space-y-4 rounded-2xl border border-[#e6ebf1] bg-white p-5">
+                <h2 className="text-[15px] font-semibold text-[#0a2540]">Story notes</h2>
+                {book.characters && book.characters.length > 0 && (
+                  <div>
+                    <p className="text-[12px] font-medium text-[#697386]">Characters</p>
+                    <ul className="mt-1 space-y-1 text-[13.5px] text-[#425466]">
+                      {book.characters.map((c) => (
+                        <li key={c}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {book.themes && book.themes.length > 0 && (
+                  <div>
+                    <p className="text-[12px] font-medium text-[#697386]">Themes</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {book.themes.map((theme) => (
+                        <span
+                          key={theme}
+                          className="rounded-full bg-[#f6f9fc] px-2.5 py-1 text-[12.5px] text-[#425466]"
+                        >
+                          {theme}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {book.customInstructions && (
+                  <div>
+                    <p className="text-[12px] font-medium text-[#697386]">Instructions</p>
+                    <p className="mt-1 text-[13.5px] leading-relaxed text-[#425466]">
+                      {book.customInstructions}
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+
+          <aside className="space-y-4 lg:sticky lg:top-20">
+            <div className="rounded-2xl border border-[#e6ebf1] bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-[14px] font-semibold text-[#0a2540]">
+                    {book.isPublic ? (
+                      <Globe className="h-4 w-4 text-[#0e6245]" />
+                    ) : (
+                      <Lock className="h-4 w-4 text-[#697386]" />
+                    )}
+                    {book.isPublic ? "Public" : "Private"}
+                  </p>
+                  <p className="mt-0.5 hidden text-[12.5px] text-[#697386] sm:block">
+                    {book.isPublic ? "Listed in the library and search" : "Only you can see it"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={book.isPublic}
+                  aria-label="Public book"
+                  disabled={togglingVisibility}
+                  onClick={toggleVisibility}
                   className={cn(
-                    "font-medium capitalize",
-                    statusStyles[book.status] ?? "text-[#697386]"
+                    "mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors duration-200 disabled:opacity-60",
+                    book.isPublic ? "bg-[#635bff]" : "bg-[#e6ebf1]"
                   )}
                 >
-                  {book.status.toLowerCase()}
-                </span>
-                {book.genre && (
-                  <span className="text-[#697386]">· {book.genre}</span>
-                )}
-                {book.tone && (
-                  <span className="text-[#697386]">· {book.tone}</span>
-                )}
+                  <span
+                    className={cn(
+                      "h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
+                      book.isPublic && "translate-x-4"
+                    )}
+                  />
+                </button>
+              </div>
+              <p className="mt-3 hidden truncate font-mono text-[11.5px] text-[#a3acb9] sm:block">
+                {book.slug}
+              </p>
+              {book.isPublic && book.slug && (
+                <a
+                  href={`/books/${book.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1.5 inline-flex items-center gap-1 text-[13px] font-medium text-[#635bff] hover:underline"
+                >
+                  View public page
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+              {book.isPublic && !book.canMakePrivate && (
                 <button
                   type="button"
                   onClick={() => {
-                    setReviewMode("manual");
-                    setReviewOpen(true);
+                    setPremiumFeatureLabel(
+                      "Private books are included on Pro ($20) and Premium ($30)."
+                    );
+                    setPremiumUpgradeOpen(true);
                   }}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#635bff]"
+                  className="mt-2 block text-[12px] text-[#697386] hover:text-[#635bff]"
                 >
-                  <MessageSquareWarning className="h-3.5 w-3.5" />
-                  Troubleshoot
+                  Private books need Pro →
                 </button>
-              </div>
-              {book.description && (
-                <ExpandableDescription
-                  text={book.description}
-                  className="mt-3 text-left text-[15px] leading-relaxed text-[#425466] lg:text-[14px]"
-                />
               )}
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:justify-end">
-            {(book.status === "DRAFT" ||
-              book.status === "FAILED" ||
-              book.status === "PAUSED") &&
-              !generating && (
-                <Button
-                  onClick={() => void startGeneration()}
-                  disabled={generating}
-                  className="col-span-2 h-11 rounded-xl bg-[#635bff] text-[14px] hover:bg-[#5851e5] lg:col-span-1 lg:h-9 lg:rounded-md lg:text-[13px]"
-                >
-                  {generating ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Play className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  {book.status === "FAILED" || book.status === "PAUSED"
-                    ? "Resume"
-                    : "Generate"}
-                </Button>
-              )}
-            {book.chapters.length > 0 && (
-              <Button
-                variant="outline"
-                className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
-                asChild
-              >
-                <a
-                  href={`/editor/${book.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <PenLine className="mr-1.5 h-3.5 w-3.5" />
-                  Editor
-                </a>
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => createEdition(true)}
-              disabled={creatingEdition}
-              className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
-            >
-              {creatingEdition ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <CopyPlus className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              New edition
-            </Button>
-            {book.status === "GENERATING" && (
-              <Button
-                variant="outline"
-                onClick={fetchBook}
-                className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
-              >
-                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                Refresh
-              </Button>
-            )}
-            {(book.status === "GENERATING" || book.status === "OUTLINING") && (
-              <Button
-                variant="outline"
-                onClick={stopGeneration}
-                disabled={stopping}
-                className="h-11 rounded-xl border-[#df1b41] text-[13px] text-[#df1b41] hover:bg-[#fde8e8] lg:h-9 lg:rounded-md"
-              >
-                {stopping ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <X className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Stop
-              </Button>
-            )}
-            {book.status === "COMPLETED" && (
-              <Button
-                variant="outline"
-                onClick={() => setDerivativesOpen(true)}
-                className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
-              >
-                <Headphones className="mr-1.5 h-3.5 w-3.5" />
-                Audio
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-xl border-[#e6ebf1] text-[13px] lg:h-9 lg:rounded-md"
-                >
-                  <Download className="mr-1.5 h-3.5 w-3.5" />
-                  Export
-                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 opacity-70" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
-                <DropdownMenuItem asChild>
-                  <a href={`/api/books/${book.id}/export?format=pdf`}>
-                    PDF (.pdf)
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`/api/books/${book.id}/export?format=epub`}>
-                    EPUB (.epub)
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`/api/books/${book.id}/export?format=md`}>
-                    Markdown (.md)
-                  </a>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+            {/* Collapsed on phones, always open from sm up. */}
+            <details className="group rounded-2xl border border-[#e6ebf1] bg-white px-4 py-3 sm:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between text-[14px] font-semibold text-[#0a2540] [&::-webkit-details-marker]:hidden">
+                Settings
+                <ChevronDown className="h-4 w-4 text-[#a3acb9] transition-transform duration-200 group-open:rotate-180" />
+              </summary>
+              <SettingsList rows={settings} />
+            </details>
+            <div className="hidden rounded-2xl border border-[#e6ebf1] bg-white px-4 pb-2 pt-4 sm:block">
+              <p className="text-[14px] font-semibold text-[#0a2540]">Settings</p>
+              <SettingsList rows={settings} />
+            </div>
+          </aside>
         </div>
       </div>
+    </>
+  );
+}
 
-      {editions.length > 1 && (
-        <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
-          <h2 className="text-[15px] font-medium text-[#0a2540]">
-            Editions ({editions.length})
-          </h2>
-          <p className="mt-1 text-[13px] text-[#697386]">
-            Each edition reuses the same premise and settings with a fresh
-            manuscript.
-          </p>
-          <ul className="mt-4 divide-y divide-[#e6ebf1] rounded-lg border border-[#e6ebf1]">
-            {editions.map((edition) => (
-              <li key={edition.id}>
-                <Link
-                  href={`/dashboard/books/${edition.id}`}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#f6f9fc]",
-                    edition.id === book.id && "bg-[#f6f9fc]"
-                  )}
-                >
-                  <BookCover
-                    title={edition.title}
-                    coverImage={edition.coverImage}
-                    aspect="compact"
-                    className="w-[44px] shadow-sm"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium text-[#0a2540]">
-                      {edition.title}
-                    </p>
-                    <p className="text-[12px] capitalize text-[#697386]">
-                      Edition {edition.edition} · {edition.status.toLowerCase()}
-                    </p>
-                  </div>
-                  {edition.id === book.id && (
-                    <span className="shrink-0 text-[11px] font-medium text-[#635bff]">
-                      Viewing
-                    </span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+function StatusPill({
+  status,
+  inProgress,
+  liveChapter,
+  chapterCount,
+}: {
+  status: string;
+  inProgress: boolean;
+  liveChapter?: number;
+  chapterCount: number;
+}) {
+  if (inProgress) {
+    const label =
+      status === "OUTLINING" || chapterCount === 0
+        ? "Outlining chapters"
+        : liveChapter
+          ? `Writing chapter ${liveChapter} of ${chapterCount}`
+          : "Writing";
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[12.5px] font-medium text-[#c9c5ff]">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#a5a0ff]" />
+        {label}
+      </span>
+    );
+  }
+  if (status === "COMPLETED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0e6245]/35 px-3 py-1 text-[12.5px] font-medium text-[#9ff0c0]">
+        <CircleCheck className="h-3.5 w-3.5" />
+        Finished{chapterCount > 0 ? ` · ${chapterCount} chapters` : ""}
+      </span>
+    );
+  }
+  const tone =
+    status === "FAILED"
+      ? "bg-[#df1b41]/20 text-[#ffb3c0]"
+      : status === "PAUSED"
+        ? "bg-[#9a6700]/30 text-[#fcd77a]"
+        : "bg-white/10 text-white/75";
+  const label = status === "FAILED" ? "Failed" : status === "PAUSED" ? "Paused" : "Draft";
+  return (
+    <span className={cn("inline-flex rounded-full px-3 py-1 text-[12.5px] font-medium", tone)}>
+      {label}
+    </span>
+  );
+}
+
+function ChapterStateIcon({
+  state,
+  inProgress,
+}: {
+  state: ChapterState;
+  inProgress: boolean;
+}) {
+  if (state === "done") {
+    return <CircleCheck aria-label="Written" className="h-4 w-4 shrink-0 text-[#0e6245]" />;
+  }
+  if (state === "writing") {
+    return (
+      <LoaderCircle aria-label="Writing" className="h-4 w-4 shrink-0 animate-spin text-[#635bff]" />
+    );
+  }
+  return (
+    <Clock
+      aria-label={inProgress ? "Queued" : "Not written yet"}
+      className="h-4 w-4 shrink-0 text-[#c1c9d2]"
+    />
+  );
+}
+
+function SettingsList({ rows }: { rows: { label: string; value: string }[] }) {
+  return (
+    <dl className="mt-2 divide-y divide-[#eef1f5]">
+      {rows.map((row) => (
+        <div
+          key={row.label}
+          className="flex items-baseline justify-between gap-3 py-2 text-[13px]"
+        >
+          <dt className="shrink-0 text-[#697386]">{row.label}</dt>
+          <dd className="truncate text-right font-medium text-[#0a2540]">{row.value}</dd>
         </div>
-      )}
+      ))}
+    </dl>
+  );
+}
 
-      {book.status === "COMPLETED" && (
-        <BookAudioPanel
-          audios={audios}
-          generatingType={audioGeneratingType}
-          phaseMessage={audioPhaseMessage}
-          onOpenStudio={() => setDerivativesOpen(true)}
-          onPickType={(type) => {
-            if (type === "MUSIC") {
-              void startAudioGeneration(type).catch((error) => {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to start audio generation"
-                );
-              });
-              return;
-            }
-            setDerivativesOpen(true);
-          }}
-        />
-      )}
-
-      {book.status !== "COMPLETED" && (
-        <div className="rounded-xl border border-[#e6ebf1] bg-white p-4 lg:rounded-lg lg:p-5">
-          <div className="mb-3 flex flex-col gap-0.5 text-[13px] text-[#697386] lg:mb-2 lg:flex-row lg:items-center lg:justify-between">
-            <span className="font-medium text-[#0a2540]">Progress</span>
-            <span>
-              {Math.round(book.progress)}% · {book.currentPages}
-              {book.targetPages > 0 ? ` / ${book.targetPages}` : ""} pages
-            </span>
-          </div>
-          <Progress value={book.progress} className="h-1.5" />
-          {book.errorMessage && (
-            <p className="mt-3 text-[13px] text-[#df1b41]">{book.errorMessage}</p>
-          )}
-        </div>
-      )}
-
-      {book.status === "COMPLETED" && book.errorMessage && (
-        <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
-          <p className="text-[13px] text-[#df1b41]">{book.errorMessage}</p>
-        </div>
-      )}
-
-      <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              {book.isPublic ? (
-                <Globe className="h-4 w-4 text-[#0e6245]" />
-              ) : (
-                <Lock className="h-4 w-4 text-[#697386]" />
-              )}
-              <h2 className="text-[15px] font-medium text-[#0a2540]">
-                {book.isPublic ? "Public book" : "Private book"}
-              </h2>
-            </div>
-            <p className="mt-1 text-[13px] text-[#697386]">
-              {book.isPublic
-                ? "Indexed for SEO and listed on /books"
-                : "Hidden from public search and the books directory"}
-            </p>
-            <p className="mt-3 font-mono text-[12px] text-[#a3acb9]">
-              Unique ID · {book.slug}
-            </p>
-            {book.isPublic && book.slug && (
-              <a
-                href={`/books/${book.slug}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-[#635bff] hover:underline"
-              >
-                View public page
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <Button
-              variant="outline"
-              disabled={togglingVisibility}
-              onClick={toggleVisibility}
-              className="h-9 border-[#e6ebf1] text-[13px]"
-            >
-              {togglingVisibility ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : book.isPublic ? (
-                <Lock className="mr-1.5 h-3.5 w-3.5" />
-              ) : (
-                <Globe className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              {book.isPublic ? "Make private" : "Make public"}
-            </Button>
-            {book.isPublic && !book.canMakePrivate && (
-              <button
-                type="button"
-                onClick={() => {
-                  setPremiumFeatureLabel(
-                    "Private books are included on Pro ($20) and Premium ($30)."
-                  );
-                  setPremiumUpgradeOpen(true);
-                }}
-                className="text-[12px] text-[#697386] hover:text-[#635bff]"
-              >
-                Upgrade to make private →
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-px overflow-hidden rounded-lg border border-[#e6ebf1] bg-[#e6ebf1] sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "POV", value: book.pov },
-          { label: "Tense", value: book.tense },
-          { label: "Model", value: book.model },
-          { label: "Creativity", value: String(book.creativity) },
-          { label: "Language", value: book.language },
-          { label: "Audience", value: book.audience ?? "—" },
-          {
-            label: "Dialogue",
-            value: book.includeDialogue ? "On" : "Off",
-          },
-          {
-            label: "Examples",
-            value: book.includeExamples ? "On" : "Off",
-          },
-        ].map((item) => (
-          <div key={item.label} className="bg-white px-4 py-3">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[#697386]">
-              {item.label}
-            </p>
-            <p className="mt-1 truncate text-[13px] capitalize text-[#0a2540]">
-              {item.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {(book.characters?.length || book.themes?.length || book.customInstructions) && (
-        <div className="space-y-3 rounded-lg border border-[#e6ebf1] bg-white p-5">
-          <h2 className="text-[15px] font-medium text-[#0a2540]">
-            Customization
-          </h2>
-          {book.characters && book.characters.length > 0 && (
-            <div>
-              <p className="text-[12px] font-medium uppercase tracking-wider text-[#697386]">
-                Characters
-              </p>
-              <ul className="mt-1 space-y-1 text-[13px] text-[#425466]">
-                {book.characters.map((c) => (
-                  <li key={c}>· {c}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {book.themes && book.themes.length > 0 && (
-            <div>
-              <p className="text-[12px] font-medium uppercase tracking-wider text-[#697386]">
-                Themes
-              </p>
-              <p className="mt-1 text-[13px] text-[#425466]">
-                {book.themes.join(", ")}
-              </p>
-            </div>
-          )}
-          {book.customInstructions && (
-            <div>
-              <p className="text-[12px] font-medium uppercase tracking-wider text-[#697386]">
-                Instructions
-              </p>
-              <p className="mt-1 text-[13px] text-[#425466]">
-                {book.customInstructions}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div>
-        <h2 className="text-[15px] font-medium text-[#0a2540]">
-          Chapters ({book.chapters.length})
-        </h2>
-
-        {book.chapters.length === 0 ? (
-          <div className="mt-4 rounded-lg border border-dashed border-[#e6ebf1] px-6 py-12 text-center text-[14px] text-[#697386]">
-            No chapters yet. Start generation to create the outline.
-          </div>
-        ) : (
-          <div className="mt-4 overflow-hidden rounded-lg border border-[#e6ebf1]">
-            {book.chapters.map((chapter) => (
-              <div
-                key={chapter.id}
-                className="border-b border-[#e6ebf1] last:border-0"
-              >
-                <div className="flex items-start justify-between gap-3 px-4 py-3">
-                  <button
-                    type="button"
-                    className="flex-1 text-left"
-                    onClick={() =>
-                      setExpanded(
-                        expanded === chapter.id ? null : chapter.id
-                      )
-                    }
-                  >
-                    <p className="text-[14px] font-medium text-[#0a2540]">
-                      Chapter {chapter.number}: {chapter.title}
-                    </p>
-                    {chapter.summary && (
-                      <p className="mt-0.5 line-clamp-2 text-[13px] text-[#697386]">
-                        {chapter.summary}
-                      </p>
-                    )}
-                  </button>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={cn(
-                        "text-[12px] font-medium capitalize",
-                        statusStyles[chapter.status] ?? "text-[#697386]"
-                      )}
-                    >
-                      {chapter.status.toLowerCase()}
-                    </span>
-                    {chapter.pageCount > 0 && (
-                      <span className="text-[12px] text-[#697386]">
-                        {chapter.pageCount}p
-                      </span>
-                    )}
-                    {(book.status === "COMPLETED" ||
-                      book.status === "DRAFT" ||
-                      book.status === "FAILED") && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[#697386]"
-                        disabled={regenerating === chapter.id}
-                        onClick={() => regenerate(chapter.id)}
-                      >
-                        {regenerating === chapter.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {expanded === chapter.id && (
-                  <div className="space-y-4 border-t border-[#e6ebf1] bg-[#f6f9fc] px-4 py-4">
-                    {chapter.sections.map((section) => (
-                      <div key={section.id}>
-                        <p className="text-[12px] font-medium text-[#697386]">
-                          {section.title}
-                          {section.pageCount > 0 && ` · ${section.pageCount} pages`}
-                        </p>
-                        <BookManuscript
-                          className="mt-1"
-                          compact
-                          genre={book.genre}
-                          templateId={book.templateId}
-                          content={
-                            section.content ??
-                            (generating &&
-                            liveSection?.sectionId === section.id
-                              ? liveContent
-                              : null) ??
-                            ""
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+function ExportItems({ bookId }: { bookId: string }) {
+  return (
+    <>
+      <DropdownMenuItem asChild>
+        <a href={`/api/books/${bookId}/export?format=pdf`}>
+          <Download className="h-4 w-4" />
+          PDF (.pdf)
+        </a>
+      </DropdownMenuItem>
+      <DropdownMenuItem asChild>
+        <a href={`/api/books/${bookId}/export?format=epub`}>
+          <Download className="h-4 w-4" />
+          EPUB (.epub)
+        </a>
+      </DropdownMenuItem>
+      <DropdownMenuItem asChild>
+        <a href={`/api/books/${bookId}/export?format=md`}>
+          <Download className="h-4 w-4" />
+          Markdown (.md)
+        </a>
+      </DropdownMenuItem>
     </>
   );
 }
