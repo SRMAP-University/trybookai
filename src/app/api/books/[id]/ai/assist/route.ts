@@ -17,12 +17,15 @@ const assistSchema = z.object({
     "continue",
     "fix_grammar",
     "regenerate_section",
+    "custom",
   ]),
   sectionId: z.string(),
   content: z.string().max(200_000),
   selection: z.string().max(50_000).optional(),
   selectionStart: z.number().int().min(0).optional(),
   selectionEnd: z.number().int().min(0).optional(),
+  /** Required for "custom": the author's own instruction. */
+  instruction: z.string().trim().min(1).max(500).optional(),
 });
 
 export async function POST(
@@ -55,11 +58,21 @@ export async function POST(
     selection,
     selectionStart,
     selectionEnd,
+    instruction,
   } = parsed.data;
 
+  if (action === "custom" && !instruction) {
+    return new Response(
+      JSON.stringify({ error: "Describe the change you want." }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  // "custom" works on the selection when there is one, else the whole section.
   if (
     action !== "continue" &&
     action !== "regenerate_section" &&
+    action !== "custom" &&
     !selection?.trim()
   ) {
     return new Response(
@@ -91,7 +104,8 @@ export async function POST(
       priorContext: ctx.priorContext,
     },
     content,
-    selection
+    selection,
+    instruction
   );
 
   const encoder = new TextEncoder();
@@ -111,7 +125,11 @@ export async function POST(
         fullOutput = await streamChatCompletion({
           model: ctx.book.model || DEFAULT_AI_MODEL,
           temperature: ctx.book.creativity ?? 0.7,
-          max_tokens: action === "regenerate_section" ? 8192 : 4096,
+          max_tokens:
+            action === "regenerate_section" ||
+            (action === "custom" && !selection?.trim())
+              ? 8192
+              : 4096,
           messages,
           onToken: (token) => {
             send("token", { text: token });

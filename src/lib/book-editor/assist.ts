@@ -6,7 +6,8 @@ export type EditorAiAction =
   | "shorten"
   | "continue"
   | "fix_grammar"
-  | "regenerate_section";
+  | "regenerate_section"
+  | "custom";
 
 type BookContext = {
   title: string;
@@ -21,7 +22,7 @@ type BookContext = {
   priorContext: string;
 };
 
-const ACTION_INSTRUCTIONS: Record<EditorAiAction, string> = {
+const ACTION_INSTRUCTIONS: Record<Exclude<EditorAiAction, "custom">, string> = {
   rewrite:
     "Rewrite the selected passage to improve clarity, flow, and prose quality. Keep the same meaning and approximate length.",
   expand:
@@ -40,10 +41,19 @@ export function buildEditorAssistMessages(
   action: EditorAiAction,
   ctx: BookContext,
   sectionContent: string,
-  selection?: string
+  selection?: string,
+  /** The author's own request, for the "custom" action. */
+  customInstruction?: string
 ): ChatMessage[] {
-  const instruction = ACTION_INSTRUCTIONS[action];
   const hasSelection = Boolean(selection?.trim());
+  const instruction =
+    action === "custom"
+      ? `Apply this change requested by the author: "${customInstruction ?? ""}". ${
+          hasSelection
+            ? "Rewrite only the selected passage."
+            : "Rewrite the whole section."
+        } Keep the voice, facts, and continuity of the book unless the request says otherwise.`
+      : ACTION_INSTRUCTIONS[action];
 
   const userParts = [
     `Book: "${ctx.title}" (${ctx.genre ?? "general"})`,
