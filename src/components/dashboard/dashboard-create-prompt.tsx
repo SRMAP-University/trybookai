@@ -188,10 +188,10 @@ export function DashboardCreatePrompt({
     <div>
       <form
         onSubmit={handleSubmit}
-        className="rounded-xl border border-[#e2e6ec] bg-white shadow-sm sm:rounded-[20px] sm:border-[#d8dee8] sm:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_28px_rgba(15,23,42,0.1)] sm:ring-1 sm:ring-black/[0.03]"
+        className="rounded-2xl border border-[#e6ebf1] bg-white shadow-[0_1px_2px_rgba(10,37,64,0.04),0_12px_32px_-20px_rgba(10,37,64,0.25)] transition-[border-color,box-shadow] duration-200 focus-within:border-[#c9c5ff] focus-within:ring-4 focus-within:ring-[#635bff]/10 sm:rounded-[20px]"
       >
         {/* Service tabs — compact on phone */}
-        <div className="flex gap-0.5 overflow-x-auto overscroll-x-contain border-b border-[#f0f2f5] px-2 pt-2 pb-1.5 [scrollbar-width:none] sm:gap-1 sm:px-3 sm:pt-3 sm:pb-2 [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-[#eef1f5] px-2 pt-2 pb-1.5 [scrollbar-width:none] sm:px-3 sm:pt-3 sm:pb-2 [&::-webkit-scrollbar]:hidden">
           {SERVICES.map((s) => {
             const Icon = s.icon;
             const selected = service === s.id;
@@ -201,14 +201,14 @@ export function DashboardCreatePrompt({
                 type="button"
                 onClick={() => setService(s.id)}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors sm:gap-1.5 sm:rounded-full sm:px-3 sm:py-2 sm:text-[13px]",
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors sm:py-2",
                   selected
-                    ? "bg-[#f0f2f5] text-[#111827]"
-                    : "text-[#6b7280] hover:bg-[#f7f8fa] hover:text-[#111827]"
+                    ? "bg-[#f0efff] text-[#635bff]"
+                    : "text-[#697386] hover:bg-[#f6f9fc] hover:text-[#0a2540]"
                 )}
               >
                 <Icon
-                  className="h-3 w-3 opacity-80 sm:h-3.5 sm:w-3.5"
+                  className="h-3.5 w-3.5 opacity-80"
                   strokeWidth={1.75}
                 />
                 {s.label}
@@ -235,7 +235,7 @@ export function DashboardCreatePrompt({
               rows={expanded ? 4 : 2}
               placeholder={active.placeholder}
               className={cn(
-                "w-full resize-none bg-transparent text-[13px] leading-snug text-[#111827] outline-none placeholder:text-[#9ca3af] sm:text-[15px] sm:leading-relaxed",
+                "w-full resize-none bg-transparent text-[16px] leading-relaxed text-[#0a2540] outline-none placeholder:text-[#a3acb9] sm:text-[15px]",
                 "transition-[min-height] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 "min-h-[52px]",
                 expanded ? "sm:min-h-[128px]" : "sm:min-h-[88px]"
@@ -248,7 +248,7 @@ export function DashboardCreatePrompt({
                   key={chip}
                   type="button"
                   onClick={() => applyChip(chip)}
-                  className="shrink-0 rounded-full bg-[#f3f4f6] px-2 py-1 text-[10px] text-[#4b5563] transition-colors hover:bg-[#e5e7eb] active:bg-[#e5e7eb] sm:px-3 sm:py-1.5 sm:text-[12px]"
+                  className="shrink-0 rounded-full bg-[#f6f9fc] px-3 py-1.5 text-[12.5px] text-[#425466] transition-colors hover:bg-[#f0efff] hover:text-[#635bff] active:bg-[#f0efff]"
                 >
                   {chip}
                 </button>
@@ -297,17 +297,17 @@ export function DashboardCreatePrompt({
         </div>
 
         {/* Footer — compact on phone */}
-        <div className="flex items-center justify-between gap-2 border-t border-[#f0f2f5] px-3 py-2 sm:gap-3 sm:px-5 sm:py-3">
-          <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-[#6b7280] sm:gap-2 sm:text-[12px]">
-            <span className="inline-flex items-center gap-1 font-medium text-[#111827] sm:gap-1.5">
+        <div className="flex items-center justify-between gap-3 border-t border-[#eef1f5] px-3 py-2.5 sm:px-5 sm:py-3">
+          <div className="flex min-w-0 items-center gap-2 text-[12px] text-[#697386]">
+            <span className="inline-flex items-center gap-1.5 font-medium text-[#0a2540]">
               <active.icon
-                className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5"
+                className="h-3.5 w-3.5 shrink-0"
                 strokeWidth={1.75}
               />
               <span className="truncate">{active.label}</span>
             </span>
             {!active.available && (
-              <span className="rounded-full bg-[#fef3c7] px-1.5 py-0.5 text-[9px] font-medium text-[#92400e] sm:px-2 sm:text-[11px]">
+              <span className="rounded-full bg-[#fcf5e0] px-2 py-0.5 text-[11px] font-medium text-[#9a6700]">
                 Waitlist
               </span>
             )}
@@ -321,14 +321,14 @@ export function DashboardCreatePrompt({
             type="submit"
             disabled={!canGenerate}
             className={cn(
-              "inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors sm:h-9 sm:gap-1.5 sm:px-4 sm:text-[13px]",
+              "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors",
               canGenerate
-                ? "bg-[#374151] text-white hover:bg-[#1f2937]"
-                : "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]"
+                ? "bg-[#635bff] text-white hover:bg-[#5851e5]"
+                : "cursor-not-allowed bg-[#e6ebf1] text-[#a3acb9]"
             )}
           >
             {active.cta}
-            <ArrowUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <ArrowUp className="h-3.5 w-3.5" />
           </button>
         </div>
       </form>

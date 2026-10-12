@@ -191,16 +191,34 @@ export function AnimatedGeneratingList({ books }: { books: GeneratingBook[] }) {
   );
 }
 
+/** Cards past this index appear with the last row instead of queueing up. */
+const MAX_STAGGERED = 8;
+
+const bookItem = {
+  hidden: item.hidden,
+  show: (index: number) => ({
+    ...item.show,
+    transition: {
+      ...item.show.transition,
+      delay: 0.04 + Math.min(index, MAX_STAGGERED) * 0.07,
+    },
+  }),
+};
+
 export function AnimatedBookGrid({ books }: { books: DashboardBook[] }) {
   return (
     <motion.div
       className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      variants={list}
       initial="hidden"
       animate="show"
     >
-      {books.map((book) => (
-        <motion.div key={book.id} variants={item} className="h-full">
+      {books.map((book, index) => (
+        <motion.div
+          key={book.id}
+          variants={bookItem}
+          custom={index}
+          className="h-full"
+        >
           <DashboardBookCard book={book} />
         </motion.div>
       ))}

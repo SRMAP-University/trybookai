@@ -9,6 +9,7 @@ import {
   Download,
   Headphones,
   LayoutGrid,
+  Library,
   MicVocal,
   Palette,
   Plus,
@@ -44,6 +45,7 @@ const navSections = [
     items: [
       { href: "/dashboard", label: "Home", icon: LayoutGrid },
       { href: "/dashboard/books/new", label: "New book", icon: Plus },
+      { href: "/dashboard/books", label: "Your books", icon: Library },
       { href: "/dashboard/audio-studio", label: "Audio Studio", icon: Headphones },
       { href: "/dashboard/songs", label: "Song Studio", icon: MicVocal },
       { href: "/dashboard/tracking", label: "Tracking", icon: Activity },
@@ -66,9 +68,12 @@ const navSections = [
 ];
 
 function isActive(pathname: string, href: string) {
-  return href === "/dashboard"
-    ? pathname === "/dashboard"
-    : pathname.startsWith(href);
+  if (href === "/dashboard") return pathname === "/dashboard";
+  // A book's own pages belong to "Your books"; the new-book form has its own item.
+  if (href === "/dashboard/books") {
+    return pathname.startsWith(href) && !pathname.startsWith("/dashboard/books/new");
+  }
+  return pathname.startsWith(href);
 }
 
 export function DashboardSidebar() {

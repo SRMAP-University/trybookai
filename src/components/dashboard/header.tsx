@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { LogoMark } from "@/components/marketing/landing-showcase";
+import { PLANS } from "@/lib/constants";
 
 export function DashboardHeader() {
   const { data: session, status } = useSession();
@@ -32,6 +33,9 @@ export function DashboardHeader() {
   const email = user?.email ?? session?.user?.email ?? "";
   const plan = user?.plan;
   const isFree = plan === "FREE";
+  // Customer-facing name ("Premium", not the internal "ENTERPRISE" key).
+  const planName =
+    plan && plan in PLANS ? PLANS[plan as keyof typeof PLANS].name : plan;
   const initials =
     name
       .split(" ")
@@ -51,16 +55,14 @@ export function DashboardHeader() {
             <LogoMark className="h-6 w-6" />
             BookAI
           </Link>
-          <div className="hidden min-w-0 lg:block">
-            <p className="truncate text-[13px] text-[#697386]">
-              {plan
-                ? isFree
-                  ? "Free plan"
-                  : `${plan.charAt(0)}${plan.slice(1).toLowerCase()} plan`
-                : "Loading plan…"}
-              {user ? ` · ${user.pagesUsed}/${user.pagesLimit} pages used` : ""}
-            </p>
-          </div>
+          {!isAnonymous && (
+            <div className="hidden min-w-0 lg:block">
+              <p className="truncate text-[13px] text-[#697386]">
+                {planName ? `${planName} plan` : "Loading plan…"}
+                {user ? ` · ${user.pagesUsed}/${user.pagesLimit} pages used` : ""}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -122,7 +124,7 @@ export function DashboardHeader() {
                     <p className="text-[13px] font-medium text-[#0a2540]">{name}</p>
                     <p className="truncate text-[12px] text-[#697386]">{email}</p>
                     <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-[#635bff]">
-                      {plan ? `${plan.toLowerCase()} plan` : "Loading plan…"}
+                      {planName ? `${planName} plan` : "Loading plan…"}
                     </p>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
