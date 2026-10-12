@@ -17,6 +17,7 @@ const voiceSettingsSchema = z
     speed: z.number().min(0.7).max(1.2).optional(),
     useSpeakerBoost: z.boolean().optional(),
     modelId: z.string().optional(),
+    backgroundMusic: z.enum(["off", "subtle", "cinematic"]).optional(),
   })
   .optional();
 
