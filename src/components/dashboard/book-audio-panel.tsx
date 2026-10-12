@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type { AudioDerivativeType } from "@/components/dashboard/book-derivatives-dialog";
+import { BackgroundScorePlayer } from "@/components/dashboard/background-score";
+import { parseMusicScore } from "@/lib/audio-generator/score-types";
 
 export type BookAudioTrack = {
   id: string;
@@ -35,6 +37,8 @@ export type BookAudioItem = {
   audioUrl: string | null;
   errorMessage: string | null;
   tracks: BookAudioTrack[];
+  /** Holds the background-music score under `music` when one was generated. */
+  voiceSettings?: unknown;
 };
 
 const TYPE_META: Record<
@@ -122,6 +126,37 @@ function AudioCard({
   const trackKey = tracks.map((t) => t.id).join("|");
   const seekMax = duration > 0 ? duration : 0.1;
 
+  // Mood-matched background music, mixed live under the narration.
+  const score = useMemo(() => parseMusicScore(audio.voiceSettings), [audio.voiceSettings]);
+  const scoreRef = useRef<BackgroundScorePlayer | null>(null);
+  const [musicOn, setMusicOn] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(0.8);
+
+  useEffect(() => {
+    if (!score) return;
+    if (scoreRef.current) scoreRef.current.setScore(score);
+    else scoreRef.current = new BackgroundScorePlayer(score);
+  }, [score]);
+
+  useEffect(() => {
+    return () => {
+      scoreRef.current?.dispose();
+      scoreRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    scoreRef.current?.setEnabled(musicOn);
+  }, [musicOn, score]);
+
+  useEffect(() => {
+    scoreRef.current?.setVolume(musicVolume);
+  }, [musicVolume, score]);
+
+  function syncScore(el: HTMLAudioElement) {
+    if (track) scoreRef.current?.sync(track.number, el.currentTime, !el.paused && !el.ended);
+  }
+
   useEffect(() => {
     if (index >= tracks.length && tracks.length > 0) {
       setIndex(tracks.length - 1);
@@ -178,6 +213,7 @@ function AudioCard({
   function togglePlay() {
     const el = audioRef.current;
     if (!el || !track) return;
+    scoreRef.current?.unlock();
     if (playing) {
       el.pause();
       setPlaying(false);
@@ -190,6 +226,7 @@ function AudioCard({
   }
 
   function playTrack(nextIndex: number) {
+    scoreRef.current?.unlock();
     setIndex(nextIndex);
     setPlaying(true);
     requestAnimationFrame(() => {
@@ -211,16 +248,27 @@ function AudioCard({
       <audio
         ref={audioRef}
         preload="metadata"
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        onEnded={() => {
+        onTimeUpdate={(e) => {
+          setCurrentTime(e.currentTarget.currentTime);
+          syncScore(e.currentTarget);
+        }}
+        onSeeked={(e) => syncScore(e.currentTarget)}
+        onEnded={(e) => {
+          syncScore(e.currentTarget);
           if (index < tracks.length - 1) {
             playTrack(index + 1);
           } else {
             setPlaying(false);
           }
         }}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        onPlay={(e) => {
+          setPlaying(true);
+          syncScore(e.currentTarget);
+        }}
+        onPause={(e) => {
+          setPlaying(false);
+          syncScore(e.currentTarget);
+        }}
       />
 
       {audio.status === "FAILED" && audio.errorMessage && (
@@ -328,6 +376,37 @@ function AudioCard({
               </div>
             </div>
           </div>
+
+          {score && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMusicOn((on) => !on)}
+                aria-pressed={musicOn}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors",
+                  musicOn
+                    ? "border-transparent bg-white text-[#0a2540] shadow-sm"
+                    : "border-[#e6ebf1] text-[#697386]"
+                )}
+              >
+                <Music2 className="h-3.5 w-3.5" />
+                Background music {musicOn ? "on" : "off"}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={musicVolume}
+                disabled={!musicOn}
+                onChange={(e) => setMusicVolume(Number(e.target.value))}
+                aria-label="Background music volume"
+                className="h-1.5 w-28 cursor-pointer appearance-none rounded-full bg-[#e6ebf1] disabled:opacity-40"
+                style={{ accentColor: meta.accent }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -345,7 +424,9 @@ function AudioCard({
                 <p className="text-[13px] font-medium text-[#0a2540]">
                   {t.number}. {t.title}
                 </p>
-                <p className="text-[11px] text-[#a3acb9]">MP3 · ready</p>
+                <p className="text-[11px] text-[#a3acb9]">
+                  {score ? "MP3 · voice only (music plays live here)" : "MP3 · ready"}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Button

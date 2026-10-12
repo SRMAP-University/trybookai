@@ -27,6 +27,7 @@ import {
   type VoiceSettingsConfig,
 } from "@/lib/elevenlabs-voices";
 import {
+  MusicLevelPicker,
   useNarrationCatalogue,
   voiceSummary,
   VoicePreviewButton,
@@ -119,6 +120,7 @@ export function AudioStudioClient() {
   const [settings, setSettings] = useState<VoiceSettingsConfig>(() => ({
     ...DEFAULT_VOICE_SETTINGS,
     ...VOICE_SETTING_PRESETS.find((p) => p.id === "narration")?.settings,
+    backgroundMusic: "subtle",
   }));
   const [activePreset, setActivePreset] = useState("narration");
   const [busy, setBusy] = useState(false);
@@ -183,6 +185,7 @@ export function AudioStudioClient() {
       ...DEFAULT_VOICE_SETTINGS,
       ...preset.settings,
       modelId: prev.modelId,
+      backgroundMusic: prev.backgroundMusic,
     }));
   }
 
@@ -733,6 +736,15 @@ export function AudioStudioClient() {
                 </div>
               )}
             </div>
+
+            {(audioType === "AUDIOBOOK" || audioType === "PODCAST") && (
+              <MusicLevelPicker
+                value={settings.backgroundMusic}
+                onChange={(backgroundMusic) =>
+                  setSettings((prev) => ({ ...prev, backgroundMusic }))
+                }
+              />
+            )}
 
             <div>
               <Label className="text-[13px] text-[#0a2540]">Delivery</Label>

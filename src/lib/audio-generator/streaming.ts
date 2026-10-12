@@ -17,6 +17,14 @@ import {
 import { isNarrativeBook } from "@/lib/book-generator/core/format";
 import { markdownToNarration } from "@/lib/audio-generator/narration";
 import {
+  assignCueMoods,
+  composeCue,
+  emptyScore,
+  scoreScenes,
+  type Scene,
+} from "@/lib/audio-generator/score";
+import type { MusicScore, ScoreMood, ScoreSpan } from "@/lib/audio-generator/score-types";
+import {
   normalizeVoiceSettings,
   parseStoredVoiceSettings,
   resolveVoice,
@@ -28,7 +36,11 @@ import {
 } from "@/lib/audio-quota";
 import { PLANS } from "@/lib/constants";
 import { SONG_STUDIO_GENRE } from "@/lib/song-studio";
-import { uploadAudioToR2, uploadFullAudioToR2 } from "@/lib/r2";
+import {
+  uploadAudioToR2,
+  uploadFullAudioToR2,
+  uploadMusicCueToR2,
+} from "@/lib/r2";
 import {
   createAudioEventEmitter,
   type AudioStreamEmitter,
@@ -61,6 +73,122 @@ function chapterNarrationText(
     parts.push(body);
   }
   return parts.join("\n\n");
+}
+
+/** Duration of a CBR 128 kbps MP3 (ElevenLabs output) from its size. */
+function mp3DurationMs(bytes: Buffer): number {
+  return Math.round((bytes.length * 8 * 1000) / 128_000);
+}
+
+/** Paragraphs for scene scoring; long unbroken scripts are split by sentences. */
+function narrationParagraphs(text: string): string[] {
+  const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length >= 3 || text.length < 1500) return paragraphs;
+  const sentences = text.match(/[^.!?]+[.!?]+["”’)]*\s*/g) ?? [text];
+  const grouped: string[] = [];
+  let current = "";
+  for (const sentence of sentences) {
+    if (current.length + sentence.length > 600 && current) {
+      grouped.push(current.trim());
+      current = "";
+    }
+    current += sentence;
+  }
+  if (current.trim()) grouped.push(current.trim());
+  return grouped;
+}
+
+/** Narrate scene by scene so each scene's start time in the track is exact. */
+async function narrateScenes(
+  scenes: Scene[],
+  options: TtsOptions
+): Promise<{ audio: Buffer; spans: ScoreSpan[] }> {
+  const buffers: Buffer[] = [];
+  const spans: ScoreSpan[] = [];
+  let at = 0;
+  for (const scene of scenes) {
+    const bytes = await textToSpeechLong(scene.text, options);
+    const ms = mp3DurationMs(bytes);
+    spans.push([at, at + ms, scene.mood]);
+    at += ms;
+    buffers.push(bytes);
+  }
+  return { audio: Buffer.concat(buffers), spans };
+}
+
+/**
+ * Collects the background-music score while narration runs and saves it on
+ * BookAudio.voiceSettings.music. Saves are queued so an older snapshot never
+ * overwrites a newer one.
+ */
+class ScoreBuilder {
+  readonly score: MusicScore;
+  private queue: Promise<void> = Promise.resolve();
+
+  constructor(
+    private readonly ids: { bookId: string; audioId: string },
+    private readonly settings: VoiceSettingsConfig,
+    level: MusicScore["level"]
+  ) {
+    this.score = emptyScore(level);
+  }
+
+  setTrack(number: number, spans: ScoreSpan[]) {
+    this.score.tracks[String(number)] = spans;
+    return this.save();
+  }
+
+  save() {
+    this.queue = this.queue
+      .then(() =>
+        db.bookAudio.update({
+          where: { id: this.ids.audioId },
+          data: { voiceSettings: { ...this.settings, music: this.score } as object },
+        })
+      )
+      .then(() => undefined)
+      .catch((error) => {
+        console.warn(
+          "[score] saving music score failed:",
+          error instanceof Error ? error.message : error
+        );
+      });
+    return this.queue;
+  }
+
+  /** Compose and upload one cue per mood; a failed cue just leaves that mood silent. */
+  async composeCues(moods: ScoreMood[], genre: string | null) {
+    await mapLimit(moods, 2, async (mood) => {
+      try {
+        const bytes = await composeCue(mood, genre);
+        this.score.cues[mood] = await uploadMusicCueToR2(
+          this.ids.bookId,
+          this.ids.audioId,
+          mood,
+          bytes
+        );
+        await this.save();
+      } catch (error) {
+        console.warn(
+          `[score] ${mood} cue failed:`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    });
+  }
+}
+
+/** Score scenes for every track and start composing their cues. */
+async function prepareScore(
+  builder: ScoreBuilder,
+  texts: string[],
+  context: { genre: string | null; title: string; kind: "audiobook" | "podcast" }
+): Promise<{ scenes: Scene[][]; cuesReady: Promise<void> }> {
+  const scored = await mapLimit(texts, 4, (text) =>
+    scoreScenes(narrationParagraphs(text), context)
+  );
+  const { moods, scenes } = assignCueMoods(scored);
+  return { scenes, cuesReady: builder.composeCues(moods, context.genre) };
 }
 
 /** Run `fn` over items with at most `limit` in flight, keeping result order. */
@@ -211,6 +339,24 @@ async function runAudiobook(
   );
   await assertAudioQuota(userId, estimateAudioMinutesFromText(texts.join("\n\n")));
 
+  const builder =
+    voiceSettings.backgroundMusic === "off"
+      ? null
+      : new ScoreBuilder({ bookId, audioId }, voiceSettings, voiceSettings.backgroundMusic);
+  let score: Awaited<ReturnType<typeof prepareScore>> | null = null;
+  if (builder) {
+    emit({
+      type: "phase",
+      message: "Scoring scenes for background music…",
+      audioType: "AUDIOBOOK",
+    });
+    score = await prepareScore(builder, texts, {
+      genre: book.genre,
+      title: book.title,
+      kind: "audiobook",
+    });
+  }
+
   emit({
     type: "phase",
     message: `Narrating ${chapters.length} chapters…`,
@@ -228,10 +374,11 @@ async function runAudiobook(
       audioType: "AUDIOBOOK",
     });
 
-    const audioBytes = await textToSpeechLong(
-      text,
-      ttsOptionsFromSettings(voiceId, voiceSettings)
-    );
+    const tts = ttsOptionsFromSettings(voiceId, voiceSettings);
+    const narrated = score
+      ? await narrateScenes(score.scenes[i], tts)
+      : { audio: await textToSpeechLong(text, tts), spans: null };
+    const audioBytes = narrated.audio;
     await creditAudioMinutes(userId, estimateAudioMinutesFromText(text));
 
     const audioUrl = await saveTrack({
@@ -242,6 +389,7 @@ async function runAudiobook(
       chapterId: chapter.id,
       audioBytes,
     });
+    if (builder && narrated.spans) await builder.setTrack(chapter.number, narrated.spans);
 
     finished++;
     const progress = (finished / chapters.length) * 95;
@@ -269,6 +417,16 @@ async function runAudiobook(
   });
   // Full audiobook in chapter order, whatever order chapters finished in.
   const chapterBuffers = narrated.filter((b): b is Buffer => Boolean(b));
+
+  if (score) {
+    emit({
+      type: "phase",
+      message: "Finishing background music…",
+      audioType: "AUDIOBOOK",
+    });
+    await score.cuesReady;
+    await builder?.save();
+  }
 
   if (chapterBuffers.length > 0) {
     emit({
@@ -408,6 +566,18 @@ async function runPodcast(
   );
   await assertAudioQuota(userId, estimated);
 
+  const builder =
+    voiceSettings.backgroundMusic === "off"
+      ? null
+      : new ScoreBuilder({ bookId, audioId }, voiceSettings, voiceSettings.backgroundMusic);
+  const score = builder
+    ? await prepareScore(
+        builder,
+        episodes.map((ep) => ep.script),
+        { genre: book.genre, title: book.title, kind: "podcast" }
+      )
+    : null;
+
   for (let i = 0; i < episodes.length; i++) {
     const ep = episodes[i];
     emit({
@@ -416,11 +586,13 @@ async function runPodcast(
       audioType: "PODCAST",
     });
 
-    const audioBytes = await textToSpeechLong(
-      ep.script,
-      ttsOptionsFromSettings(voiceId, voiceSettings)
-    );
+    const tts = ttsOptionsFromSettings(voiceId, voiceSettings);
+    const narrated = score
+      ? await narrateScenes(score.scenes[i], tts)
+      : { audio: await textToSpeechLong(ep.script, tts), spans: null };
+    const audioBytes = narrated.audio;
     episodeBuffers.push(audioBytes);
+    if (builder && narrated.spans) await builder.setTrack(ep.number, narrated.spans);
     await creditAudioMinutes(userId, estimateAudioMinutesFromText(ep.script));
 
     const audioUrl = await saveTrack({
@@ -452,6 +624,11 @@ async function runPodcast(
       trackNumber: ep.number,
       trackTitle: ep.title,
     });
+  }
+
+  if (score) {
+    await score.cuesReady;
+    await builder?.save();
   }
 
   if (episodeBuffers.length > 0) {

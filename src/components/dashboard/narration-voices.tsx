@@ -9,6 +9,7 @@ import {
   ELEVENLABS_VOICES,
   type ElevenLabsVoice,
 } from "@/lib/elevenlabs-voices";
+import { MUSIC_LEVELS, type MusicLevel } from "@/lib/audio-generator/score-types";
 
 type TtsModel = { id: string; name: string; description: string };
 
@@ -114,5 +115,44 @@ export function VoicePreviewButton({
     >
       {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
     </button>
+  );
+}
+
+/** Off / Subtle / Cinematic background-music choice for audiobooks and podcasts. */
+export function MusicLevelPicker({
+  value,
+  onChange,
+}: {
+  value: MusicLevel;
+  onChange: (level: MusicLevel) => void;
+}) {
+  const active = MUSIC_LEVELS.find((level) => level.id === value) ?? MUSIC_LEVELS[0];
+  return (
+    <div>
+      <p className="text-[13px] font-medium text-[#0a2540]">Background music</p>
+      <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Background music">
+        {MUSIC_LEVELS.map((level) => (
+          <button
+            key={level.id}
+            type="button"
+            role="radio"
+            aria-checked={value === level.id}
+            onClick={() => onChange(level.id)}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+              value === level.id
+                ? "border-[#635bff] bg-[#f0efff] text-[#635bff]"
+                : "border-[#e6ebf1] text-[#425466] hover:border-[#c9c5ff]"
+            )}
+          >
+            {level.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1.5 text-[12px] text-[#697386]">
+        {active.description}
+        {value !== "off" && " — follows each scene's mood (suspense, calm, action…)."}
+      </p>
+    </div>
   );
 }

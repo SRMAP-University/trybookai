@@ -28,12 +28,14 @@ export const authConfig = {
 
       // Public cover images back og:image and Book schema; crawlers have no session.
       const isPublicCover = path.startsWith("/api/books/cover/");
+      // Background-music cues are public R2 files; listeners on public book pages have no session.
+      const isPublicMusic = path === "/api/audio/music";
 
       const isApiProtected =
         (path.startsWith("/api/books") && !isPublicCover) ||
         path.startsWith("/api/billing") ||
         path.startsWith("/api/generate") ||
-        path.startsWith("/api/audio") ||
+        (path.startsWith("/api/audio") && !isPublicMusic) ||
         path.startsWith("/api/settings") ||
         path.startsWith("/api/branding") ||
         path.startsWith("/api/analytics") ||

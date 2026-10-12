@@ -33,6 +33,7 @@ import {
   type VoiceSettingsConfig,
 } from "@/lib/elevenlabs-voices";
 import {
+  MusicLevelPicker,
   useNarrationCatalogue,
   voiceSummary,
   VoicePreviewButton,
@@ -256,6 +257,7 @@ export function BookDerivativesDialog({
     setSettings({
       ...DEFAULT_VOICE_SETTINGS,
       ...preset?.settings,
+      backgroundMusic: "subtle",
     });
     setStep("customize");
   }
@@ -421,6 +423,15 @@ export function BookDerivativesDialog({
                 </p>
               </div>
 
+              {(selected?.audioType === "AUDIOBOOK" || selected?.audioType === "PODCAST") && (
+                <MusicLevelPicker
+                  value={settings.backgroundMusic}
+                  onChange={(backgroundMusic) =>
+                    setSettings((current) => ({ ...current, backgroundMusic }))
+                  }
+                />
+              )}
+
               <div>
                 <Label className="text-[13px] text-[#0a2540]">Presets</Label>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -434,6 +445,7 @@ export function BookDerivativesDialog({
                           ...DEFAULT_VOICE_SETTINGS,
                           ...preset.settings,
                           modelId,
+                          backgroundMusic: settings.backgroundMusic,
                         });
                       }}
                       className={cn(

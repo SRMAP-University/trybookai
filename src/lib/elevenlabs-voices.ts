@@ -1,5 +1,7 @@
 /** ElevenLabs voice/model catalogue and settings. Client-safe: no API calls here. */
 
+import { normalizeMusicLevel, type MusicLevel } from "@/lib/audio-generator/score-types";
+
 export type ElevenLabsVoice = {
   id: string;
   name: string;
@@ -83,6 +85,8 @@ export type VoiceSettingsConfig = {
   speed: number;
   useSpeakerBoost: boolean;
   modelId: string;
+  /** Mood-matched background music played under the narration. */
+  backgroundMusic: MusicLevel;
 };
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettingsConfig = {
@@ -92,6 +96,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettingsConfig = {
   speed: 1,
   useSpeakerBoost: true,
   modelId: DEFAULT_TTS_MODEL,
+  backgroundMusic: "off",
 };
 
 export const VOICE_SETTING_PRESETS: {
@@ -173,6 +178,7 @@ export function normalizeVoiceSettings(
     speed: clamp(base.speed, 0.7, 1.2),
     useSpeakerBoost: Boolean(base.useSpeakerBoost),
     modelId: normalizeTtsModel(base.modelId),
+    backgroundMusic: normalizeMusicLevel(base.backgroundMusic),
   };
 }
 
@@ -197,5 +203,6 @@ export function parseStoredVoiceSettings(
       raw.useSpeakerBoost ?? raw.use_speaker_boost ?? true
     ),
     modelId: typeof raw.modelId === "string" ? raw.modelId : undefined,
+    backgroundMusic: normalizeMusicLevel(raw.backgroundMusic),
   });
 }

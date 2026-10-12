@@ -308,3 +308,24 @@ export async function getCoverFromR2(bookId: string): Promise<Buffer | null> {
 
   return null;
 }
+
+/** Upload a background-music cue for an audiobook / podcast score. */
+export async function uploadMusicCueToR2(
+  bookId: string,
+  audioId: string,
+  mood: string,
+  audioBytes: Buffer
+): Promise<string> {
+  const key = `${AUDIO_PREFIX}/${bookId}/${audioId}/music-${mood.replace(/[^a-z0-9-]/gi, "")}.mp3`;
+  const result = await uploadAudioBytes(key, audioBytes, `music-${mood}.mp3`);
+  if (!result.publicUrl) {
+    throw new Error("R2_PUBLIC_BASE_URL must be set so generated audio can be played.");
+  }
+  return result.publicUrl;
+}
+
+/** Public URL prefix for generated audio, used to validate proxied cue URLs. */
+export function audioPublicPrefix(): string | null {
+  const { publicBaseUrl } = getR2Config();
+  return publicBaseUrl ? `${publicBaseUrl}/${AUDIO_PREFIX}/` : null;
+}

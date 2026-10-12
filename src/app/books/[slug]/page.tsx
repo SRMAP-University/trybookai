@@ -13,6 +13,7 @@ import { ExpandableDescription } from "@/components/ui/expandable-description";
 import { BookManuscript } from "@/components/book/book-manuscript";
 import { JsonLd } from "@/components/seo/json-ld";
 import { bookJsonLd, breadcrumbJsonLd, truncateForMeta } from "@/lib/seo";
+import { parseMusicScore } from "@/lib/audio-generator/score-types";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -226,6 +227,8 @@ export default async function PublicBookPage({ params }: Props) {
                     voiceName: audio.voiceName,
                     audioUrl: audio.audioUrl,
                     errorMessage: audio.errorMessage,
+                    // Only the music score is public; voice settings stay server-side.
+                    voiceSettings: { music: parseMusicScore(audio.voiceSettings) },
                     tracks: audio.tracks.map((t) => ({
                       id: t.id,
                       number: t.number,
