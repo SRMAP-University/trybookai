@@ -72,19 +72,24 @@ ${proseForExtraction(input.content)}`,
   ];
 }
 
+const PLACEHOLDER = /^(none|n\/?a|null|nil|nothing|unknown|-|—|no (contradictions?|conflicts?|threads?|open threads?)\b.*)\.?$/i;
+
+/** List values without the "None" / "N/A" placeholders models emit for empty lists. */
+function cleanList(value: unknown): string[] {
+  return asStringArray(value).filter((item) => !PLACEHOLDER.test(item));
+}
+
 export function parseSectionUpdate(raw: string): SectionUpdate {
   try {
     const parsed = parseJsonLoose(raw) as Record<string, unknown>;
     const facts = Array.isArray(parsed.newFacts) ? parsed.newFacts : [];
+    const location = typeof parsed.location === "string" ? parsed.location.trim() : "";
     return {
       sectionSummary: String(parsed.sectionSummary ?? "").trim().slice(0, 1500),
       objective: parsed.objective ? String(parsed.objective).slice(0, 400) : undefined,
-      charactersPresent: asStringArray(parsed.charactersPresent).slice(0, 12),
-      location:
-        parsed.location && parsed.location !== "null"
-          ? String(parsed.location).slice(0, 120)
-          : undefined,
-      events: asStringArray(parsed.events).slice(0, 12),
+      charactersPresent: cleanList(parsed.charactersPresent).slice(0, 12),
+      location: location && !PLACEHOLDER.test(location) ? location.slice(0, 120) : undefined,
+      events: cleanList(parsed.events).slice(0, 12),
       newFacts: facts
         .map((f) => {
           const fact = (f ?? {}) as Partial<CanonFactInput>;
@@ -96,9 +101,9 @@ export function parseSectionUpdate(raw: string): SectionUpdate {
         })
         .filter((f) => f.subject && f.predicate && f.object)
         .slice(0, 12),
-      openThreads: asStringArray(parsed.openThreads).slice(0, 10),
-      resolvedThreads: asStringArray(parsed.resolvedThreads).slice(0, 10),
-      contradictions: asStringArray(parsed.contradictions).slice(0, 8),
+      openThreads: cleanList(parsed.openThreads).slice(0, 10),
+      resolvedThreads: cleanList(parsed.resolvedThreads).slice(0, 10),
+      contradictions: cleanList(parsed.contradictions).slice(0, 8),
     };
   } catch {
     return {

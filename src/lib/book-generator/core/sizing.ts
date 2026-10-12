@@ -94,7 +94,7 @@ export function creditedSectionPages(
 }
 
 /** Rough output tokens needed per word, by script. */
-function tokensPerWord(language: string | null | undefined): number {
+export function tokensPerWord(language: string | null | undefined): number {
   if (usesCharacterCount(language)) return 2.4;
   const name = languageName(language);
   if (["Hindi", "Arabic", "Bengali", "Urdu", "Korean", "Russian"].includes(name)) {

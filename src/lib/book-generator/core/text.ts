@@ -127,7 +127,8 @@ function isTitleLine(line: string, titleKeys: string[]): boolean {
     .trim();
   const key = normalizeTitle(stripped);
   if (!key) return false;
-  if (titleKeys.includes(key)) return true;
+  // "The Beginning." as plain text is a sentence, not a repeated title.
+  if (titleKeys.includes(key)) return isHeading || !/[.!?]$/.test(stripped);
   const withoutNumber = key.replace(/^(chapter|section|part|scene)\s+(\d+|[ivxlc]+)\s*/, "");
   if (withoutNumber !== key && (!withoutNumber || titleKeys.includes(withoutNumber))) {
     return true;
@@ -192,22 +193,29 @@ export function cleanSectionOutput(
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-/** True when text ends at a sentence or block boundary rather than mid-thought. */
+// Sentence terminators, including Devanagari (। ॥) and Arabic-script (۔ ؟) marks.
+const TERMINAL = /[.!?…。！？।॥۔؟」』"”’')\]*_]$/;
+const SENTENCE_END = /[.!?…。！？।॥۔؟]["”’')\]*_]*(?=\s|$)/g;
+const BLOCK_LINE = /^([-*+]\s|\d+[.)]\s|\||#{1,6}\s|\[FIGURE:)/i;
+
+/** True when text ends at a sentence or block boundary (list item, table, heading, figure). */
 export function endsCleanly(text: string): boolean {
   const trimmed = text.trimEnd();
   if (!trimmed) return false;
   const lastLine = trimmed.slice(trimmed.lastIndexOf("\n") + 1).trim();
-  if (/^\|.*\|$/.test(lastLine) || /^#{1,6}\s/.test(lastLine)) return true;
-  if (/^\[FIGURE:.*\]$/i.test(lastLine)) return true;
-  return /[.!?…。！？」』"”’')\]*_]$/.test(trimmed);
+  return BLOCK_LINE.test(lastLine) || TERMINAL.test(trimmed);
 }
 
-const SENTENCE_END = /[.!?…。！？]["”’')\]*_]*(?=\s|$)/g;
-
-/** Drop a dangling partial sentence left by a max-token cutoff. */
+/** Drop the partial sentence or block left by a max-token cutoff. Only call on cut-off text. */
 export function trimIncompleteEnding(text: string): string {
   const trimmed = text.trimEnd();
-  if (endsCleanly(trimmed)) return trimmed;
+  if (TERMINAL.test(trimmed)) return trimmed;
+  const lastBreak = trimmed.lastIndexOf("\n");
+  const lastLine = trimmed.slice(lastBreak + 1).trim();
+  // A cut-off list item, table row or heading: drop that line.
+  if (lastBreak > trimmed.length * 0.5 && BLOCK_LINE.test(lastLine)) {
+    return trimmed.slice(0, lastBreak).trimEnd();
+  }
   let cut = -1;
   for (const match of trimmed.matchAll(SENTENCE_END)) {
     cut = (match.index ?? 0) + match[0].length;
@@ -282,11 +290,22 @@ export function formatList(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** Text for a list item a model returned as a string or an object. */
+function itemText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const named = obj.name ?? obj.text ?? obj.title ?? obj.description ?? obj.summary;
+    return typeof named === "string" ? named : JSON.stringify(value);
+  }
+  return value == null ? "" : String(value);
+}
+
 export function asStringArray(value: unknown): string[] {
   if (!value) return [];
   if (Array.isArray(value)) {
     return value
-      .map((v) => (typeof v === "string" ? v : String(v)))
+      .map(itemText)
       .map((s) => s.trim())
       .filter(Boolean);
   }

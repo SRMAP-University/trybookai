@@ -5,6 +5,7 @@
  */
 
 import { isNarrativeBook } from "./format";
+import { tokensPerWord } from "./sizing";
 import { clipText, languageName, lengthPhrase, parseJsonLoose } from "./text";
 import type { ChatMessage, LlmCall } from "./types";
 
@@ -45,6 +46,10 @@ export type OutlineRequest = {
 const SINGLE_CALL_MAX_SECTIONS = 24;
 const SECTIONS_PER_BATCH = 24;
 const BATCH_CONCURRENCY = 3;
+/** Planned output size for one call; leaves headroom under the 8192 cap for retries. */
+const CALL_TOKEN_TARGET = 5500;
+/** Approximate output tokens per planned item, in English. */
+const TOKENS = { base: 900, chapter: 160, section: 150 } as const;
 
 const NARRATIVE_RULES = [
   "- Shape the chapters into one complete arc: establish the protagonist, world and central conflict early; escalate with complications and reversals through the middle; build to a climax near the end; resolve the central conflict in the final chapter.",
@@ -331,10 +336,11 @@ async function requestJson<T>(
 ): Promise<T> {
   let feedback = "";
   let best: T | null = null;
+  let budget = maxTokens;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await call(attempt === 0 ? messages : withFeedback(messages, feedback), {
-      max_tokens: Math.min(8192, maxTokens),
+      max_tokens: Math.min(8192, Math.ceil(budget)),
       temperature: attempt === 0 ? 0.5 : 0.3,
       purpose: "outline",
     });
@@ -343,6 +349,8 @@ async function requestJson<T>(
     try {
       parsed = parseJsonLoose(result.text);
     } catch {
+      // A cut-off answer gets more room as well as a request to be brief.
+      if (result.truncated) budget *= 1.6;
       feedback = result.truncated
         ? "It was cut off before the JSON was complete. Keep every summary shorter."
         : "It was not valid JSON. Return a single JSON object and nothing else.";
@@ -393,13 +401,17 @@ export async function planBookOutline(
   const narrative = isNarrativeBook(req);
   const chapters = req.chapterCount;
   const sections = req.sectionsPerChapter;
+  // Non-Latin scripts need several times the tokens for the same plan.
+  const scale = Math.max(1, tokensPerWord(req.language) / tokensPerWord("en"));
+  const fullBudget =
+    (TOKENS.base + chapters * TOKENS.chapter + chapters * sections * TOKENS.section) * scale;
 
-  if (chapters * sections <= SINGLE_CALL_MAX_SECTIONS) {
+  if (chapters * sections <= SINGLE_CALL_MAX_SECTIONS && fullBudget <= CALL_TOKEN_TARGET) {
     onProgress?.(`Planning ${chapters} chapters × ${sections} sections…`);
     const outline = await requestJson(
       call,
       fullOutlineMessages(req, narrative),
-      700 + chapters * 120 + chapters * sections * 110,
+      fullBudget,
       (parsed) => normalizeBook(parsed, req, true)
     );
     return { ...outline, chapters: outline.chapters.map(ensureSections) };
@@ -409,11 +421,15 @@ export async function planBookOutline(
   const skeleton = await requestJson(
     call,
     skeletonMessages(req, narrative),
-    900 + chapters * 140,
+    (TOKENS.base + chapters * TOKENS.chapter) * scale,
     (parsed) => normalizeBook(parsed, req, false)
   );
 
-  const perBatch = Math.max(1, Math.floor(SECTIONS_PER_BATCH / sections));
+  const sectionsPerBatch = Math.min(
+    SECTIONS_PER_BATCH,
+    Math.floor(CALL_TOKEN_TARGET / (TOKENS.section * scale))
+  );
+  const perBatch = Math.max(1, Math.floor(sectionsPerBatch / sections));
   const batches: OutlineChapter[][] = [];
   for (let i = 0; i < skeleton.chapters.length; i += perBatch) {
     batches.push(skeleton.chapters.slice(i, i + perBatch));
@@ -424,7 +440,7 @@ export async function planBookOutline(
     const result = await requestJson(
       call,
       sectionBatchMessages(req, narrative, skeleton, batch),
-      400 + batch.length * (40 + sections * 120),
+      (400 + batch.length * (40 + sections * TOKENS.section)) * scale,
       (parsed) => normalizeSectionBatch(parsed, batch, sections)
     );
     planned += batch.length;

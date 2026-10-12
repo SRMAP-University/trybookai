@@ -93,23 +93,34 @@ function looseList(value: unknown): LooseEntry[] {
   return Array.isArray(value) ? (value as LooseEntry[]) : [];
 }
 
-/** Outline entry for a chapter: by title first (survives renumbering), then by number. */
+/**
+ * Outline entry by number when its title agrees; otherwise by a unique title
+ * (survives reordering in the editor); otherwise by number.
+ */
+function findEntry(list: LooseEntry[], number: number, title: string) {
+  const byNumber = list.find((e) => Number(e.number) === number);
+  if (byNumber && sameTitle(byNumber.title, title)) return byNumber;
+  const titled = list.filter((e) => sameTitle(e.title, title));
+  return titled.length === 1 ? titled[0] : (byNumber ?? null);
+}
+
 function findOutlineChapter(outline: unknown, number: number, title: string) {
-  const chapters = looseList((outline as { chapters?: unknown } | null)?.chapters);
-  return (
-    chapters.find((c) => sameTitle(c.title, title)) ??
-    chapters.find((c) => Number(c.number) === number) ??
-    null
-  );
+  return findEntry(looseList((outline as { chapters?: unknown } | null)?.chapters), number, title);
 }
 
 function findOutlineSection(chapter: LooseEntry | null, number: number, title: string) {
-  const sections = looseList(chapter?.sections);
-  return (
-    sections.find((s) => sameTitle(s.title, title)) ??
-    sections.find((s) => Number(s.number) === number) ??
-    null
-  );
+  return findEntry(looseList(chapter?.sections), number, title);
+}
+
+/** Take lines in order while they fit; shrinks the shared budget. */
+function takeLines(lines: string[], budget: { left: number }): string[] {
+  const taken: string[] = [];
+  for (const line of lines) {
+    if (line.length + 1 > budget.left) break;
+    taken.push(line);
+    budget.left -= line.length + 1;
+  }
+  return taken;
 }
 
 const ESCAPE = /[.*+?^${}()|[\]\\]/g;
@@ -226,33 +237,41 @@ export function composeSectionPrompt(input: SectionContextInput): ComposedSectio
     .join("\n");
 
   // ── STORY SO FAR + THIS CHAPTER ─────────────────────────────────────────
-  const storySoFar = composeStorySoFar(input.priorChapters, BUDGET.storySoFar);
+  // Long chapters get shorter roadmap entries so the whole roadmap always fits.
+  const entryChars = Math.min(420, Math.max(160, Math.floor(2400 / siblings.length)));
   const roadmap = siblings
     .map((s) => {
       const label = `${s.number}. "${s.title}"`;
       if (s.number === section.number) return `${label} — ▶ you are writing this now`;
       if (s.done) {
-        return `${label} — already written: ${clipText(s.summary || planFor(s), 420) || "(done)"}`;
+        return `${label} — already written: ${clipText(s.summary || planFor(s), entryChars) || "(done)"}`;
       }
       const plan = planFor(s);
-      return `${label} — comes later, do not cover yet${plan ? `: ${clipText(plan, 220)}` : ""}`;
+      return `${label} — comes later, do not cover yet${plan ? `: ${clipText(plan, Math.min(220, entryChars))}` : ""}`;
     })
     .join("\n");
   const next = input.nextChapter;
-  const current = clipText(
-    [
-      storySoFar ? `${narrative ? "STORY SO FAR" : "COVERED SO FAR"}\n${storySoFar}\n` : null,
-      `THIS CHAPTER — Chapter ${chapter.number} of ${input.totalChapters}: "${chapter.title}"`,
-      chapterPlan ? `Plan: ${clipText(chapterPlan, 1200)}` : null,
-      `Sections:\n${roadmap}`,
-      next
-        ? `Next: Chapter ${next.number} "${next.title}"${next.summary ? ` — ${clipText(next.summary, 280)}` : ""} (do not start it).`
-        : "This is the final chapter of the book.",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    BUDGET.current
+  const chapterBlock = [
+    `THIS CHAPTER — Chapter ${chapter.number} of ${input.totalChapters}: "${chapter.title}"`,
+    chapterPlan ? `Plan: ${clipText(chapterPlan, 1200)}` : null,
+    `Sections:\n${roadmap}`,
+    next
+      ? `Next: Chapter ${next.number} "${next.title}"${next.summary ? ` — ${clipText(next.summary, 280)}` : ""} (do not start it).`
+      : "This is the final chapter of the book.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  // The story so far gets whatever room the chapter block leaves.
+  const storySoFar = composeStorySoFar(
+    input.priorChapters,
+    Math.max(800, Math.min(BUDGET.storySoFar, BUDGET.current - chapterBlock.length))
   );
+  const current = [
+    storySoFar ? `${narrative ? "STORY SO FAR" : "COVERED SO FAR"}\n${storySoFar}\n` : null,
+    chapterBlock,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   // ── CONTINUITY ──────────────────────────────────────────────────────────
   const doneSummaries = siblings
@@ -296,39 +315,54 @@ export function composeSectionPrompt(input: SectionContextInput): ComposedSectio
   const onStage = asStringArray(chapter.charactersPresent).slice(-6);
   const anyDone = siblings.some((s) => s.done);
 
-  const retrieved = clipText(
-    [
-      "CONTINUITY (stay consistent with these)",
-      shownChars.length
-        ? `Characters / people:\n${shownChars
-            .map((c) => `- ${c.name}${c.profile ? `: ${clipText(c.profile, 240)}` : ""}`)
-            .join("\n")}`
-        : null,
-      places.length
-        ? `Places:\n${places
-            .map((l) => `- ${l.name}${l.description ? `: ${clipText(l.description, 200)}` : ""}`)
-            .join("\n")}`
-        : null,
-      input.factions.length ? `Factions: ${input.factions.slice(0, 6).join(", ")}` : null,
-      facts.length
-        ? `Established facts:\n${facts.map((f) => `- ${f.subject} ${f.predicate} ${f.object}`).join("\n")}`
-        : null,
-      input.openThreads.length
-        ? `Open threads: ${input.openThreads.slice(-8).join("; ")}`
-        : null,
-      anyDone && (chapter.location || onStage.length)
-        ? `Where things stand: ${[
-            chapter.location ? `location — ${chapter.location}` : null,
-            onStage.length ? `present — ${onStage.join(", ")}` : null,
-          ]
-            .filter(Boolean)
-            .join("; ")}`
-        : null,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    BUDGET.retrieved
+  // Fill the budget in priority order (most specific notes first), then print
+  // in reading order, so nothing is cut off mid-list.
+  const budget = { left: BUDGET.retrieved };
+  const whereLines =
+    anyDone && (chapter.location || onStage.length)
+      ? takeLines(
+          [
+            `Where things stand: ${[
+              chapter.location ? `location — ${chapter.location}` : null,
+              onStage.length ? `present — ${onStage.join(", ")}` : null,
+            ]
+              .filter(Boolean)
+              .join("; ")}`,
+          ],
+          budget
+        )
+      : [];
+  const threadLines = input.openThreads.length
+    ? takeLines([`Open threads: ${clipText(input.openThreads.slice(-8).join("; "), 800)}`], budget)
+    : [];
+  const factLines = takeLines(
+    facts.map((f) => `- ${f.subject} ${f.predicate} ${f.object}`),
+    budget
   );
+  const charLines = takeLines(
+    shownChars.map((c) => `- ${c.name}${c.profile ? `: ${clipText(c.profile, 240)}` : ""}`),
+    budget
+  );
+  const placeLines = takeLines(
+    places.map((l) => `- ${l.name}${l.description ? `: ${clipText(l.description, 200)}` : ""}`),
+    budget
+  );
+  const factionLines = input.factions.length
+    ? takeLines([`Factions: ${input.factions.slice(0, 6).join(", ")}`], budget)
+    : [];
+  const shownFacts = facts.slice(0, factLines.length);
+
+  const retrieved = [
+    "CONTINUITY (stay consistent with these)",
+    charLines.length ? `Characters / people:\n${charLines.join("\n")}` : null,
+    placeLines.length ? `Places:\n${placeLines.join("\n")}` : null,
+    ...factionLines,
+    factLines.length ? `Established facts:\n${factLines.join("\n")}` : null,
+    ...threadLines,
+    ...whereLines,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   // ── PREVIOUS TEXT ───────────────────────────────────────────────────────
   const prev = input.previousText;
@@ -387,7 +421,7 @@ ${systemStyle}`;
     approxTokens: Math.ceil((system.length + userPrompt.length) / 4),
     targetWords,
     pageBudget,
-    factsBrief: facts
+    factsBrief: shownFacts
       .slice(0, 16)
       .map((f) => `${f.subject} ${f.predicate} ${f.object}`)
       .join("\n"),
