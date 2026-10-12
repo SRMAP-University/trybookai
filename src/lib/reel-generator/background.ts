@@ -5,7 +5,7 @@ import { runReelGeneration } from "@/lib/reel-generator/runner";
 const activeReelJobs = new Map<string, Promise<void>>();
 
 /** A running job refreshes its heartbeat every 15 s; past this it's presumed dead. */
-export const HEARTBEAT_STALE_MS = 90_000;
+export const HEARTBEAT_STALE_MS = 60_000;
 
 export function isReelGenerationActive(reelId: string) {
   return activeReelJobs.has(reelId);

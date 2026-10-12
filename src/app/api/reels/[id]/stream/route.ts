@@ -9,6 +9,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+/** End the stream a little before maxDuration so it closes cleanly and the page reconnects. */
+const STREAM_MS = 280_000;
+
 function encodeSse(event: ReelStreamEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
@@ -64,7 +67,7 @@ export async function POST(
         }
       };
       try {
-        await watchReelStream(id, emit, request.signal);
+        await watchReelStream(id, emit, request.signal, STREAM_MS);
       } catch (error) {
         if (!request.signal.aborted) {
           emit({

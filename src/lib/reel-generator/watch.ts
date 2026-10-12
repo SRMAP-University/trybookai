@@ -53,8 +53,11 @@ async function snapshot(reelId: string) {
 export async function watchReelStream(
   reelId: string,
   emit: ReelStreamEmitter,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Stop before the function's time limit; the client reconnects and the job resumes. */
+  maxMs = Infinity
 ) {
+  const deadline = Date.now() + maxMs;
   const first = await snapshot(reelId);
   if (!first) {
     emit({ type: "error", message: "Reel not found" });
@@ -87,7 +90,7 @@ export async function watchReelStream(
   });
 
   try {
-    while (!signal?.aborted && !finished) {
+    while (!signal?.aborted && !finished && Date.now() < deadline) {
       await sleep(POLL_MS, signal);
       if (finished || isReelGenerationActive(reelId)) continue;
 

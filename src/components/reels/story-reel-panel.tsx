@@ -105,10 +105,12 @@ export function StoryReelPanel({
   }, []);
 
   const refreshReel = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<ReelView | null> => {
       const res = await fetch(`/api/reels/${id}`, { cache: "no-store" });
       const result = await readJson<{ reel: ReelView }>(res);
-      if (result.ok) patchReel(id, () => result.data.reel);
+      if (!result.ok) return null;
+      patchReel(id, () => result.data.reel);
+      return result.data.reel;
     },
     [patchReel]
   );
@@ -128,15 +130,21 @@ export function StoryReelPanel({
     [refreshReel]
   );
 
+  const mounted = useRef(true);
   useEffect(() => {
+    mounted.current = true;
     const timers = refreshTimers.current;
-    return () => timers.forEach((t) => clearTimeout(t));
+    return () => {
+      mounted.current = false;
+      timers.forEach((t) => clearTimeout(t));
+    };
   }, []);
 
   const watch = useCallback(
-    async (reelId: string, retry = false) => {
+    async function watchReel(reelId: string, retry = false, attempt = 0): Promise<void> {
       if (watching.current.has(reelId)) return;
       watching.current.add(reelId);
+      let finished = false;
       try {
         const res = await fetch(`/api/reels/${reelId}/stream`, {
           method: "POST",
@@ -144,6 +152,7 @@ export function StoryReelPanel({
           body: JSON.stringify({ retry }),
         });
         if (!res.ok || !res.body) {
+          finished = true;
           const result = await readJson(res);
           if (!result.ok) toast.error(result.error);
           return;
@@ -189,9 +198,11 @@ export function StoryReelPanel({
             } else if (event.type === "episode_done") {
               scheduleRefresh(reelId);
             } else if (event.type === "done") {
+              finished = true;
               await refreshReel(reelId);
               toast.success("Your reel is ready to watch");
             } else if (event.type === "error") {
+              finished = true;
               await refreshReel(reelId);
               toast.error(event.message);
             }
@@ -201,7 +212,12 @@ export function StoryReelPanel({
         /* connection dropped; the job keeps running on the server */
       } finally {
         watching.current.delete(reelId);
-        void refreshReel(reelId);
+      }
+      // The stream closes at the server's time limit while the reel is still
+      // being made; reconnecting also restarts a job that stopped with it.
+      const latest = await refreshReel(reelId).catch(() => null);
+      if (!finished && mounted.current && latest && isRunning(latest) && attempt < 30) {
+        setTimeout(() => void watchReel(reelId, false, attempt + 1), 1500);
       }
     },
     [patchReel, refreshReel, scheduleRefresh]
