@@ -181,6 +181,17 @@ export type ReelView = {
   episodes: ReelEpisodeView[];
 };
 
+/** One reel in the public feed, with the book it came from. */
+export type ReelFeedItem = {
+  /** Finished videos only, in order; at most the first few parts. */
+  reel: ReelView;
+  book: { title: string; slug: string; author: string };
+  /** All finished parts, including ones not sent. */
+  totalParts: number;
+};
+
+export type ReelFeedPage = { items: ReelFeedItem[]; nextCursor: string | null };
+
 export type ReelAllowance = {
   limitSeconds: number;
   usedSeconds: number;

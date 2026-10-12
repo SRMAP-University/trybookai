@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   BarChart3,
+  Clapperboard,
   CreditCard,
   Download,
   Headphones,
@@ -48,6 +49,7 @@ const navSections = [
       { href: "/dashboard/books", label: "Your books", icon: Library },
       { href: "/dashboard/audio-studio", label: "Audio Studio", icon: Headphones },
       { href: "/dashboard/songs", label: "Song Studio", icon: MicVocal },
+      { href: "/dashboard/reels", label: "Reels", icon: Clapperboard },
       { href: "/dashboard/tracking", label: "Tracking", icon: Activity },
     ],
   },
@@ -275,7 +277,7 @@ export function DashboardSidebar() {
 const mobileNav = [
   { href: "/dashboard", label: "Home", icon: LayoutGrid },
   { href: "/dashboard/audio-studio", label: "Audio", icon: Headphones },
-  { href: "/dashboard/tracking", label: "Track", icon: Activity },
+  { href: "/dashboard/reels", label: "Reels", icon: Clapperboard },
   { href: "/dashboard/usage", label: "Usage", icon: BarChart3 },
   { href: "/dashboard/settings", label: "More", icon: Settings },
 ];

@@ -14,50 +14,13 @@ import {
 } from "lucide-react";
 import { BackgroundScorePlayer } from "@/components/dashboard/background-score";
 import { holdTawkHidden } from "@/components/tawk-visibility";
-import { cn } from "@/lib/utils";
 import {
-  captionChunks,
-  chunkIndexAt,
-  shotIndexAt,
-  type ReelMotion,
-  type ReelView,
-} from "@/lib/reel-generator/types";
-
-/** Camera move over a shot, `p` from 0 (shot starts) to 1 (shot ends). */
-function motionTransform(motion: ReelMotion, p: number): string {
-  switch (motion) {
-    case "pull-out":
-      return `scale(${1.18 - 0.12 * p})`;
-    case "pan-left":
-      return `scale(1.16) translateX(${4 - 8 * p}%)`;
-    case "pan-right":
-      return `scale(1.16) translateX(${-4 + 8 * p}%)`;
-    case "rise":
-      return `scale(1.14) translateY(${-4 + 8 * p}%)`;
-    default:
-      return `scale(${1.04 + 0.12 * p})`;
-  }
-}
-
-function formatTime(ms: number) {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
-
-const CAPTION_SHADOW =
-  "0 2px 0 rgba(0,0,0,.55), 0 0 14px rgba(0,0,0,.55), 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000";
+  RailButton,
+  ReelStage,
+  formatReelTime as formatTime,
+} from "@/components/reels/reel-stage";
+import { cn } from "@/lib/utils";
+import { shotIndexAt, type ReelView } from "@/lib/reel-generator/types";
 
 /**
  * Full-screen vertical player. The narration <audio> is the only clock: the
@@ -90,7 +53,6 @@ export function ReelPlayer({
   const [captionsOn, setCaptionsOn] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
   const [listOpen, setListOpen] = useState(false);
-  const reduced = usePrefersReducedMotion();
   const autoplayNext = useRef(false);
   const touchStart = useRef<number | null>(null);
   const swiped = useRef(false);
@@ -184,21 +146,6 @@ export function ReelPlayer({
 
   const shots = episode?.shots ?? [];
   const current = shots.length ? shotIndexAt(shots, ms) : 0;
-  const shotProgress = (i: number) => {
-    const shot = shots[i];
-    if (!shot || shot.startMs == null || shot.endMs == null) return 0;
-    const span = Math.max(1, shot.endMs - shot.startMs);
-    return Math.min(1, Math.max(0, (ms - shot.startMs) / span));
-  };
-
-  const chunks = useMemo(() => captionChunks(episode?.captions ?? []), [episode?.captions]);
-  const chunkIndex = chunkIndexAt(chunks, ms);
-  const chunk = chunkIndex >= 0 ? chunks[chunkIndex] : null;
-  const words = episode?.captions ?? [];
-  let activeWord = -1;
-  if (chunk) {
-    for (let i = chunk.first; i <= chunk.last; i++) if (words[i][1] <= ms) activeWord = i;
-  }
 
   const duration = episode?.durationMs ?? 0;
   const mood = shots[current]?.mood;
@@ -278,42 +225,7 @@ export function ReelPlayer({
           goTo(dy < 0 ? index + 1 : index - 1);
         }}
       >
-        {shots.map((shot, i) =>
-          shot.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={shot.id}
-              src={shot.imageUrl}
-              alt=""
-              draggable={false}
-              className={cn(
-                "absolute inset-0 h-full w-full object-cover will-change-transform",
-                !reduced && "transition-opacity duration-500 ease-out"
-              )}
-              style={{
-                opacity: i === current ? 1 : 0,
-                transform:
-                  Math.abs(i - current) <= 1
-                    ? motionTransform(shot.motion, reduced ? 0.5 : shotProgress(i))
-                    : undefined,
-              }}
-            />
-          ) : null
-        )}
-
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,.5),transparent_18%,transparent_55%,rgba(0,0,0,.7))]" />
-
-        {/* One segment per shot */}
-        <div className="pointer-events-none absolute inset-x-3 top-[max(12px,env(safe-area-inset-top))] flex gap-1">
-          {shots.map((shot, i) => (
-            <span key={shot.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30">
-              <span
-                className="block h-full bg-white"
-                style={{ width: `${i < current ? 100 : i === current ? shotProgress(i) * 100 : 0}%` }}
-              />
-            </span>
-          ))}
-        </div>
+        <ReelStage episode={episode} ms={ms} captionsOn={captionsOn} />
 
         <div className="absolute inset-x-3 top-[max(24px,calc(env(safe-area-inset-top)+12px))] flex items-center justify-between gap-3">
           <p className="truncate text-[12px] font-medium text-white/80">
@@ -332,26 +244,6 @@ export function ReelPlayer({
             <X className="h-4 w-4" />
           </button>
         </div>
-
-        {captionsOn && chunk && (
-          <p
-            className="pointer-events-none absolute inset-x-4 top-[58%] pr-12 text-center text-[22px] font-extrabold leading-[1.2] tracking-[-0.01em] text-white sm:text-[26px]"
-            style={{ textShadow: CAPTION_SHADOW }}
-            aria-hidden
-          >
-            {words.slice(chunk.first, chunk.last + 1).map((word, i) => (
-              <span
-                key={chunk.first + i}
-                className={cn(
-                  "mx-[0.12em] inline-block transition-transform duration-100",
-                  chunk.first + i === activeWord && "scale-[1.08] text-[#ffd84d]"
-                )}
-              >
-                {word[0]}
-              </span>
-            ))}
-          </p>
-        )}
 
         {/* Right rail */}
         <div className="absolute bottom-28 right-2 flex flex-col items-center gap-4">
@@ -483,29 +375,5 @@ export function ReelPlayer({
         {playing ? "" : "Paused"}
       </span>
     </div>
-  );
-}
-
-function RailButton({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className="flex flex-col items-center gap-0.5 text-[10px] font-medium text-white/85 [filter:drop-shadow(0_1px_2px_rgba(0,0,0,.6))]"
-    >
-      {icon}
-      {label}
-    </button>
   );
 }

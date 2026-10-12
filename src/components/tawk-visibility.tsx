@@ -18,8 +18,8 @@ declare global {
 /** Where the chat bubble would cover the page's own controls. */
 function shouldHide(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
-  // Shared Story Reels are a full-screen player.
-  if (pathname.startsWith("/r/")) return true;
+  // Shared Story Reels and the Reels feed are full-screen players.
+  if (pathname.startsWith("/r/") || pathname === "/dashboard/reels") return true;
   // The new-book page has a sticky create button above the phone nav.
   return (
     pathname === "/dashboard/books/new" &&

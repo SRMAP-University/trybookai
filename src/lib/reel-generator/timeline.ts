@@ -94,6 +94,7 @@ export function toPublicReelView(view: ReelView): ReelView {
     errorMessage: null,
     billedSeconds: 0,
     phase: null,
+    shareToken: null,
     episodes: view.episodes.filter((e) => e.status === "COMPLETED"),
   };
 }
