@@ -43,7 +43,7 @@ export default async function Home() {
       <JsonLd data={websiteJsonLd()} />
       <JsonLd data={softwareApplicationJsonLd()} />
       <JsonLd data={faqPageJsonLd()} />
-      <Navbar />
+      <Navbar blend />
       <main>
         <HomeHero covers={covers} />
         <HomeShelf covers={covers} />

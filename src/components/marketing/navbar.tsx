@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { LogoMark } from "@/components/marketing/landing-showcase";
+import { cn } from "@/lib/utils";
 import "@/components/marketing/marketing.css";
 
 const navLinks = [
@@ -16,11 +17,30 @@ const navLinks = [
   { href: "/#pricing", label: "Pricing" },
 ];
 
-export function Navbar() {
+function subscribeToScroll(onChange: () => void) {
+  window.addEventListener("scroll", onChange, { passive: true });
+  return () => window.removeEventListener("scroll", onChange);
+}
+
+const isScrolled = () => window.scrollY > 8;
+
+/**
+ * `blend` makes the header transparent while the page is at the top, so it
+ * reads as part of the hero beneath it; it turns solid once the page scrolls.
+ */
+export function Navbar({ blend = false }: { blend?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const scrolled = useSyncExternalStore(subscribeToScroll, isScrolled, () => false);
+  const solid = !blend || scrolled || mobileOpen;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--landing-bg,#f3f3f1)]/90">
+    <header
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-[background-color,box-shadow] duration-300",
+        solid ? "bg-[var(--landing-bg,#f3f3f1)]/90" : "bg-transparent",
+        blend && solid && "shadow-[0_1px_0_#e6ebf1]"
+      )}
+    >
       <nav className="mx-auto flex h-[72px] max-w-[1200px] items-center px-6">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
