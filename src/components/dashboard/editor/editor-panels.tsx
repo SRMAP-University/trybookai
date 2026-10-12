@@ -473,8 +473,11 @@ export function SuggestionCard({
   const streaming = suggestion.status === "streaming";
 
   return (
-    <div className="my-5 overflow-hidden rounded-2xl border border-[#c9c5ff] bg-white shadow-[0_18px_40px_-24px_rgba(99,91,255,0.55)]">
-      <div className="flex items-center justify-between gap-3 border-b border-[#eef1f5] bg-[#f8f7ff] px-4 py-2.5">
+    <div className="overflow-hidden rounded-2xl border border-[#c9c5ff] bg-white shadow-[0_-18px_48px_-20px_rgba(10,37,64,0.4)] sm:rounded-b-none sm:border-b-0">
+      <div className="flex justify-center bg-[#f8f7ff] pt-2" aria-hidden>
+        <span className="h-1 w-10 rounded-full bg-[#c9c5ff]" />
+      </div>
+      <div className="flex items-center justify-between gap-3 border-b border-[#eef1f5] bg-[#f8f7ff] px-4 pb-2.5 pt-1.5">
         <p className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-[#635bff]">
           {streaming ? (
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
@@ -496,7 +499,7 @@ export function SuggestionCard({
         </button>
       </div>
 
-      <div className="max-h-[50vh] space-y-3 overflow-y-auto px-4 py-3">
+      <div className="max-h-[38dvh] space-y-3 overflow-y-auto px-4 py-3">
         {original && (
           <p className="line-clamp-3 text-[13px] leading-relaxed text-[#a3acb9] line-through decoration-[#c1c9d2]">
             {original

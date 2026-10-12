@@ -235,6 +235,7 @@ export function BookEditor({ book }: { book: Book }) {
   const pendingFocusRef = useRef<TextRange | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const suggestionIdRef = useRef(0);
+  const suggestionOpenRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const [aiOpen, setAiOpen] = useState(true);
@@ -589,12 +590,6 @@ export function BookEditor({ book }: { book: Book }) {
       merged: null,
       status: "streaming",
     });
-    requestAnimationFrame(() =>
-      document
-        .getElementById(`suggestion-${req.sectionId}`)
-        ?.scrollIntoView({ block: "nearest", behavior: "smooth" })
-    );
-
     // Batch streamed tokens into one state update per frame.
     let buffered = "";
     let frame: number | null = null;
@@ -867,6 +862,11 @@ export function BookEditor({ book }: { book: Book }) {
         e.preventDefault();
         saveAllNow();
       } else if (e.key === "Escape") {
+        if (suggestionOpenRef.current) {
+          abortRef.current?.abort();
+          setSuggestion(null);
+          return;
+        }
         setFindOpen(false);
         setFocusMode(false);
       }
@@ -874,6 +874,10 @@ export function BookEditor({ book }: { book: Book }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [saveAllNow]);
+
+  useEffect(() => {
+    suggestionOpenRef.current = suggestion !== null;
+  }, [suggestion]);
 
   useEffect(() => {
     if (saveStatus === "saved") return;
@@ -1119,17 +1123,6 @@ export function BookEditor({ book }: { book: Book }) {
                           />
                         </div>
                       )}
-                      {hasSuggestion && suggestion && (
-                        <div id={`suggestion-${section.id}`}>
-                          <SuggestionCard
-                            suggestion={suggestion}
-                            fontClass={fontClass}
-                            onAccept={acceptSuggestion}
-                            onRetry={retrySuggestion}
-                            onDiscard={discardSuggestion}
-                          />
-                        </div>
-                      )}
                     </article>
                   );
                 })}
@@ -1213,6 +1206,31 @@ export function BookEditor({ book }: { book: Book }) {
                 Done
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* AI suggestion drawer: slides up from the bottom, text stays in place. */}
+      {suggestion && (
+        <div
+          className={cn(
+            "pointer-events-none fixed inset-x-0 bottom-[calc(56px+env(safe-area-inset-bottom))] z-40 flex justify-center px-2 sm:bottom-0 sm:px-4",
+            !focusMode && "lg:left-[264px]",
+            !focusMode && aiOpen && "lg:right-[300px]"
+          )}
+        >
+          <div
+            role="dialog"
+            aria-label="AI suggestion"
+            className="pointer-events-auto w-full max-w-[720px] animate-in fade-in-0 slide-in-from-bottom-8 duration-300"
+          >
+            <SuggestionCard
+              suggestion={suggestion}
+              fontClass={fontClass}
+              onAccept={acceptSuggestion}
+              onRetry={retrySuggestion}
+              onDiscard={discardSuggestion}
+            />
           </div>
         </div>
       )}
