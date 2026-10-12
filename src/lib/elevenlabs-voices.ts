@@ -1,8 +1,4 @@
-import {
-  DEFAULT_TTS_MODEL,
-  DEFAULT_VOICE_ID,
-  DEFAULT_VOICE_NAME,
-} from "@/lib/elevenlabs";
+/** ElevenLabs voice/model catalogue and settings. Client-safe: no API calls here. */
 
 export type ElevenLabsVoice = {
   id: string;
@@ -10,113 +6,75 @@ export type ElevenLabsVoice = {
   gender: "female" | "male" | "neutral";
   style: string;
   description: string;
+  accent?: string;
+  age?: string;
+  useCase?: string;
+  /** Short sample clip hosted by ElevenLabs. */
+  previewUrl?: string;
+  category?: string;
 };
 
-/** Curated ElevenLabs library voices for narration. */
+/**
+ * Last-resort narrator when the live voice list is unavailable. Voices come
+ * from the account via GET /v2/voices; ElevenLabs retires its Default voices
+ * on 31 Dec 2026, so nothing should depend on these IDs long term.
+ */
+export const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
+export const DEFAULT_VOICE_NAME = "George";
+
+/** Newest and most expressive model; recommended by ElevenLabs for audiobooks. */
+export const DEFAULT_TTS_MODEL = "eleven_v4";
+
+/** Most stable long-form model; used when a newer model isn't available. */
+export const FALLBACK_TTS_MODEL = "eleven_multilingual_v2";
+
+/** Shown only if the account's voice list can't be loaded. */
 export const ELEVENLABS_VOICES: ElevenLabsVoice[] = [
-  {
-    id: "21m00Tcm4TlvDq8ikWAM",
-    name: "Rachel",
-    gender: "female",
-    style: "Calm",
-    description: "Clear, warm narrator — great default for fiction",
-  },
-  {
-    id: "EXAVITQu4vr4xnSDxMaL",
-    name: "Bella",
-    gender: "female",
-    style: "Soft",
-    description: "Soft and conversational",
-  },
-  {
-    id: "XrExE9yKIg1WjnnlVkGX",
-    name: "Matilda",
-    gender: "female",
-    style: "Warm",
-    description: "Warm storytelling voice",
-  },
-  {
-    id: "pFZP5JQG7iQjIQuC4Bku",
-    name: "Lily",
-    gender: "female",
-    style: "British",
-    description: "British, articulate narration",
-  },
-  {
-    id: "LcfcDJNUP1GQjkzn1xUU",
-    name: "Emily",
-    gender: "female",
-    style: "Calm",
-    description: "Calm and meditative",
-  },
-  {
-    id: "pNInz6obpgDQGcFmaJgB",
-    name: "Adam",
-    gender: "male",
-    style: "Deep",
-    description: "Deep, authoritative narrator",
-  },
-  {
-    id: "TxGEqnHWrfWFTfGW9XjX",
-    name: "Josh",
-    gender: "male",
-    style: "Young",
-    description: "Young and natural",
-  },
-  {
-    id: "VR6AewLTigWG4xSOukaG",
-    name: "Arnold",
-    gender: "male",
-    style: "Crisp",
-    description: "Crisp, professional delivery",
-  },
-  {
-    id: "JBFqnCBsd6RMkjVDRZzb",
-    name: "George",
-    gender: "male",
-    style: "British",
-    description: "Warm British storyteller",
-  },
-  {
-    id: "onwK4e9ZLuTAKqWW03F9",
-    name: "Daniel",
-    gender: "male",
-    style: "Steady",
-    description: "Steady documentary tone",
-  },
-  {
-    id: "IKne3meq5aSn9XLyUdCD",
-    name: "Charlie",
-    gender: "male",
-    style: "Casual",
-    description: "Casual Australian tone",
-  },
-  {
-    id: "N2lVS1w4EtoT3dr4eOWO",
-    name: "Callum",
-    gender: "male",
-    style: "Intense",
-    description: "Intense, dramatic reads",
-  },
+  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George", gender: "male", style: "British", description: "Warm, captivating storyteller" },
+  { id: "nPczCjzI2devNBz1zQrb", name: "Brian", gender: "male", style: "Deep", description: "Deep, resonant narrator" },
+  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel", gender: "male", style: "British", description: "Steady, authoritative broadcaster" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam", gender: "male", style: "Articulate", description: "Energetic, clear delivery" },
+  { id: "IKne3meq5aSn9XLyUdCD", name: "Charlie", gender: "male", style: "Australian", description: "Relaxed, conversational" },
+  { id: "N2lVS1w4EtoT3dr4eOWO", name: "Callum", gender: "male", style: "Husky", description: "Intense, dramatic reads" },
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", gender: "female", style: "Soft", description: "Soft, reassuring narrator" },
+  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily", gender: "female", style: "British", description: "Warm, velvety narration" },
+  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda", gender: "female", style: "Warm", description: "Knowledgeable, friendly storyteller" },
+  { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice", gender: "female", style: "British", description: "Clear, engaging educator" },
+  { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura", gender: "female", style: "Upbeat", description: "Bright, quirky delivery" },
+  { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica", gender: "female", style: "Expressive", description: "Playful, bright and warm" },
 ];
 
 export const ELEVENLABS_TTS_MODELS = [
   {
-    id: "eleven_multilingual_v2",
-    name: "Multilingual v2",
-    description: "Best quality / language balance for books",
+    id: "eleven_v4",
+    name: "Eleven v4",
+    description: "Newest and most expressive — best for audiobooks",
   },
   {
-    id: "eleven_turbo_v2_5",
-    name: "Turbo v2.5",
-    description: "Faster generation, slightly lower cost",
+    id: "eleven_v3",
+    name: "Eleven v3",
+    description: "Dramatic, emotive delivery",
+  },
+  {
+    id: "eleven_multilingual_v2",
+    name: "Multilingual v2",
+    description: "Most stable on very long narration",
   },
   {
     id: "eleven_flash_v2_5",
     name: "Flash v2.5",
-    description: "Fastest — good for drafts",
+    description: "Fastest and lowest cost — good for drafts",
   },
 ] as const;
+
+/** Retired model ids stored on older audio settings → current equivalent. */
+const RETIRED_TTS_MODELS: Record<string, string> = {
+  eleven_turbo_v2_5: "eleven_flash_v2_5",
+  eleven_turbo_v2: "eleven_flash_v2_5",
+  eleven_flash_v2: "eleven_flash_v2_5",
+  eleven_monolingual_v1: FALLBACK_TTS_MODEL,
+  eleven_multilingual_v1: FALLBACK_TTS_MODEL,
+};
 
 export type VoiceSettingsConfig = {
   stability: number;
@@ -199,6 +157,11 @@ export function resolveVoice(
   };
 }
 
+export function normalizeTtsModel(modelId?: string | null): string {
+  const id = modelId ? (RETIRED_TTS_MODELS[modelId] ?? modelId) : DEFAULT_TTS_MODEL;
+  return ELEVENLABS_TTS_MODELS.some((m) => m.id === id) ? id : DEFAULT_TTS_MODEL;
+}
+
 export function normalizeVoiceSettings(
   input?: Partial<VoiceSettingsConfig> | null
 ): VoiceSettingsConfig {
@@ -209,10 +172,7 @@ export function normalizeVoiceSettings(
     style: clamp(base.style, 0, 1),
     speed: clamp(base.speed, 0.7, 1.2),
     useSpeakerBoost: Boolean(base.useSpeakerBoost),
-    modelId:
-      ELEVENLABS_TTS_MODELS.some((m) => m.id === base.modelId)
-        ? base.modelId
-        : DEFAULT_TTS_MODEL,
+    modelId: normalizeTtsModel(base.modelId),
   };
 }
 

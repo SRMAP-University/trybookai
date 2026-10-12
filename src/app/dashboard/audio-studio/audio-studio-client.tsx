@@ -23,11 +23,14 @@ import { useDashboardUser } from "@/components/dashboard/user-context";
 import { UpgradeLink } from "@/components/dashboard/upgrade-button";
 import {
   DEFAULT_VOICE_SETTINGS,
-  ELEVENLABS_VOICES,
   VOICE_SETTING_PRESETS,
   type VoiceSettingsConfig,
 } from "@/lib/elevenlabs-voices";
-import { DEFAULT_VOICE_ID } from "@/lib/elevenlabs";
+import {
+  useNarrationCatalogue,
+  voiceSummary,
+  VoicePreviewButton,
+} from "@/components/dashboard/narration-voices";
 import { cn } from "@/lib/utils";
 import { estimateAudioMinutesFromText } from "@/lib/audio-quota";
 
@@ -109,7 +112,10 @@ export function AudioStudioClient() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [sourceMode, setSourceMode] = useState<SourceMode>("text");
   const [audioType, setAudioType] = useState<AudioType>("AUDIOBOOK");
-  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE_ID);
+  const catalogue = useNarrationCatalogue();
+  // Empty until the user picks: follows the account's recommended narrator.
+  const [pickedVoiceId, setVoiceId] = useState("");
+  const voiceId = pickedVoiceId || catalogue.defaultVoiceId;
   const [settings, setSettings] = useState<VoiceSettingsConfig>(() => ({
     ...DEFAULT_VOICE_SETTINGS,
     ...VOICE_SETTING_PRESETS.find((p) => p.id === "narration")?.settings,
@@ -127,8 +133,8 @@ export function AudioStudioClient() {
   const playerRef = useRef<HTMLDivElement>(null);
 
   const selectedVoice = useMemo(
-    () => ELEVENLABS_VOICES.find((v) => v.id === voiceId) ?? ELEVENLABS_VOICES[0],
-    [voiceId]
+    () => catalogue.voices.find((v) => v.id === voiceId) ?? catalogue.voices[0],
+    [catalogue.voices, voiceId]
   );
 
   const wordCount = useMemo(
@@ -670,42 +676,50 @@ export function AudioStudioClient() {
             <div>
               <Label className="text-[13px] text-[#0a2540]">Voice</Label>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {ELEVENLABS_VOICES.slice(0, 8).map((voice) => {
+                {catalogue.voices.slice(0, 8).map((voice) => {
                   const active = voiceId === voice.id;
                   return (
-                    <button
+                    <div
                       key={voice.id}
-                      type="button"
-                      onClick={() => setVoiceId(voice.id)}
                       className={cn(
-                        "rounded-lg border px-3 py-2.5 text-left transition-colors",
+                        "relative rounded-lg border transition-colors",
                         active
                           ? "border-[#635bff] bg-[#f8f7ff]"
                           : "border-[#e6ebf1] hover:border-[#c9c5ff]"
                       )}
                     >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-medium text-[#0a2540]">
+                      <button
+                        type="button"
+                        onClick={() => setVoiceId(voice.id)}
+                        aria-pressed={active}
+                        className="block w-full px-3 py-2.5 pr-11 text-left"
+                      >
+                        <span className="block text-[13px] font-medium text-[#0a2540]">
                           {voice.name}
                         </span>
-                        <span className="text-[10px] uppercase tracking-[0.06em] text-[#a3acb9]">
-                          {voice.gender}
+                        <span className="mt-0.5 block text-[11px] capitalize text-[#a3acb9]">
+                          {voiceSummary(voice)}
                         </span>
-                      </span>
-                      <span className="mt-0.5 block text-[11px] text-[#697386]">
-                        {voice.style} · {voice.description}
-                      </span>
-                    </button>
+                        <span className="mt-0.5 line-clamp-2 block text-[11px] text-[#697386]">
+                          {voice.description}
+                        </span>
+                      </button>
+                      <VoicePreviewButton
+                        voice={voice}
+                        className="absolute right-2.5 top-2.5"
+                      />
+                    </div>
                   );
                 })}
               </div>
-              {ELEVENLABS_VOICES.length > 8 && (
+              {catalogue.voices.length > 8 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {ELEVENLABS_VOICES.slice(8).map((voice) => (
+                  {catalogue.voices.slice(8).map((voice) => (
                     <button
                       key={voice.id}
                       type="button"
                       onClick={() => setVoiceId(voice.id)}
+                      title={[voiceSummary(voice), voice.description].filter(Boolean).join(" — ")}
                       className={cn(
                         "rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
                         voiceId === voice.id

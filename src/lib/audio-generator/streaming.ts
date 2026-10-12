@@ -9,9 +9,13 @@ import {
   generateMusic,
   generateSong,
   isElevenLabsConfigured,
+  listVoices,
+  pickNarrationVoice,
   textToSpeechLong,
   type TtsOptions,
 } from "@/lib/elevenlabs";
+import { isNarrativeBook } from "@/lib/book-generator/core/format";
+import { markdownToNarration } from "@/lib/audio-generator/narration";
 import {
   normalizeVoiceSettings,
   parseStoredVoiceSettings,
@@ -30,18 +34,52 @@ import {
   type AudioStreamEmitter,
 } from "@/lib/audio-generator/events";
 
-function chapterNarrationText(chapter: {
-  number: number;
-  title: string;
-  sections: { number: number; title: string; content: string | null }[];
-}): string {
-  const parts = [`Chapter ${chapter.number}. ${chapter.title}.`];
+/** Chapters narrated at once; each chapter's chunks stay sequential. */
+const NARRATION_CONCURRENCY = 3;
+
+/**
+ * Spoken text for a chapter. Markdown becomes speech (headings, lists and
+ * tables read naturally; figures dropped). Section titles are read only for
+ * non-fiction, where they work like sub-headings; in a novel they're internal.
+ */
+function chapterNarrationText(
+  chapter: {
+    number: number;
+    title: string;
+    sections: { number: number; title: string; content: string | null }[];
+  },
+  options: { sectionTitles: boolean; opening?: string }
+): string {
+  const parts = [
+    options.opening,
+    `Chapter ${chapter.number}. ${chapter.title}.`,
+  ].filter((p): p is string => Boolean(p));
   for (const section of chapter.sections) {
-    const body = section.content?.trim();
+    const body = markdownToNarration(section.content);
     if (!body) continue;
-    parts.push(`${section.title}. ${body}`);
+    if (options.sectionTitles) parts.push(`${section.title.replace(/[.!?]*$/, "")}.`);
+    parts.push(body);
   }
   return parts.join("\n\n");
+}
+
+/** Run `fn` over items with at most `limit` in flight, keeping result order. */
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const index = next++;
+        results[index] = await fn(items[index], index);
+      }
+    })
+  );
+  return results;
 }
 
 async function assertAudioQuota(userId: string, estimatedMinutes: number) {
@@ -164,8 +202,14 @@ async function runAudiobook(
     throw new Error("No chapter content available to narrate.");
   }
 
-  const fullText = chapters.map((c) => chapterNarrationText(c)).join("\n\n");
-  await assertAudioQuota(userId, estimateAudioMinutesFromText(fullText));
+  const sectionTitles = !isNarrativeBook(book);
+  const texts = chapters.map((chapter, i) =>
+    chapterNarrationText(chapter, {
+      sectionTitles,
+      opening: i === 0 ? `${book.title}.` : undefined,
+    })
+  );
+  await assertAudioQuota(userId, estimateAudioMinutesFromText(texts.join("\n\n")));
 
   emit({
     type: "phase",
@@ -173,12 +217,10 @@ async function runAudiobook(
     audioType: "AUDIOBOOK",
   });
 
-  const chapterBuffers: Buffer[] = [];
-
-  for (let i = 0; i < chapters.length; i++) {
-    const chapter = chapters[i];
-    const text = chapterNarrationText(chapter);
-    if (!text.trim()) continue;
+  let finished = 0;
+  const narrated = await mapLimit(chapters, NARRATION_CONCURRENCY, async (chapter, i) => {
+    const text = texts[i];
+    if (!text.trim()) return null;
 
     emit({
       type: "phase",
@@ -190,7 +232,6 @@ async function runAudiobook(
       text,
       ttsOptionsFromSettings(voiceId, voiceSettings)
     );
-    chapterBuffers.push(audioBytes);
     await creditAudioMinutes(userId, estimateAudioMinutesFromText(text));
 
     const audioUrl = await saveTrack({
@@ -202,7 +243,8 @@ async function runAudiobook(
       audioBytes,
     });
 
-    const progress = ((i + 1) / chapters.length) * 95;
+    finished++;
+    const progress = (finished / chapters.length) * 95;
     await db.bookAudio.update({
       where: { id: audioId },
       data: { progress, status: "GENERATING" },
@@ -223,7 +265,10 @@ async function runAudiobook(
       trackNumber: chapter.number,
       trackTitle: chapter.title,
     });
-  }
+    return audioBytes;
+  });
+  // Full audiobook in chapter order, whatever order chapters finished in.
+  const chapterBuffers = narrated.filter((b): b is Buffer => Boolean(b));
 
   if (chapterBuffers.length > 0) {
     emit({
@@ -770,6 +815,20 @@ export async function runAudioGeneration(
   }
 }
 
+/**
+ * Voice id + display name. With no choice, the best narration voice on the
+ * account (ElevenLabs retires its fixed Default voices on 31 Dec 2026).
+ */
+async function resolveVoiceLive(voiceId?: string | null, voiceName?: string | null) {
+  if (voiceId && voiceName) return { voiceId, voiceName };
+  const { voices } = await listVoices();
+  if (voiceId) {
+    return resolveVoice(voiceId, voices.find((v) => v.id === voiceId)?.name ?? voiceName);
+  }
+  const narrator = pickNarrationVoice(voices);
+  return { voiceId: narrator.id, voiceName: narrator.name };
+}
+
 export async function ensureAudioRecord(params: {
   bookId: string;
   userId: string;
@@ -845,9 +904,9 @@ export async function ensureAudioRecord(params: {
       orderBy: { createdAt: "desc" },
     });
     if (failedOrPending) {
-      const { voiceId, voiceName } = resolveVoice(
-        params.voiceId,
-        params.voiceName
+      const { voiceId, voiceName } = await resolveVoiceLive(
+        params.voiceId ?? failedOrPending.voiceId,
+        params.voiceName ?? failedOrPending.voiceName
       );
       const voiceSettings = normalizeVoiceSettings(params.voiceSettings);
       return db.bookAudio.update({
@@ -879,7 +938,7 @@ export async function ensureAudioRecord(params: {
     where: { bookId: params.bookId, type: params.type },
   });
 
-  const { voiceId, voiceName } = resolveVoice(
+  const { voiceId, voiceName } = await resolveVoiceLive(
     params.voiceId,
     params.voiceName
   );

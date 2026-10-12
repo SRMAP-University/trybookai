@@ -32,6 +32,7 @@ export async function notifyApp(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       console.warn(

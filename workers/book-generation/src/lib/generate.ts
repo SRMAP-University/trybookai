@@ -2,7 +2,7 @@ import type { Env } from "../env";
 import type { Sql } from "./db";
 import { runGenerationAiDetailed } from "./ai";
 import { ensureBookCover } from "./cover";
-import { notifyApp } from "./notify";
+import { nextPushMilestone, notifyApp } from "./notify";
 import { resolveGenerationShape } from "./shape";
 import { assembleSectionContext } from "./context-assembler";
 import { seedBibleFromOutline } from "./context-seed";
@@ -458,19 +458,38 @@ export async function writeSectionStep(
     sectionTitle: section.title,
   });
 
+  // Per-phase timings and the model behind each prose call, returned as the
+  // step output so slow sections can be diagnosed from the Workflow dashboard.
+  const started = Date.now();
+  let mark = started;
+  const timings: Record<string, number> = {};
+  const lap = (phase: string) => {
+    const now = Date.now();
+    timings[phase] = (timings[phase] ?? 0) + (now - mark);
+    mark = now;
+  };
+  const proseCalls: string[] = [];
+
   const prompt = await assembleSectionContext(sql, bookId, sectionId);
+  lap("assembleMs");
   const titles = {
     sectionTitle: prompt.sectionTitle,
     chapterTitle: prompt.chapterTitle,
   };
-  const call: LlmCall = (messages, options) =>
-    withAiHeartbeat(
+  const call: LlmCall = async (messages, options) => {
+    const callStarted = Date.now();
+    const result = await withAiHeartbeat(
       sql,
       jobId,
       "writing_ai",
       { currentSectionId: sectionId, sectionTitle: section.title },
       () => runGenerationAiDetailed(env, book.model, messages, options, "prose")
     );
+    proseCalls.push(
+      `${(result.model ?? "?").split("/").pop()} ${((Date.now() - callStarted) / 1000).toFixed(1)}s${result.truncated ? " cut" : ""}`
+    );
+    return result;
+  };
 
   const draft = await draftSection({
     messages: prompt.messages,
@@ -480,6 +499,7 @@ export async function writeSectionStep(
     titles,
     call,
   });
+  lap("draftMs");
 
   await assertNotPaused(sql, bookId);
 
@@ -499,6 +519,7 @@ export async function writeSectionStep(
 
   let content = draft.content;
   let update: SectionUpdate | null = await extract(content);
+  lap("ledgerMs");
 
   // One continuity revision when the ledger reports a conflict with canon.
   if (update?.contradictions.length) {
@@ -521,6 +542,7 @@ export async function writeSectionStep(
       content = revised;
       update = (await extract(revised)) ?? update;
     }
+    lap("reviseMs");
   }
 
   const wordCount = countWords(content);
@@ -544,6 +566,8 @@ export async function writeSectionStep(
       );
     });
   }
+
+  lap("saveMs");
 
   const chapterSections = await sql<{ id: string; wordCount: number }[]>`
     SELECT id, "wordCount" FROM "Section" WHERE "chapterId" = ${section.chapterId}
@@ -570,6 +594,7 @@ export async function writeSectionStep(
         error instanceof Error ? error.message : error
       );
     });
+    lap("chapterMs");
   }
 
   await sql`
@@ -587,8 +612,14 @@ export async function writeSectionStep(
     (jobRows[0]?.payload as { lastPushMilestone?: number } | null) ?? {};
   const lastMilestone = prevPayload.lastPushMilestone ?? 0;
 
+  // Only call the app when a push milestone is crossed (25/50/75%), not
+  // after every section: a cold Vercel function can take seconds.
   let nextMilestone = lastMilestone;
-  if (progress && !progress.allDone) {
+  if (
+    progress &&
+    !progress.allDone &&
+    nextPushMilestone(lastMilestone, progress.progress) != null
+  ) {
     const notified = await notifyApp(env, {
       userId: book.userId,
       bookId,
@@ -611,11 +642,21 @@ export async function writeSectionStep(
     lastPushMilestone: nextMilestone,
   });
 
+  lap("progressMs");
+  const totalMs = Date.now() - started;
+  console.log(
+    `[section] ${sectionId} ${wordCount}w in ${(totalMs / 1000).toFixed(1)}s`,
+    JSON.stringify({ ...timings, proseCalls })
+  );
+
   return {
     skipped: false as const,
     wordCount,
     pageCount,
     allDone: progress?.allDone ?? false,
+    totalMs,
+    timings,
+    proseCalls,
   };
 }
 
