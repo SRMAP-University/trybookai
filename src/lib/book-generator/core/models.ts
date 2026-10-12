@@ -23,3 +23,11 @@ export function workersAiOptions(cfModel: string): Record<string, unknown> {
     ? { chat_template_kwargs: { enable_thinking: false } }
     : {};
 }
+
+/**
+ * With thinking disabled, Workers AI streams these models' answer in
+ * `delta.reasoning` rather than `delta.content`, so streams must read it.
+ */
+export function streamsAnswerAsReasoning(cfModel: string): boolean {
+  return HYBRID_REASONING.test(cfModel);
+}

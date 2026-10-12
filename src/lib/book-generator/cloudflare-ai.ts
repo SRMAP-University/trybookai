@@ -1,21 +1,49 @@
-import { workersAiOptions } from "@/lib/book-generator/core/models";
+import {
+  CF_FALLBACK_MODEL,
+  streamsAnswerAsReasoning,
+  workersAiOptions,
+} from "@/lib/book-generator/core/models";
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
-function extractChunkText(json: Record<string, unknown>): string {
-  if (typeof json.response === "string") return json.response;
-  if (typeof json.text === "string") return json.text;
+type ChunkText = { text: string; fromReasoning: boolean };
+
+function extractChunkText(
+  json: Record<string, unknown>,
+  reasoningIsAnswer: boolean
+): ChunkText {
+  if (typeof json.response === "string") {
+    return { text: json.response, fromReasoning: false };
+  }
+  if (typeof json.text === "string") {
+    return { text: json.text, fromReasoning: false };
+  }
 
   const choices = json.choices as
-    | Array<{ delta?: { content?: string; reasoning_content?: string } }>
+    | Array<{
+        delta?: {
+          content?: string | null;
+          reasoning?: string | null;
+          reasoning_content?: string | null;
+        };
+      }>
     | undefined;
   const delta = choices?.[0]?.delta;
-  if (typeof delta?.content === "string") return delta.content;
+  if (typeof delta?.content === "string" && delta.content) {
+    return { text: delta.content, fromReasoning: false };
+  }
+  // Hybrid models with thinking disabled stream the answer as "reasoning".
+  if (reasoningIsAnswer) {
+    const reasoning = delta?.reasoning ?? delta?.reasoning_content;
+    if (typeof reasoning === "string" && reasoning) {
+      return { text: reasoning, fromReasoning: true };
+    }
+  }
 
-  return "";
+  return { text: "", fromReasoning: false };
 }
 
 /** Normalize Workers AI result payloads across chat / text / reasoning models. */
@@ -98,11 +126,14 @@ export function extractCloudflareResponseText(result: unknown): string {
 }
 
 async function* parseSseStream(
-  body: ReadableStream<Uint8Array>
+  body: ReadableStream<Uint8Array>,
+  reasoningIsAnswer: boolean
 ): AsyncGenerator<string> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  // If real content ever arrives, any "reasoning" was thinking: drop the rest.
+  let sawContent = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -117,25 +148,59 @@ async function* parseSseStream(
       if (!trimmed.startsWith("data:")) continue;
       const payload = trimmed.slice(5).trim();
       if (!payload || payload === "[DONE]") continue;
+      let json: Record<string, unknown>;
       try {
-        const json = JSON.parse(payload) as Record<string, unknown>;
-        const text = extractChunkText(json);
-        if (text) yield text;
+        json = JSON.parse(payload) as Record<string, unknown>;
       } catch {
-        if (payload) yield payload;
+        yield payload;
+        continue;
       }
+      const chunk = extractChunkText(json, reasoningIsAnswer && !sawContent);
+      if (!chunk.text) continue;
+      if (!chunk.fromReasoning) sawContent = true;
+      yield chunk.text;
     }
   }
 }
 
+type StreamOptions = {
+  messages: ChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  onToken: (token: string) => void;
+};
+
+/**
+ * Streams a Workers AI chat completion. If the model fails before producing
+ * any text, retries once on the fallback model (as the non-streaming path does).
+ */
 export async function runCloudflareAiStream(
   model: string,
-  options: {
-    messages: ChatMessage[];
-    temperature?: number;
-    max_tokens?: number;
-    onToken: (token: string) => void;
+  options: StreamOptions
+): Promise<string> {
+  let emitted = false;
+  const tracked = {
+    ...options,
+    onToken: (token: string) => {
+      emitted = true;
+      options.onToken(token);
+    },
+  };
+  try {
+    return await streamCloudflareAiOnce(model, tracked);
+  } catch (error) {
+    if (emitted || model === CF_FALLBACK_MODEL) throw error;
+    console.warn(
+      `[cloudflare-ai] ${model} stream failed; falling back to ${CF_FALLBACK_MODEL}:`,
+      error instanceof Error ? error.message : error
+    );
+    return streamCloudflareAiOnce(CF_FALLBACK_MODEL, tracked);
   }
+}
+
+async function streamCloudflareAiOnce(
+  model: string,
+  options: StreamOptions
 ): Promise<string> {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
@@ -171,7 +236,10 @@ export async function runCloudflareAiStream(
   }
 
   let full = "";
-  for await (const chunk of parseSseStream(res.body)) {
+  for await (const chunk of parseSseStream(
+    res.body,
+    streamsAnswerAsReasoning(model)
+  )) {
     if (!chunk) continue;
     full += chunk;
     options.onToken(chunk);
