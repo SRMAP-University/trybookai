@@ -36,6 +36,7 @@ export const authConfig = {
         path.startsWith("/api/billing") ||
         path.startsWith("/api/generate") ||
         (path.startsWith("/api/audio") && !isPublicMusic) ||
+        path.startsWith("/api/reels") ||
         path.startsWith("/api/settings") ||
         path.startsWith("/api/branding") ||
         path.startsWith("/api/analytics") ||

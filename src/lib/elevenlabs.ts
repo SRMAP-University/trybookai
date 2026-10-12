@@ -238,17 +238,11 @@ function modelProfile(modelId: string): ModelProfile {
   return { chunkChars: 4000, contextText: true, discreteStability: false, fullSettings: true };
 }
 
-export async function textToSpeech(
-  text: string,
-  options: TtsOptions = {}
-): Promise<Buffer> {
-  const voiceId = options.voiceId || DEFAULT_VOICE_ID;
-  const modelId = options.modelId || DEFAULT_TTS_MODEL;
+function ttsRequestBody(text: string, options: TtsOptions, modelId: string): string {
   const profile = modelProfile(modelId);
-  const url = `${ELEVEN_BASE}/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
   const stability = options.stability ?? 0.45;
 
-  const body = JSON.stringify({
+  return JSON.stringify({
     text,
     model_id: modelId,
     voice_settings: profile.fullSettings
@@ -268,20 +262,22 @@ export async function textToSpeech(
       : {}),
     ...(profile.contextText && options.nextText ? { next_text: options.nextText } : {}),
   });
+}
 
-  // Retry rate limits and transient server errors; fail fast on bad requests.
+/** POST to a TTS endpoint, retrying rate limits and transient server errors; fail fast on bad requests. */
+async function postTts(url: string, body: string, accept: string): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "xi-api-key": getApiKey(),
         "Content-Type": "application/json",
-        Accept: "audio/mpeg",
+        Accept: accept,
       },
       body,
       signal: AbortSignal.timeout(180_000),
     });
-    if (res.ok) return Buffer.from(await res.arrayBuffer());
+    if (res.ok) return res;
 
     const detail = (await res.text()).slice(0, 400);
     const retryable = res.status === 429 || res.status >= 500;
@@ -291,6 +287,84 @@ export async function textToSpeech(
     const waitSeconds = Number(res.headers.get("retry-after"));
     await sleep(Number.isFinite(waitSeconds) && waitSeconds > 0 ? waitSeconds * 1000 : 2000 * 2 ** attempt);
   }
+}
+
+export async function textToSpeech(
+  text: string,
+  options: TtsOptions = {}
+): Promise<Buffer> {
+  const voiceId = options.voiceId || DEFAULT_VOICE_ID;
+  const modelId = options.modelId || DEFAULT_TTS_MODEL;
+  const url = `${ELEVEN_BASE}/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
+  const res = await postTts(url, ttsRequestBody(text, options, modelId), "audio/mpeg");
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/** When each character of the request text is spoken, in seconds. */
+export type TtsAlignment = {
+  characters: string[];
+  starts: number[];
+  ends: number[];
+};
+
+/**
+ * Narrate one request's worth of text (under the model's chunk size) and get
+ * per-character timings with it, for captions and cutting the audio into shots.
+ * Uses the requested model when the account has it; if ElevenLabs rejects the
+ * model, retries on the stable long-form model.
+ */
+export async function textToSpeechWithTimestamps(
+  text: string,
+  options: TtsOptions = {}
+): Promise<{ audio: Buffer; alignment: TtsAlignment | null }> {
+  const voiceId = options.voiceId || DEFAULT_VOICE_ID;
+  const url = `${ELEVEN_BASE}/text-to-speech/${voiceId}/with-timestamps?output_format=mp3_44100_128`;
+
+  const run = async (modelId: string) => {
+    const res = await postTts(url, ttsRequestBody(text, options, modelId), "application/json");
+    const data = (await res.json()) as {
+      audio_base64?: string;
+      alignment?: {
+        characters?: string[];
+        character_start_times_seconds?: number[];
+        character_end_times_seconds?: number[];
+      } | null;
+    };
+    if (!data.audio_base64) {
+      throw new ElevenLabsError("ElevenLabs returned no audio", 502);
+    }
+    const a = data.alignment;
+    const alignment =
+      a?.characters?.length &&
+      a.character_start_times_seconds?.length === a.characters.length &&
+      a.character_end_times_seconds?.length === a.characters.length
+        ? {
+            characters: a.characters,
+            starts: a.character_start_times_seconds,
+            ends: a.character_end_times_seconds,
+          }
+        : null;
+    return { audio: Buffer.from(data.audio_base64, "base64"), alignment };
+  };
+
+  const modelId = await resolveTtsModel(options.modelId);
+  try {
+    return await run(modelId);
+  } catch (error) {
+    const rejected =
+      error instanceof ElevenLabsError && [400, 403, 404, 422].includes(error.status);
+    if (!rejected || modelId === FALLBACK_TTS_MODEL) throw error;
+    console.warn(
+      `[elevenlabs] ${modelId} rejected the timestamped request; using ${FALLBACK_TTS_MODEL}:`,
+      error.message
+    );
+    return run(FALLBACK_TTS_MODEL);
+  }
+}
+
+/** Largest text one TTS request takes for this model. */
+export async function ttsChunkChars(requestedModel?: string | null): Promise<number> {
+  return modelProfile(await resolveTtsModel(requestedModel)).chunkChars;
 }
 
 function splitLongParagraph(paragraph: string, maxChars: number): string[] {

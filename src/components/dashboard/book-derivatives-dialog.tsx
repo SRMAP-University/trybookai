@@ -86,12 +86,12 @@ const OPTIONS: DerivativeOption[] = [
     available: true,
   },
   {
-    id: "movie",
-    label: "Screenplay",
-    description: "Scenes, shot list, and pacing notes",
+    id: "reel",
+    label: "Story Reel",
+    description: "TikTok-style videos with a picture for every scene",
     icon: Clapperboard,
     tone: "from-[#0a2540] to-[#1a3a5c]",
-    available: false,
+    available: true,
   },
 ];
 
@@ -182,6 +182,8 @@ type BookDerivativesDialogProps = {
     options?: AudioGenerationOptions
   ) => Promise<void>;
   existingTypes?: AudioDerivativeType[];
+  /** Opens the Story Reel create flow. */
+  onOpenReel?: () => void;
 };
 
 export function BookDerivativesDialog({
@@ -190,6 +192,7 @@ export function BookDerivativesDialog({
   bookTitle,
   onStartAudio,
   existingTypes = [],
+  onOpenReel,
 }: BookDerivativesDialogProps) {
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<"pick" | "customize">("pick");
@@ -226,6 +229,12 @@ export function BookDerivativesDialog({
   }
 
   async function handleSelect(option: DerivativeOption) {
+    if (option.id === "reel" && onOpenReel) {
+      resetAndClose(false);
+      onOpenReel();
+      return;
+    }
+
     if (!option.available || !option.audioType) {
       toast.success(`We'll email you when ${option.label.toLowerCase()} ships.`);
       resetAndClose(false);
@@ -312,7 +321,7 @@ export function BookDerivativesDialog({
                   </DialogTitle>
                   <DialogDescription className="mx-auto mt-2 max-w-[400px] text-[13px] leading-relaxed text-[#697386]">
                     <span className="font-medium text-[#0a2540]">{bookTitle}</span>{" "}
-                    can become an audiobook, podcast, or theme track.
+                    can become an audiobook, podcast, theme track, or Story Reel.
                   </DialogDescription>
                 </div>
               </div>
@@ -352,7 +361,9 @@ export function BookDerivativesDialog({
                     <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[#635bff]">
                       {!option.available
                         ? "Join waitlist"
-                        : option.audioType === "MUSIC"
+                        : option.id === "reel"
+                          ? "Make a reel"
+                          : option.audioType === "MUSIC"
                           ? hasExisting
                             ? "Regenerate"
                             : "Generate"

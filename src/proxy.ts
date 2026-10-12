@@ -13,6 +13,7 @@ function isApiProtected(path: string) {
     path.startsWith("/api/billing") ||
     path.startsWith("/api/generate") ||
     path.startsWith("/api/audio") ||
+    path.startsWith("/api/reels") ||
     path.startsWith("/api/settings") ||
     path.startsWith("/api/branding") ||
     path.startsWith("/api/analytics") ||
@@ -59,6 +60,8 @@ export const config = {
     "/api/generate/:path*",
     "/api/audio",
     "/api/audio/:path*",
+    "/api/reels",
+    "/api/reels/:path*",
     "/api/settings",
     "/api/settings/:path*",
     "/api/branding",

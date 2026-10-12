@@ -164,6 +164,16 @@ async function uploadAudioBytes(
   audioBytes: Buffer,
   filename?: string
 ): Promise<{ key: string; publicUrl: string | null }> {
+  return uploadPublicBytes(key, audioBytes, "audio/mpeg", filename);
+}
+
+/** Upload an immutable object to the public bucket (S3 API, else REST API). */
+async function uploadPublicBytes(
+  key: string,
+  audioBytes: Buffer,
+  contentType: string,
+  filename?: string
+): Promise<{ key: string; publicUrl: string | null }> {
   const contentDisposition = filename
     ? `inline; filename="${filename.replace(/"/g, "")}"`
     : undefined;
@@ -175,7 +185,7 @@ async function uploadAudioBytes(
         Bucket: bucket,
         Key: key,
         Body: audioBytes,
-        ContentType: "audio/mpeg",
+        ContentType: contentType,
         CacheControl: "public, max-age=31536000, immutable",
         ...(contentDisposition
           ? { ContentDisposition: contentDisposition }
@@ -201,7 +211,7 @@ async function uploadAudioBytes(
       method: "PUT",
       headers: {
         Authorization: `Bearer ${apiToken}`,
-        "Content-Type": "audio/mpeg",
+        "Content-Type": contentType,
         ...(contentDisposition
           ? { "Content-Disposition": contentDisposition }
           : {}),
@@ -212,7 +222,7 @@ async function uploadAudioBytes(
     if (!res.ok) {
       const body = await res.text();
       throw new Error(
-        `R2 REST audio upload failed (${res.status}): ${body.slice(0, 300)}`
+        `R2 REST upload failed (${res.status}): ${body.slice(0, 300)}`
       );
     }
 
@@ -223,7 +233,7 @@ async function uploadAudioBytes(
   }
 
   throw new Error(
-    "R2 is not configured. Set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY for audio uploads."
+    "R2 is not configured. Set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY for uploads."
   );
 }
 
@@ -328,4 +338,27 @@ export async function uploadMusicCueToR2(
 export function audioPublicPrefix(): string | null {
   const { publicBaseUrl } = getR2Config();
   return publicBaseUrl ? `${publicBaseUrl}/${AUDIO_PREFIX}/` : null;
+}
+
+const REEL_PREFIX = "reels";
+
+/**
+ * Upload a Story Reel file (shot image, narration) to
+ * reels/{bookId}/{reelId}/{name}. Names must be unique per version because
+ * objects are cached as immutable.
+ */
+export async function uploadReelFileToR2(
+  bookId: string,
+  reelId: string,
+  name: string,
+  bytes: Buffer,
+  contentType: string
+): Promise<string> {
+  const safeName = name.replace(/[^a-z0-9._/-]/gi, "");
+  const key = `${REEL_PREFIX}/${bookId}/${reelId}/${safeName}`;
+  const result = await uploadPublicBytes(key, bytes, contentType);
+  if (!result.publicUrl) {
+    throw new Error("R2_PUBLIC_BASE_URL must be set so reels can be played.");
+  }
+  return result.publicUrl;
 }

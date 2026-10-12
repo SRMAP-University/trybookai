@@ -52,6 +52,22 @@ enum AudioDerivativeStatus {
   FAILED
 }
 
+enum ReelFormat {
+  /// One 60–90 s reel per chapter
+  SHORTS
+  /// The whole book in about a minute
+  TRAILER
+  /// Illustrates an existing audiobook (Premium)
+  AUDIOBOOK
+}
+
+enum ReelStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id               String    @id @default(cuid())
   name             String?
@@ -123,6 +139,7 @@ model User {
   books    Book[]
   pushTokens DevicePushToken[]
   bookFeedbacks BookFeedback[]
+  reels    StoryReel[]
 }
 
 /// FCM device tokens for mobile push notifications
@@ -236,6 +253,7 @@ model Book {
   bible           BookBible?
   storyState      StoryState?
   canonFacts      CanonFact[]
+  reels           StoryReel[]
 
   @@index([userId])
   @@index([status])
@@ -405,6 +423,7 @@ model BookAudio {
 
   book   Book             @relation(fields: [bookId], references: [id], onDelete: Cascade)
   tracks BookAudioTrack[]
+  reels  StoryReel[]
 
   @@index([bookId])
   @@index([bookId, type])
@@ -426,6 +445,115 @@ model BookAudioTrack {
 
   @@unique([audioId, number])
   @@index([audioId])
+}
+
+/// Story Reel: vertical narrated video with one AI illustration per shot,
+/// word-timed captions and mood music. Played live from its timeline.
+model StoryReel {
+  id            String     @id @default(cuid())
+  bookId        String
+  userId        String
+  /// Visual Audiobook: the audiobook this reel illustrates
+  audioId       String?
+  format        ReelFormat
+  status        ReelStatus @default(PENDING)
+  progress      Float      @default(0)
+  /// What the job is doing right now, for progress UI
+  phase         String?
+  title         String
+  stylePreset   String     @default("cinematic")
+  voiceId       String?
+  voiceName     String?
+  /// TTS settings, plus the background-music score under `music`
+  voiceSettings Json?
+  /// Style line plus cast and place descriptors shared by every shot prompt
+  visualBible   Json?
+  /// Narration seconds charged to the monthly reel allowance (an estimate until narrated)
+  billedSeconds Int        @default(0)
+  /// Unlisted share link: /r/[shareToken]
+  shareToken    String?    @unique
+  /// Refreshed by the running job; a stale heartbeat means it can be resumed
+  heartbeatAt   DateTime?
+  errorMessage  String?    @db.Text
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  completedAt   DateTime?
+  /// Hidden from the user but kept, so its narration still counts against this month's allowance
+  deletedAt     DateTime?
+
+  book     Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  audio    BookAudio?    @relation(fields: [audioId], references: [id], onDelete: SetNull)
+  episodes ReelEpisode[]
+
+  @@index([bookId])
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+/// One playable video in a reel: a chapter Short, the trailer, or an audiobook track.
+model ReelEpisode {
+  id          String     @id @default(cuid())
+  reelId      String
+  number      Int
+  title       String
+  chapterId   String?
+  status      ReelStatus @default(PENDING)
+  /// Narration script; paragraphs separated by blank lines, single spaces
+  script      String?    @db.Text
+  audioUrl    String?    @db.Text
+  durationMs  Int?
+  /// Word timings for captions: [[word, startMs, endMs], ...]
+  captions    Json?
+  /// MP4 export: QUEUED | RENDERING | DONE | STALE | FAILED
+  videoStatus String?
+  videoUrl    String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  reel  StoryReel  @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  shots ReelShot[]
+
+  @@unique([reelId, number])
+  @@index([reelId])
+}
+
+/// One illustration and the stretch of narration it covers.
+model ReelShot {
+  id               String    @id @default(cuid())
+  episodeId        String
+  number           Int
+  /// Narration this image covers
+  text             String    @db.Text
+  /// Character range of the episode script this shot covers
+  charStart        Int
+  charEnd          Int
+  startMs          Int?
+  endMs            Int?
+  /// What the image shows, from the shot planner (no style or cast lines)
+  description      String    @db.Text
+  /// Full prompt last sent to the image model
+  prompt           String?   @db.Text
+  imageUrl         String?   @db.Text
+  /// Image before the last re-roll, for undo
+  previousImageUrl String?   @db.Text
+  /// push-in | pull-out | pan-left | pan-right | rise
+  motion           String    @default("push-in")
+  mood             String    @default("neutral")
+  /// Cast names in the shot
+  characters       Json?
+  /// PENDING | GENERATING | DONE | REUSED | FAILED
+  status           String    @default("PENDING")
+  attempts         Int       @default(0)
+  rerolls          Int       @default(0)
+  claimedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  episode ReelEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([episodeId, number])
+  @@index([episodeId])
 }
 
 model Chapter {

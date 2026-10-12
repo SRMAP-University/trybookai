@@ -18,6 +18,8 @@ declare global {
 /** Where the chat bubble would cover the page's own controls. */
 function shouldHide(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
+  // Shared Story Reels are a full-screen player.
+  if (pathname.startsWith("/r/")) return true;
   // The new-book page has a sticky create button above the phone nav.
   return (
     pathname === "/dashboard/books/new" &&
@@ -26,12 +28,14 @@ function shouldHide(pathname: string): boolean {
 }
 
 let hidden = false;
+/** Full-screen overlays (the reel player) open on top of the current route. */
+let overlays = 0;
 
 function apply() {
   const api = window.Tawk_API;
   if (!api || typeof api.hideWidget !== "function") return;
   try {
-    if (hidden) api.hideWidget();
+    if (hidden || overlays > 0) api.hideWidget();
     else api.showWidget?.();
   } catch {
     /* widget not ready */
@@ -56,4 +60,14 @@ export function TawkVisibility() {
   }, [pathname]);
 
   return null;
+}
+
+/** Hide the bubble while a full-screen overlay is open; call the result to release. */
+export function holdTawkHidden(): () => void {
+  overlays += 1;
+  apply();
+  return () => {
+    overlays = Math.max(0, overlays - 1);
+    apply();
+  };
 }

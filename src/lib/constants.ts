@@ -9,6 +9,8 @@ export const PLANS = {
     maxBookPages: 50,
     booksPerMonth: 1,
     audioMinutesLimit: 0,
+    /** Story Reels narration minutes per month */
+    reelMinutesLimit: 1,
     features: [
       "50 pages per month",
       "1 book at a time",
@@ -29,6 +31,7 @@ export const PLANS = {
     maxBookPages: 500,
     booksPerMonth: 20,
     audioMinutesLimit: 60,
+    reelMinutesLimit: 30,
     features: [
       "5,000 pages per month",
       "1 hour of audiobook narration / mo",
@@ -51,6 +54,7 @@ export const PLANS = {
     maxBookPages: 1000,
     booksPerMonth: -1,
     audioMinutesLimit: 180,
+    reelMinutesLimit: 90,
     features: [
       "10,000 pages per month",
       "3 hours of audiobook narration / mo",
@@ -75,6 +79,8 @@ export const PLANS = {
     maxBookPages: 5_000,
     booksPerMonth: -1,
     audioMinutesLimit: 3_000,
+    /** Soft fair-use cap, like audio */
+    reelMinutesLimit: 600,
     features: [
       "Unlimited pages*",
       "Unlimited audiobook narration*",
@@ -111,6 +117,7 @@ export const PREMIUM_TRIAL = {
   pagesLimit: 10000,
   maxBookPages: 1000,
   audioMinutesLimit: 120,
+  reelMinutesLimit: 5,
 } as const;
 
 export type BillingInterval = "month" | "year";

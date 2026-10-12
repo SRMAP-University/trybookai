@@ -46,6 +46,7 @@ import {
   type BookAudioItem,
 } from "@/components/dashboard/book-audio-panel";
 import { useDashboardUser } from "@/components/dashboard/user-context";
+import { StoryReelPanel } from "@/components/reels/story-reel-panel";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
@@ -217,6 +218,7 @@ function BookDetailPageContent() {
   const [dockOpen, setDockOpen] = useState(false);
   const [dockMinimized, setDockMinimized] = useState(false);
   const [derivativesOpen, setDerivativesOpen] = useState(false);
+  const [reelCreateOpen, setReelCreateOpen] = useState(false);
   const [coverGenerating, setCoverGenerating] = useState(false);
   const [creatingEdition, setCreatingEdition] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -1037,6 +1039,7 @@ function BookDetailPageContent() {
         onOpenChange={setDerivativesOpen}
         bookTitle={book.title}
         onStartAudio={startAudioGeneration}
+        onOpenReel={() => setReelCreateOpen(true)}
         existingTypes={audios
           .filter((a) => a.status === "COMPLETED")
           .map((a) => a.type)}
@@ -1431,6 +1434,21 @@ function BookDetailPageContent() {
                   }
                   setDerivativesOpen(true);
                 }}
+              />
+            )}
+
+            {isComplete && (
+              <StoryReelPanel
+                bookId={book.id}
+                bookTitle={book.title}
+                chapters={book.chapters.map((chapter) => ({
+                  id: chapter.id,
+                  number: chapter.number,
+                  title: chapter.title,
+                  written: chapter.sections.some((section) => section.content?.trim()),
+                }))}
+                createOpen={reelCreateOpen}
+                onCreateOpenChange={setReelCreateOpen}
               />
             )}
 

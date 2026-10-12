@@ -35,7 +35,7 @@ const MOOD_GUIDE: Record<ScoreMood, string> = {
 };
 
 /** Closest substitutes when a mood doesn't get its own cue. */
-const MOOD_FALLBACK: Record<ScoreMood, ScoreMood[]> = {
+export const MOOD_FALLBACK: Record<ScoreMood, ScoreMood[]> = {
   suspense: ["dark", "mystery", "action", "neutral"],
   action: ["suspense", "triumph", "dark", "neutral"],
   dark: ["suspense", "mystery", "sad", "neutral"],
