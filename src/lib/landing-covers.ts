@@ -18,13 +18,17 @@ const SAMPLE_AS_LANDING: LandingCoverBook[] = SAMPLE_BOOKS.map((b) => ({
   isSample: true,
 }));
 
-/** Recent books with covers for the landing hero (public only). */
+/**
+ * Recent public books with covers, for the landing page and dashboard
+ * showcases. Private books never appear: these surfaces are public.
+ */
 export async function getRecentLandingCovers(
   limit = 4
 ): Promise<LandingCoverBook[]> {
   const recent = await db.book
     .findMany({
       where: {
+        isPublic: true,
         coverImage: { not: null },
       },
       orderBy: [{ updatedAt: "desc" }],
@@ -35,7 +39,6 @@ export async function getRecentLandingCovers(
         genre: true,
         coverImage: true,
         slug: true,
-        isPublic: true,
       },
     })
     .catch((error) => {
@@ -53,7 +56,7 @@ export async function getRecentLandingCovers(
     title: b.title,
     genre: b.genre,
     coverImage: b.coverImage,
-    slug: b.isPublic ? b.slug : null,
+    slug: b.slug,
     isSample: false,
   }));
 
