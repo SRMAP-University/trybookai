@@ -5,21 +5,35 @@ import { genreToSlug, getAppUrl } from "@/lib/book-public";
 
 const STATIC_UPDATED = new Date("2026-09-13");
 
+// Regenerate hourly so newly published books show up without a redeploy.
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getAppUrl();
 
-  const [books, genreRows] = await Promise.all([
-    db.book.findMany({
-      where: { isPublic: true },
-      select: { slug: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-      take: 5000,
-    }),
-    db.book.groupBy({
-      by: ["genre"],
-      where: { isPublic: true, genre: { not: null } },
-    }),
-  ]);
+  let books: Array<{ slug: string; updatedAt: Date }> = [];
+  let genreRows: Array<{ genre: string | null }> = [];
+  try {
+    [books, genreRows] = await Promise.all([
+      db.book.findMany({
+        where: { isPublic: true },
+        select: { slug: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+        take: 5000,
+      }),
+      db.book.groupBy({
+        by: ["genre"],
+        where: { isPublic: true, genre: { not: null } },
+      }),
+    ]);
+  } catch (error) {
+    // Builds without a database (Vercel previews) still get the static pages;
+    // the next revalidation fills in the books.
+    console.warn(
+      "[sitemap] database unavailable; listing static pages only:",
+      error instanceof Error ? error.message : error
+    );
+  }
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: base, lastModified: STATIC_UPDATED, changeFrequency: "weekly", priority: 1 },
