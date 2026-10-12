@@ -1,4 +1,8 @@
-import { runCloudflareAi, runCloudflareAiStream } from "@/lib/book-generator/cloudflare-ai";
+import {
+  runCloudflareAiDetailed,
+  runCloudflareAiStream,
+} from "@/lib/book-generator/cloudflare-ai";
+import type { LlmResult } from "@/lib/book-generator/core/types";
 import {
   DEFAULT_AI_MODEL,
   getModelConfig,
@@ -186,12 +190,12 @@ function defaultCloudflareRuntimeModel(): string {
 }
 
 async function runWithGroqFallback(
-  runGroq: () => Promise<string>,
-  runNormal: () => Promise<string>
-): Promise<string> {
+  runGroq: () => Promise<LlmResult>,
+  runNormal: () => Promise<LlmResult>
+): Promise<LlmResult> {
   try {
-    const text = await runGroq();
-    if (text.trim()) return text;
+    const result = await runGroq();
+    if (result.text.trim()) return result;
     throw new Error("empty response");
   } catch (error) {
     console.warn(
@@ -209,7 +213,7 @@ async function runGroqAi(
     temperature: number;
     max_tokens: number;
   }
-): Promise<string> {
+): Promise<LlmResult> {
   const apiKey = cleanEnv(process.env.GROQ_API_KEY);
   if (!apiKey) throw new Error("GROQ_API_KEY is not configured");
 
@@ -225,6 +229,7 @@ async function runGroqAi(
       temperature: options.temperature,
       max_tokens: options.max_tokens,
     }),
+    signal: AbortSignal.timeout(180_000),
   });
 
   if (!res.ok) {
@@ -235,9 +240,12 @@ async function runGroqAi(
   }
 
   const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   };
-  return data.choices?.[0]?.message?.content ?? "";
+  return {
+    text: data.choices?.[0]?.message?.content ?? "",
+    truncated: data.choices?.[0]?.finish_reason === "length",
+  };
 }
 
 async function runGroqAiStream(
@@ -248,7 +256,7 @@ async function runGroqAiStream(
     max_tokens: number;
     onToken: (token: string) => void;
   }
-): Promise<string> {
+): Promise<LlmResult> {
   const apiKey = cleanEnv(process.env.GROQ_API_KEY);
   if (!apiKey) throw new Error("GROQ_API_KEY is not configured");
 
@@ -279,6 +287,7 @@ async function runGroqAiStream(
   const decoder = new TextDecoder();
   let full = "";
   let buffer = "";
+  let finishReason: string | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -293,8 +302,12 @@ async function runGroqAiStream(
       if (!payload || payload === "[DONE]") continue;
       try {
         const json = JSON.parse(payload) as {
-          choices?: Array<{ delta?: { content?: string } }>;
+          choices?: Array<{
+            delta?: { content?: string };
+            finish_reason?: string | null;
+          }>;
         };
+        finishReason = json.choices?.[0]?.finish_reason ?? finishReason;
         const token = json.choices?.[0]?.delta?.content;
         if (token) {
           full += token;
@@ -306,12 +319,19 @@ async function runGroqAiStream(
     }
   }
 
-  return full;
+  return { text: full, truncated: finishReason === "length" };
 }
 
 export async function createChatCompletion(
   options: ChatCompletionOptions
 ): Promise<string> {
+  return (await createChatCompletionDetailed(options)).text;
+}
+
+/** createChatCompletion plus whether the reply stopped at max_tokens. */
+export async function createChatCompletionDetailed(
+  options: ChatCompletionOptions
+): Promise<LlmResult> {
   const { provider, runtimeModel } = resolveProvider(options.model);
   const temperature = options.temperature ?? 0.7;
   const max_tokens = options.max_tokens ?? 8192;
@@ -332,24 +352,31 @@ export async function createChatCompletion(
       ? await runWithGroqFallback(
           () => runGroqAi(runtimeModel, { messages, temperature, max_tokens }),
           () =>
-            runCloudflareAi(defaultCloudflareRuntimeModel(), {
+            runCloudflareAiDetailed(defaultCloudflareRuntimeModel(), {
               messages,
               temperature,
               max_tokens,
             })
         )
-      : await runCloudflareAi(runtimeModel, {
+      : await runCloudflareAiDetailed(runtimeModel, {
           messages,
           temperature,
           max_tokens,
         });
   // DeepSeek R1 and similar models may wrap answers in <think>…</think>.
-  return extractModelText(raw);
+  return { text: extractModelText(raw.text), truncated: raw.truncated };
 }
 
 export async function streamChatCompletion(
   options: ChatCompletionOptions & { onToken: (token: string) => void }
 ): Promise<string> {
+  return (await streamChatCompletionDetailed(options)).text;
+}
+
+/** streamChatCompletion plus whether the reply stopped at max_tokens (Groq only). */
+export async function streamChatCompletionDetailed(
+  options: ChatCompletionOptions & { onToken: (token: string) => void }
+): Promise<LlmResult> {
   const { provider, runtimeModel } = resolveProvider(options.model);
   const temperature = options.temperature ?? 0.7;
   const max_tokens = options.max_tokens ?? 8192;
@@ -372,14 +399,16 @@ export async function streamChatCompletion(
     if (visible) onToken(visible);
   };
 
+  let truncated = false;
   if (provider === "groq") {
     try {
-      await runGroqAiStream(runtimeModel, {
+      const result = await runGroqAiStream(runtimeModel, {
         messages,
         temperature,
         max_tokens,
         onToken: onVisible,
       });
+      truncated = result.truncated;
     } catch (error) {
       if (filter.getVisible().trim()) throw error;
       console.warn(
@@ -403,5 +432,5 @@ export async function streamChatCompletion(
   }
   const tail = filter.flush();
   if (tail) onToken(tail);
-  return extractModelText(filter.getVisible());
+  return { text: extractModelText(filter.getVisible()), truncated };
 }

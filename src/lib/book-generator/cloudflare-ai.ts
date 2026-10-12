@@ -195,6 +195,18 @@ export async function runCloudflareAi(
     max_tokens?: number;
   }
 ): Promise<string> {
+  return (await runCloudflareAiDetailed(model, options)).text;
+}
+
+/** Like runCloudflareAi, plus whether the reply stopped at max_tokens. */
+export async function runCloudflareAiDetailed(
+  model: string,
+  options: {
+    messages: ChatMessage[];
+    temperature?: number;
+    max_tokens?: number;
+  }
+): Promise<{ text: string; truncated: boolean }> {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
 
@@ -205,6 +217,7 @@ export async function runCloudflareAi(
   }
 
   const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  const maxTokens = options.max_tokens ?? 8192;
 
   const res = await fetch(url, {
     method: "POST",
@@ -215,8 +228,9 @@ export async function runCloudflareAi(
     body: JSON.stringify({
       messages: options.messages,
       temperature: options.temperature ?? 0.7,
-      max_tokens: options.max_tokens ?? 8192,
+      max_tokens: maxTokens,
     }),
+    signal: AbortSignal.timeout(300_000),
   });
 
   const data = (await res.json()) as CloudflareAiResponse;
@@ -235,5 +249,10 @@ export async function runCloudflareAi(
     );
   }
 
-  return text;
+  const usage = (data.result as { usage?: { completion_tokens?: number } } | null)
+    ?.usage;
+  const truncated =
+    typeof usage?.completion_tokens === "number" &&
+    usage.completion_tokens >= maxTokens - 4;
+  return { text, truncated };
 }

@@ -1,223 +1,110 @@
 import type { Sql } from "./db";
-import { extractJsonPayload, OUTLINE_CF_MODEL, runAi } from "./ai";
-import { asStringArray, newRowId } from "./context-utils";
+import { OUTLINE_CF_MODEL, runAi } from "./ai";
+import { newRowId } from "./context-utils";
+import {
+  buildChapterSummaryMessages,
+  buildExtractMessages,
+  cleanChapterSummary,
+  composeStorySoFar,
+  fallbackChapterSummary,
+  mergeChapterState,
+  mergeThreads,
+  parseSectionUpdate,
+  type SectionUpdate,
+} from "../../../../src/lib/book-generator/core";
 
-export type ExtractedSectionUpdate = {
-  sectionSummary: string;
-  objective?: string;
-  charactersPresent: string[];
-  location?: string;
-  events: string[];
-  newFacts: Array<{ subject: string; predicate: string; object: string }>;
-  openThreads: string[];
-  contradictions: string[];
-};
-
-function parseExtract(raw: string): ExtractedSectionUpdate {
-  try {
-    const parsed = JSON.parse(extractJsonPayload(raw)) as Partial<ExtractedSectionUpdate>;
-    return {
-      sectionSummary: String(parsed.sectionSummary ?? "").slice(0, 1200),
-      objective: parsed.objective
-        ? String(parsed.objective).slice(0, 400)
-        : undefined,
-      charactersPresent: asStringArray(parsed.charactersPresent).slice(0, 12),
-      location: parsed.location
-        ? String(parsed.location).slice(0, 120)
-        : undefined,
-      events: asStringArray(parsed.events).slice(0, 12),
-      newFacts: Array.isArray(parsed.newFacts)
-        ? parsed.newFacts
-            .map((f) => ({
-              subject: String(
-                (f as { subject?: string }).subject ?? ""
-              ).slice(0, 120),
-              predicate: String(
-                (f as { predicate?: string }).predicate ?? ""
-              ).slice(0, 80),
-              object: String((f as { object?: string }).object ?? "").slice(
-                0,
-                240
-              ),
-            }))
-            .filter((f) => f.subject && f.predicate && f.object)
-            .slice(0, 12)
-        : [],
-      openThreads: asStringArray(parsed.openThreads).slice(0, 10),
-      contradictions: asStringArray(parsed.contradictions).slice(0, 8),
-    };
-  } catch {
-    return {
-      sectionSummary: raw.slice(0, 400),
-      charactersPresent: [],
-      events: [],
-      newFacts: [],
-      openThreads: [],
-      contradictions: [],
-    };
-  }
-}
-
-export async function extractAndUpdateCanon(
-  sql: Sql,
+/** Ledger pass over a draft. Pure: nothing is stored until the final draft is chosen. */
+export async function extractSectionUpdate(
   ai: Ai,
   input: {
-    bookId: string;
-    chapterId: string;
-    sectionId: string;
     sectionTitle: string;
     content: string;
-    existingFactsBrief?: string;
+    knownFacts?: string;
+    openThreads?: string[];
   }
-): Promise<ExtractedSectionUpdate> {
-  const prose = input.content.slice(0, 6000);
-  const raw = await runAi(
-    ai,
-    OUTLINE_CF_MODEL,
-    [
-      {
-        role: "system",
-        content: `You maintain a book canon ledger. Return ONLY JSON:
-{
-  "sectionSummary": "100-200 token scene summary",
-  "objective": "what this scene accomplished",
-  "charactersPresent": ["Name"],
-  "location": "place or null",
-  "events": ["short event"],
-  "newFacts": [{"subject":"","predicate":"","object":""}],
-  "openThreads": ["unresolved question"],
-  "contradictions": ["conflict with known facts if any"]
-}`,
-      },
-      {
-        role: "user",
-        content: `Section: ${input.sectionTitle}
+): Promise<SectionUpdate> {
+  const raw = await runAi(ai, OUTLINE_CF_MODEL, buildExtractMessages(input), {
+    max_tokens: 1400,
+    temperature: 0.2,
+  });
+  return parseSectionUpdate(raw);
+}
 
-KNOWN FACTS:
-${input.existingFactsBrief || "(none yet)"}
-
-PROSE:
-${prose}`,
-      },
-    ],
-    { max_tokens: 1200, temperature: 0.2 }
-  );
-
-  const update = parseExtract(raw);
-
-  const secState = await sql<{ id: string }[]>`
-    SELECT id FROM "SectionState" WHERE "sectionId" = ${input.sectionId} LIMIT 1
+/** Store a section's ledger entry and fold it into chapter, canon and story state. */
+export async function applySectionUpdate(
+  sql: Sql,
+  ids: { bookId: string; chapterId: string; sectionId: string },
+  update: SectionUpdate
+) {
+  await sql`
+    INSERT INTO "SectionState" (
+      id, "sectionId", summary, objective, "charactersPresent", "createdAt", "updatedAt"
+    ) VALUES (
+      ${newRowId()}, ${ids.sectionId}, ${update.sectionSummary},
+      ${update.objective ?? null}, ${sql.json(update.charactersPresent as never)},
+      NOW(), NOW()
+    )
+    ON CONFLICT ("sectionId") DO UPDATE SET
+      summary = EXCLUDED.summary,
+      objective = EXCLUDED.objective,
+      "charactersPresent" = EXCLUDED."charactersPresent",
+      "updatedAt" = NOW()
   `;
-  if (!secState[0]) {
-    await sql`
-      INSERT INTO "SectionState" (
-        id, "sectionId", summary, objective, "charactersPresent", "createdAt", "updatedAt"
-      ) VALUES (
-        ${newRowId()}, ${input.sectionId}, ${update.sectionSummary},
-        ${update.objective ?? null},
-        ${sql.json(update.charactersPresent as never)},
-        NOW(), NOW()
-      )
-    `;
-  } else {
-    await sql`
-      UPDATE "SectionState"
-      SET
-        summary = ${update.sectionSummary},
-        objective = ${update.objective ?? null},
-        "charactersPresent" = ${sql.json(update.charactersPresent as never)},
-        "updatedAt" = NOW()
-      WHERE "sectionId" = ${input.sectionId}
-    `;
-  }
 
-  const chStateRows = await sql<
+  const [prev] = await sql<
     {
-      id: string;
       summary: string | null;
       charactersPresent: unknown;
+      location: string | null;
       events: unknown;
       newFacts: unknown;
       openThreads: unknown;
-      location: string | null;
     }[]
   >`
-    SELECT id, summary, "charactersPresent", events, "newFacts", "openThreads", location
-    FROM "ChapterState" WHERE "chapterId" = ${input.chapterId} LIMIT 1
+    SELECT summary, "charactersPresent", location, events, "newFacts", "openThreads"
+    FROM "ChapterState" WHERE "chapterId" = ${ids.chapterId} LIMIT 1
   `;
-  const chState = chStateRows[0];
-  const mergedEvents = [
-    ...asStringArray(chState?.events),
-    ...update.events,
-  ].slice(-20);
-  const mergedChars = [
-    ...new Set([
-      ...asStringArray(chState?.charactersPresent),
-      ...update.charactersPresent,
-    ]),
-  ].slice(0, 20);
-  const mergedThreads = [
-    ...new Set([
-      ...asStringArray(chState?.openThreads),
-      ...update.openThreads,
-    ]),
-  ].slice(0, 16);
-  const mergedFacts = [
-    ...asStringArray(chState?.newFacts),
-    ...update.newFacts.map((f) => `${f.subject} ${f.predicate} ${f.object}`),
-  ].slice(-24);
-  const combinedSummary = [chState?.summary, update.sectionSummary]
-    .filter(Boolean)
-    .join(" ")
-    .slice(0, 2000);
-
-  if (!chState) {
-    await sql`
-      INSERT INTO "ChapterState" (
-        id, "chapterId", summary, "charactersPresent", location, events, "newFacts", "openThreads", "createdAt", "updatedAt"
-      ) VALUES (
-        ${newRowId()}, ${input.chapterId}, ${combinedSummary},
-        ${sql.json(mergedChars as never)},
-        ${update.location ?? null},
-        ${sql.json(mergedEvents as never)},
-        ${sql.json(mergedFacts as never)},
-        ${sql.json(mergedThreads as never)},
-        NOW(), NOW()
-      )
-    `;
-  } else {
-    await sql`
-      UPDATE "ChapterState"
-      SET
-        summary = ${combinedSummary},
-        "charactersPresent" = ${sql.json(mergedChars as never)},
-        location = COALESCE(${update.location ?? null}, location),
-        events = ${sql.json(mergedEvents as never)},
-        "newFacts" = ${sql.json(mergedFacts as never)},
-        "openThreads" = ${sql.json(mergedThreads as never)},
-        "updatedAt" = NOW()
-      WHERE "chapterId" = ${input.chapterId}
-    `;
-  }
+  const merged = mergeChapterState(prev, update);
+  await sql`
+    INSERT INTO "ChapterState" (
+      id, "chapterId", summary, "charactersPresent", location, events, "newFacts", "openThreads", "createdAt", "updatedAt"
+    ) VALUES (
+      ${newRowId()}, ${ids.chapterId}, ${merged.summary},
+      ${sql.json(merged.charactersPresent as never)},
+      ${merged.location},
+      ${sql.json(merged.events as never)},
+      ${sql.json(merged.newFacts as never)},
+      ${sql.json(merged.openThreads as never)},
+      NOW(), NOW()
+    )
+    ON CONFLICT ("chapterId") DO UPDATE SET
+      summary = EXCLUDED.summary,
+      "charactersPresent" = EXCLUDED."charactersPresent",
+      location = EXCLUDED.location,
+      events = EXCLUDED.events,
+      "newFacts" = EXCLUDED."newFacts",
+      "openThreads" = EXCLUDED."openThreads",
+      "updatedAt" = NOW()
+  `;
 
   for (const fact of update.newFacts) {
-    const existing = await sql<{ id: string }[]>`
+    const [existing] = await sql<{ id: string }[]>`
       SELECT id FROM "CanonFact"
-      WHERE "bookId" = ${input.bookId}
+      WHERE "bookId" = ${ids.bookId}
         AND LOWER(subject) = LOWER(${fact.subject})
         AND LOWER(predicate) = LOWER(${fact.predicate})
         AND LOWER(object) = LOWER(${fact.object})
       LIMIT 1
     `;
-    if (existing[0]) {
+    if (existing) {
       await sql`
         UPDATE "CanonFact"
         SET status = 'CANON',
-            "sourceChapterId" = ${input.chapterId},
-            "sourceSectionId" = ${input.sectionId},
+            "sourceChapterId" = ${ids.chapterId},
+            "sourceSectionId" = ${ids.sectionId},
             confidence = 0.8,
             "updatedAt" = NOW()
-        WHERE id = ${existing[0].id}
+        WHERE id = ${existing.id}
       `;
     } else {
       await sql`
@@ -225,144 +112,106 @@ ${prose}`,
           id, "bookId", subject, predicate, object, status,
           "sourceChapterId", "sourceSectionId", confidence, "createdAt", "updatedAt"
         ) VALUES (
-          ${newRowId()}, ${input.bookId}, ${fact.subject}, ${fact.predicate}, ${fact.object},
-          'CANON', ${input.chapterId}, ${input.sectionId}, 0.75, NOW(), NOW()
+          ${newRowId()}, ${ids.bookId}, ${fact.subject}, ${fact.predicate}, ${fact.object},
+          'CANON', ${ids.chapterId}, ${ids.sectionId}, 0.75, NOW(), NOW()
         )
       `;
     }
   }
 
-  if (update.openThreads.length) {
-    const story = await sql<{ openThreads: unknown }[]>`
-      SELECT "openThreads" FROM "StoryState" WHERE "bookId" = ${input.bookId} LIMIT 1
+  if (update.openThreads.length || update.resolvedThreads.length) {
+    const [story] = await sql<{ openThreads: unknown }[]>`
+      SELECT "openThreads" FROM "StoryState" WHERE "bookId" = ${ids.bookId} LIMIT 1
     `;
-    const threads = [
-      ...new Set([
-        ...asStringArray(story[0]?.openThreads),
-        ...update.openThreads,
-      ]),
-    ].slice(0, 24);
-    if (!story[0]) {
-      await sql`
-        INSERT INTO "StoryState" (
-          id, "bookId", "openThreads", "createdAt", "updatedAt"
-        ) VALUES (
-          ${newRowId()}, ${input.bookId}, ${sql.json(threads as never)}, NOW(), NOW()
-        )
-      `;
-    } else {
-      await sql`
-        UPDATE "StoryState"
-        SET "openThreads" = ${sql.json(threads as never)}, "updatedAt" = NOW()
-        WHERE "bookId" = ${input.bookId}
-      `;
-    }
+    const threads = mergeThreads(story?.openThreads, update, 20);
+    await sql`
+      INSERT INTO "StoryState" (id, "bookId", "openThreads", "createdAt", "updatedAt")
+      VALUES (${newRowId()}, ${ids.bookId}, ${sql.json(threads as never)}, NOW(), NOW())
+      ON CONFLICT ("bookId") DO UPDATE SET
+        "openThreads" = EXCLUDED."openThreads",
+        "updatedAt" = NOW()
+    `;
   }
-
-  return update;
 }
 
+/** After a chapter completes, compress it into Chapter.summary and refresh the book summary. */
 export async function refreshChapterCanon(
   sql: Sql,
+  ai: Ai,
   bookId: string,
   chapterId: string
 ) {
-  const chapterRows = await sql<
-    { summary: string | null; stateSummary: string | null }[]
-  >`
-    SELECT c.summary, st.summary AS "stateSummary"
-    FROM "Chapter" c
-    LEFT JOIN "ChapterState" st ON st."chapterId" = c.id
-    WHERE c.id = ${chapterId}
-    LIMIT 1
+  const [chapter] = await sql<{ number: number; title: string; summary: string | null }[]>`
+    SELECT number, title, summary FROM "Chapter" WHERE id = ${chapterId} LIMIT 1
   `;
-  const sectionSummaries = await sql<{ summary: string | null }[]>`
+  if (!chapter) return;
+
+  const sectionRows = await sql<{ summary: string | null }[]>`
     SELECT st.summary
     FROM "Section" s
     LEFT JOIN "SectionState" st ON st."sectionId" = s.id
     WHERE s."chapterId" = ${chapterId}
     ORDER BY s.number ASC
   `;
+  const sectionSummaries = sectionRows
+    .map((s) => s.summary ?? "")
+    .filter(Boolean);
 
-  const summary =
-    chapterRows[0]?.stateSummary ||
-    sectionSummaries
-      .map((s) => s.summary)
-      .filter(Boolean)
-      .join(" ")
-      .slice(0, 1500) ||
-    chapterRows[0]?.summary;
+  let summary = "";
+  if (sectionSummaries.length) {
+    try {
+      summary = cleanChapterSummary(
+        await runAi(
+          ai,
+          OUTLINE_CF_MODEL,
+          buildChapterSummaryMessages(chapter, sectionSummaries),
+          { max_tokens: 500, temperature: 0.2 }
+        )
+      );
+    } catch (error) {
+      console.warn(
+        `[canon] chapter summary failed for ${chapterId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+    summary ||= fallbackChapterSummary(sectionSummaries);
+  }
 
   if (summary) {
     await sql`
       UPDATE "Chapter" SET summary = ${summary}, "updatedAt" = NOW()
       WHERE id = ${chapterId}
     `;
-    const st = await sql<{ id: string }[]>`
-      SELECT id FROM "ChapterState" WHERE "chapterId" = ${chapterId} LIMIT 1
-    `;
-    if (!st[0]) {
-      await sql`
-        INSERT INTO "ChapterState" (
-          id, "chapterId", summary, "charactersPresent", events, "newFacts", "openThreads", "createdAt", "updatedAt"
-        ) VALUES (
-          ${newRowId()}, ${chapterId}, ${summary},
-          ${sql.json([] as never)}, ${sql.json([] as never)},
-          ${sql.json([] as never)}, ${sql.json([] as never)},
-          NOW(), NOW()
-        )
-      `;
-    } else {
-      await sql`
-        UPDATE "ChapterState" SET summary = ${summary}, "updatedAt" = NOW()
-        WHERE "chapterId" = ${chapterId}
-      `;
-    }
-  }
-
-  const completed = await sql<
-    {
-      number: number;
-      title: string;
-      summary: string | null;
-      stateSummary: string | null;
-    }[]
-  >`
-    SELECT c.number, c.title, c.summary, st.summary AS "stateSummary"
-    FROM "Chapter" c
-    LEFT JOIN "ChapterState" st ON st."chapterId" = c.id
-    WHERE c."bookId" = ${bookId} AND c.status = 'COMPLETED'
-    ORDER BY c.number ASC
-  `;
-  const bookSummary = completed
-    .map(
-      (c) =>
-        `Ch ${c.number} ${c.title}: ${c.stateSummary ?? c.summary ?? ""}`
-    )
-    .join("\n")
-    .slice(0, 3000);
-
-  const story = await sql<{ id: string }[]>`
-    SELECT id FROM "StoryState" WHERE "bookId" = ${bookId} LIMIT 1
-  `;
-  if (!story[0]) {
     await sql`
-      INSERT INTO "StoryState" (
-        id, "bookId", "bookSummary", "plotPhase", "createdAt", "updatedAt"
+      INSERT INTO "ChapterState" (
+        id, "chapterId", summary, "charactersPresent", events, "newFacts", "openThreads", "createdAt", "updatedAt"
       ) VALUES (
-        ${newRowId()}, ${bookId}, ${bookSummary}, 'in_progress', NOW(), NOW()
+        ${newRowId()}, ${chapterId}, ${summary},
+        ${sql.json([] as never)}, ${sql.json([] as never)},
+        ${sql.json([] as never)}, ${sql.json([] as never)},
+        NOW(), NOW()
       )
-    `;
-  } else {
-    await sql`
-      UPDATE "StoryState"
-      SET "bookSummary" = ${bookSummary}, "plotPhase" = 'in_progress', "updatedAt" = NOW()
-      WHERE "bookId" = ${bookId}
+      ON CONFLICT ("chapterId") DO UPDATE SET summary = EXCLUDED.summary, "updatedAt" = NOW()
     `;
   }
+
+  const completed = await sql<{ number: number; title: string; summary: string | null }[]>`
+    SELECT number, title, summary FROM "Chapter"
+    WHERE "bookId" = ${bookId} AND status = 'COMPLETED'
+    ORDER BY number ASC
+  `;
+  const bookSummary = composeStorySoFar(completed, 3000);
+  await sql`
+    INSERT INTO "StoryState" (id, "bookId", "bookSummary", "plotPhase", "createdAt", "updatedAt")
+    VALUES (${newRowId()}, ${bookId}, ${bookSummary}, 'in_progress', NOW(), NOW())
+    ON CONFLICT ("bookId") DO UPDATE SET
+      "bookSummary" = EXCLUDED."bookSummary",
+      "plotPhase" = EXCLUDED."plotPhase",
+      "updatedAt" = NOW()
+  `;
 }
 
-/** True when every section has real content. */
+/** True when any section lacks real content. */
 export async function hasIncompleteSections(
   sql: Sql,
   bookId: string

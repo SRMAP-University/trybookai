@@ -1,21 +1,28 @@
 import type { Env } from "../env";
 import type { Sql } from "./db";
-import {
-  extractJsonPayload,
-  runGenerationAi,
-  stripThinking,
-} from "./ai";
+import { runGenerationAiDetailed } from "./ai";
 import { ensureBookCover } from "./cover";
 import { notifyApp } from "./notify";
 import { resolveGenerationShape } from "./shape";
-import { resolveContentFormat } from "./content-format";
 import { assembleSectionContext } from "./context-assembler";
 import { seedBibleFromOutline } from "./context-seed";
 import {
-  extractAndUpdateCanon,
+  applySectionUpdate,
+  extractSectionUpdate,
   hasIncompleteSections,
   refreshChapterCanon,
 } from "./context-extract";
+import {
+  buildStyleBlock,
+  countWords,
+  creditedSectionPages,
+  draftSection,
+  planBookOutline,
+  reviseForContinuity,
+  WORDS_PER_PAGE,
+  type LlmCall,
+  type SectionUpdate,
+} from "../../../../src/lib/book-generator/core";
 
 export class GenerationPausedError extends Error {
   constructor(message = "Generation cancelled") {
@@ -196,40 +203,6 @@ async function getBook(sql: Sql, bookId: string): Promise<BookRow> {
   return rows[0];
 }
 
-function buildStyleBlock(book: BookRow): string {
-  const parts = [
-    `Point of view: ${book.pov}`,
-    `Tense: ${book.tense}`,
-    `Language: ${book.language}`,
-    `Tone: ${book.tone ?? "professional"}`,
-    `Audience: ${book.audience ?? "general readers"}`,
-    book.includeDialogue
-      ? "Include natural dialogue where appropriate."
-      : "Minimize or avoid dialogue.",
-    book.includeExamples
-      ? "Include concrete examples, frameworks, or case studies."
-      : "Focus on narrative or exposition without instructional examples.",
-  ];
-  if (book.style) parts.push(`Style guide: ${book.style}`);
-  if (book.customInstructions)
-    parts.push(`Custom instructions: ${book.customInstructions}`);
-  if (book.characters)
-    parts.push(`Characters / cast: ${JSON.stringify(book.characters)}`);
-  if (book.themes) parts.push(`Themes: ${JSON.stringify(book.themes)}`);
-  if (book.forbiddenTopics)
-    parts.push(`Avoid these topics: ${book.forbiddenTopics}`);
-  parts.push(
-    resolveContentFormat({
-      genre: book.genre,
-      templateId: book.templateId,
-      description: book.description,
-      customInstructions: book.customInstructions,
-      includeExamples: book.includeExamples,
-    }).instructions
-  );
-  return parts.join("\n");
-}
-
 export async function generateOutlineStep(
   sql: Sql,
   ai: Ai,
@@ -258,85 +231,32 @@ export async function generateOutlineStep(
     sectionsPerChapter,
   });
 
-  const styleBlock = buildStyleBlock(book);
-  const outlineTokens = Math.min(
-    8192,
-    400 + chapterCount * sectionsPerChapter * 100
-  );
-
-  const raw = await withAiHeartbeat(
+  const outline = await withAiHeartbeat(
     sql,
     jobId,
     "outlining_ai",
     { chapterCount, sectionsPerChapter },
     () =>
-      runGenerationAi(
-        env,
-        book.model,
-        [
-          {
-            role: "system",
-            content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book. For practical, educational, business, or handbook books, plan sections that naturally include comparisons, frameworks, tables, or visual explanations when those help the reader.`,
-          },
-          {
-            role: "user",
-            content: `Create an outline for a ${book.targetPages}-page ${book.genre ?? "general"} book titled "${book.title}".
-${book.description ? `Description: ${book.description}` : ""}
-
-Writing requirements:
-${styleBlock}`,
-          },
-        ],
-        { max_tokens: outlineTokens, temperature: 0.5 },
-        "outline"
+      planBookOutline(
+        {
+          title: book.title,
+          genre: book.genre,
+          description: book.description,
+          templateId: book.templateId,
+          customInstructions: book.customInstructions,
+          includeExamples: book.includeExamples,
+          language: book.language,
+          targetPages: book.targetPages,
+          wordsPerPage,
+          chapterCount,
+          sectionsPerChapter,
+          styleBlock: buildStyleBlock(book, { includeCast: true }),
+        },
+        (messages, options) =>
+          runGenerationAiDetailed(env, book.model, messages, options, "outline")
       )
   );
-
-  let outline: {
-    title?: string;
-    synopsis?: string;
-    chapters: Array<{
-      number?: number;
-      title?: string;
-      summary?: string;
-      sections?: Array<{ number?: number; title?: string; summary?: string }>;
-    }>;
-  };
-  try {
-    outline = JSON.parse(extractJsonPayload(raw)) as typeof outline;
-  } catch {
-    const retry = await runGenerationAi(
-      env,
-      book.model,
-      [
-        {
-          role: "system",
-          content:
-            "Return ONLY valid JSON for a book outline. No prose before or after. Schema: {title, synopsis, chapters:[{number,title,summary,sections:[{number,title,summary}]}]}",
-        },
-        {
-          role: "user",
-          content: `Fix this into valid JSON outline with exactly ${chapterCount} chapters and ${sectionsPerChapter} sections each:\n${raw.slice(0, 6000)}`,
-        },
-      ],
-      { max_tokens: outlineTokens, temperature: 0.2 },
-      "outline"
-    );
-    outline = JSON.parse(extractJsonPayload(retry)) as typeof outline;
-  }
-
-  const normalizedChapters = (outline.chapters ?? []).map(
-    (chapter, chapterIndex) => ({
-      number: chapterIndex + 1,
-      title: chapter.title ?? `Chapter ${chapterIndex + 1}`,
-      summary: chapter.summary ?? "",
-      sections: (chapter.sections ?? []).map((section, sectionIndex) => ({
-        number: sectionIndex + 1,
-        title: section.title ?? `Section ${sectionIndex + 1}`,
-        summary: section.summary ?? "",
-      })),
-    })
-  );
+  const normalizedChapters = outline.chapters;
 
   const newId = () =>
     `c${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
@@ -378,7 +298,7 @@ ${styleBlock}`,
     await tx`
       UPDATE "Book"
       SET
-        outline = ${tx.json({ ...outline, chapters: normalizedChapters })},
+        outline = ${tx.json(outline as never)},
         status = 'GENERATING',
         progress = 5,
         "chapterCount" = ${chapterCount},
@@ -457,9 +377,9 @@ async function applyProgress(sql: Sql, bookId: string) {
       Math.round((5 + sectionProgress * 90) * 10) / 10
     )
   );
-  const allDone =
-    (sections.length > 0 && completed.length === sections.length) ||
-    (book[0].targetPages > 0 && currentPages >= book[0].targetPages);
+  // Only finished when every planned section is written. Stopping at the page
+  // target used to skip the last sections and then fail the completeness check.
+  const allDone = sections.length > 0 && completed.length === sections.length;
 
   if (allDone) {
     await sql`
@@ -500,23 +420,15 @@ export async function writeSectionStep(
   const sectionRows = await sql<
     {
       id: string;
-      number: number;
       title: string;
       content: string | null;
       wordCount: number;
       chapterId: string;
-      chapterNumber: number;
-      chapterTitle: string;
-      chapterSummary: string | null;
     }[]
   >`
-    SELECT
-      s.id, s.number, s.title, s.content, s."wordCount",
-      c.id AS "chapterId", c.number AS "chapterNumber", c.title AS "chapterTitle",
-      c.summary AS "chapterSummary"
-    FROM "Section" s
-    INNER JOIN "Chapter" c ON c.id = s."chapterId"
-    WHERE s.id = ${sectionId}
+    SELECT id, title, content, "wordCount", "chapterId"
+    FROM "Section"
+    WHERE id = ${sectionId}
     LIMIT 1
   `;
   const section = sectionRows[0];
@@ -526,9 +438,8 @@ export async function writeSectionStep(
   }
 
   const book = await getBook(sql, bookId);
-  const shape = resolveGenerationShape(book);
-  const { sectionsPerChapter, wordsPerPage, pagesPerSection } = shape;
-  const targetWords = pagesPerSection * wordsPerPage;
+  const wordsPerPage = book.wordsPerPage || WORDS_PER_PAGE;
+  const temperature = book.creativity ?? 0.7;
 
   await sql`
     UPDATE "Chapter" SET status = 'GENERATING', "updatedAt" = NOW()
@@ -545,139 +456,92 @@ export async function writeSectionStep(
     sectionTitle: section.title,
   });
 
-  let assembled;
-  try {
-    assembled = await assembleSectionContext(sql, bookId, sectionId);
-  } catch (error) {
-    console.warn(
-      `[section] context assemble failed, using fallback:`,
-      error instanceof Error ? error.message : error
+  const prompt = await assembleSectionContext(sql, bookId, sectionId);
+  const titles = {
+    sectionTitle: prompt.sectionTitle,
+    chapterTitle: prompt.chapterTitle,
+  };
+  const call: LlmCall = (messages, options) =>
+    withAiHeartbeat(
+      sql,
+      jobId,
+      "writing_ai",
+      { currentSectionId: sectionId, sectionTitle: section.title },
+      () => runGenerationAiDetailed(env, book.model, messages, options, "prose")
     );
-    assembled = null;
-  }
 
-  const fallbackStyle = [
-    `Point of view: ${book.pov}`,
-    `Tense: ${book.tense}`,
-    `Language: ${book.language}`,
-    `Tone: ${book.tone ?? "professional"}`,
-    book.style ? `Style guide: ${book.style}` : null,
-    book.customInstructions
-      ? `Custom instructions: ${book.customInstructions}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const systemContent = `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the CORE/CURRENT/RETRIEVED context. Follow FORMAT RULES in the writing requirements. Output only the section manuscript — no preamble, no thinking notes.
-
-Writing requirements:
-${assembled?.systemStyle ?? fallbackStyle}`;
-
-  const userContent =
-    assembled?.userPrompt ??
-    `Book synopsis: ${(book.outline as { synopsis?: string } | null)?.synopsis ?? book.description ?? ""}
-
-Current chapter: "${section.chapterTitle}" - ${section.chapterSummary ?? ""}
-
-Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`;
-
-  let raw = await withAiHeartbeat(
-    sql,
-    jobId,
-    "writing_ai",
-    { currentSectionId: sectionId, sectionTitle: section.title },
-    () =>
-      runGenerationAi(
-        env,
-        book.model,
-        [
-          { role: "system", content: systemContent },
-          { role: "user", content: userContent },
-        ],
-        {
-          max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
-          temperature: book.creativity ?? 0.7,
-        },
-        "prose"
-      )
-  );
+  const draft = await draftSection({
+    messages: prompt.messages,
+    targetWords: prompt.targetWords,
+    language: book.language,
+    temperature,
+    titles,
+    call,
+  });
 
   await assertNotPaused(sql, bookId);
 
-  let content = stripThinking(raw);
-  let extractResult: Awaited<ReturnType<typeof extractAndUpdateCanon>> | null =
-    null;
-  try {
-    extractResult = await extractAndUpdateCanon(sql, ai, {
-      bookId,
-      chapterId: section.chapterId,
-      sectionId,
+  const extract = (text: string) =>
+    extractSectionUpdate(ai, {
       sectionTitle: section.title,
-      content,
-      existingFactsBrief: assembled?.factsBrief,
-    });
-  } catch (error) {
-    console.warn(
-      `[section] extract canon failed:`,
-      error instanceof Error ? error.message : error
-    );
-  }
-
-  // One-shot consistency revise if contradictions found.
-  if (extractResult?.contradictions?.length) {
-    const note = extractResult.contradictions.join("; ");
-    try {
-      raw = await runGenerationAi(
-        env,
-        book.model,
-        [
-          { role: "system", content: systemContent },
-          {
-            role: "user",
-            content: `${userContent}
-
-CONSISTENCY FIX REQUIRED — revise the scene to resolve:
-${note}
-
-Previous draft:
-${content.slice(0, 4000)}`,
-          },
-        ],
-        {
-          max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
-          temperature: Math.min(0.5, book.creativity ?? 0.5),
-        },
-        "prose"
+      content: text,
+      knownFacts: prompt.factsBrief,
+      openThreads: prompt.openThreads,
+    }).catch((error) => {
+      console.warn(
+        `[section] extract canon failed:`,
+        error instanceof Error ? error.message : error
       );
-      content = stripThinking(raw);
-      await extractAndUpdateCanon(sql, ai, {
-        bookId,
-        chapterId: section.chapterId,
-        sectionId,
-        sectionTitle: section.title,
-        content,
-        existingFactsBrief: assembled?.factsBrief,
-      }).catch(() => undefined);
-    } catch (error) {
+      return null;
+    });
+
+  let content = draft.content;
+  let update: SectionUpdate | null = await extract(content);
+
+  // One continuity revision when the ledger reports a conflict with canon.
+  if (update?.contradictions.length) {
+    const revised = await reviseForContinuity({
+      messages: prompt.messages,
+      draft: content,
+      contradictions: update.contradictions,
+      language: book.language,
+      temperature,
+      titles,
+      call,
+    }).catch((error) => {
       console.warn(
         `[section] consistency revise failed:`,
         error instanceof Error ? error.message : error
       );
+      return null;
+    });
+    if (revised) {
+      content = revised;
+      update = (await extract(revised)) ?? update;
     }
   }
 
-  const wordCount = content.split(/\s+/).filter(Boolean).length;
-  const pageCount = Math.min(
-    pagesPerSection,
-    Math.max(1, Math.ceil(wordCount / wordsPerPage))
-  );
+  const wordCount = countWords(content);
+  const pageCount = creditedSectionPages(wordCount, wordsPerPage, prompt.pageBudget);
 
   await sql`
     UPDATE "Section"
     SET content = ${content}, "wordCount" = ${wordCount}, "pageCount" = ${pageCount}, "updatedAt" = NOW()
     WHERE id = ${sectionId}
   `;
+
+  if (update) {
+    await applySectionUpdate(
+      sql,
+      { bookId, chapterId: section.chapterId, sectionId },
+      update
+    ).catch((error) => {
+      console.warn(
+        `[section] save canon failed:`,
+        error instanceof Error ? error.message : error
+      );
+    });
+  }
 
   const chapterSections = await sql<{ id: string; wordCount: number }[]>`
     SELECT id, "wordCount" FROM "Section" WHERE "chapterId" = ${section.chapterId}
@@ -698,7 +562,7 @@ ${content.slice(0, 4000)}`,
         "updatedAt" = NOW()
       WHERE id = ${section.chapterId}
     `;
-    await refreshChapterCanon(sql, bookId, section.chapterId).catch((error) => {
+    await refreshChapterCanon(sql, ai, bookId, section.chapterId).catch((error) => {
       console.warn(
         `[section] refresh chapter canon failed:`,
         error instanceof Error ? error.message : error

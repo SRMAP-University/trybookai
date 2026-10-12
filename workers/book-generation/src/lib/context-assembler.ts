@@ -1,29 +1,20 @@
 import type { Sql } from "./db";
+import { asStringArray } from "./context-utils";
 import {
-  asStringArray,
-  buildAssembledUserPrompt,
-  clipToBudget,
-  extractEntityHints,
-  formatList,
-} from "./context-utils";
-import {
-  resolveContentFormat,
-  sectionOutputHint,
-} from "./content-format";
+  composeSectionPrompt,
+  type SectionContextInput,
+} from "../../../../src/lib/book-generator/core";
 
-type OutlineLike = { synopsis?: string };
-
+/** Load everything the writer needs for one section and compose its prompt. */
 export async function assembleSectionContext(
   sql: Sql,
   bookId: string,
   sectionId: string
 ) {
-  const sections = await sql<
+  const rows = await sql<
     {
-      id: string;
       number: number;
       title: string;
-      content: string | null;
       chapterId: string;
       chapterNumber: number;
       chapterTitle: string;
@@ -42,181 +33,93 @@ export async function assembleSectionContext(
       includeExamples: boolean;
       customInstructions: string | null;
       forbiddenTopics: string | null;
-      sectionsPerChapter: number;
       templateId: string | null;
+      characters: unknown;
+      themes: unknown;
+      targetPages: number;
+      wordsPerPage: number;
     }[]
   >`
     SELECT
-      s.id, s.number, s.title, s.content,
+      s.number, s.title,
       c.id AS "chapterId", c.number AS "chapterNumber", c.title AS "chapterTitle",
       c.summary AS "chapterSummary",
       b.title AS "bookTitle", b.description, b.genre, b.outline, b.style,
       b.audience, b.tone, b.pov, b.tense, b.language,
       b."includeDialogue", b."includeExamples", b."customInstructions",
-      b."forbiddenTopics", b."sectionsPerChapter", b."templateId"
+      b."forbiddenTopics", b."templateId", b.characters, b.themes,
+      b."targetPages", b."wordsPerPage"
     FROM "Section" s
     INNER JOIN "Chapter" c ON c.id = s."chapterId"
     INNER JOIN "Book" b ON b.id = c."bookId"
     WHERE s.id = ${sectionId} AND c."bookId" = ${bookId}
     LIMIT 1
   `;
-  const section = sections[0];
-  if (!section) throw new Error(`Section ${sectionId} not found`);
+  const row = rows[0];
+  if (!row) throw new Error(`Section ${sectionId} not found`);
 
-  const bibleRows = await sql<
+  const [bible] = await sql<
     { id: string; styleNotes: string | null; worldRules: string | null; themes: unknown }[]
   >`
     SELECT id, "styleNotes", "worldRules", themes FROM "BookBible"
     WHERE "bookId" = ${bookId} LIMIT 1
   `;
-  const bible = bibleRows[0];
-
-  const storyRows = await sql<
-    {
-      plotPhase: string | null;
-      openThreads: unknown;
-      bookSummary: string | null;
-    }[]
-  >`
-    SELECT "plotPhase", "openThreads", "bookSummary" FROM "StoryState"
-    WHERE "bookId" = ${bookId} LIMIT 1
+  const [story] = await sql<{ openThreads: unknown }[]>`
+    SELECT "openThreads" FROM "StoryState" WHERE "bookId" = ${bookId} LIMIT 1
   `;
-  const story = storyRows[0];
-
-  const chStateRows = await sql<
-    {
-      summary: string | null;
-      charactersPresent: unknown;
-      location: string | null;
-      events: unknown;
-      openThreads: unknown;
-    }[]
-  >`
-    SELECT summary, "charactersPresent", location, events, "openThreads"
-    FROM "ChapterState" WHERE "chapterId" = ${section.chapterId} LIMIT 1
+  const [chState] = await sql<{ location: string | null; charactersPresent: unknown }[]>`
+    SELECT location, "charactersPresent" FROM "ChapterState"
+    WHERE "chapterId" = ${row.chapterId} LIMIT 1
   `;
-  const chState = chStateRows[0];
 
-  const secStateRows = await sql<
-    { summary: string | null; objective: string | null; charactersPresent: unknown }[]
+  const siblings = await sql<
+    { number: number; title: string; wordCount: number; summary: string | null }[]
   >`
-    SELECT summary, objective, "charactersPresent"
-    FROM "SectionState" WHERE "sectionId" = ${sectionId} LIMIT 1
-  `;
-  const secState = secStateRows[0];
-
-  const priorSections = await sql<
-    { number: number; title: string; content: string | null; summary: string | null }[]
-  >`
-    SELECT s.number, s.title, s.content, st.summary
+    SELECT s.number, s.title, s."wordCount", st.summary
     FROM "Section" s
     LEFT JOIN "SectionState" st ON st."sectionId" = s.id
-    WHERE s."chapterId" = ${section.chapterId} AND s.number < ${section.number}
-    ORDER BY s.number DESC
+    WHERE s."chapterId" = ${row.chapterId}
+    ORDER BY s.number ASC
+  `;
+
+  const chapters = await sql<
+    { number: number; title: string; summary: string | null }[]
+  >`
+    SELECT number, title, summary FROM "Chapter"
+    WHERE "bookId" = ${bookId}
+    ORDER BY number ASC
+  `;
+
+  const [position] = await sql<{ total: number; before: number }[]>`
+    SELECT
+      COUNT(*)::int AS total,
+      (COUNT(*) FILTER (
+        WHERE c.number < ${row.chapterNumber}
+          OR (c.number = ${row.chapterNumber} AND s.number < ${row.number})
+      ))::int AS before
+    FROM "Section" s
+    INNER JOIN "Chapter" c ON c.id = s."chapterId"
+    WHERE c."bookId" = ${bookId}
+  `;
+
+  const [prevInChapter] = await sql<{ content: string | null }[]>`
+    SELECT content FROM "Section"
+    WHERE "chapterId" = ${row.chapterId} AND number < ${row.number} AND "wordCount" > 0
+    ORDER BY number DESC
     LIMIT 1
   `;
-  const prev = priorSections[0];
+  const [prevChapterEnd] = prevInChapter?.content
+    ? [undefined]
+    : await sql<{ content: string | null }[]>`
+        SELECT s.content
+        FROM "Section" s
+        INNER JOIN "Chapter" c ON c.id = s."chapterId"
+        WHERE c."bookId" = ${bookId} AND c.number < ${row.chapterNumber} AND s."wordCount" > 0
+        ORDER BY c.number DESC, s.number DESC
+        LIMIT 1
+      `;
 
-  const priorChapters = await sql<
-    { number: number; title: string; summary: string | null; stateSummary: string | null }[]
-  >`
-    SELECT c.number, c.title, c.summary, st.summary AS "stateSummary"
-    FROM "Chapter" c
-    LEFT JOIN "ChapterState" st ON st."chapterId" = c.id
-    WHERE c."bookId" = ${bookId} AND c.number < ${section.chapterNumber}
-    ORDER BY c.number ASC
-  `;
-
-  const outline = section.outline as OutlineLike | null;
-  const styleParts = [
-    `Point of view: ${section.pov}`,
-    `Tense: ${section.tense}`,
-    `Language: ${section.language}`,
-    `Tone: ${section.tone ?? "professional"}`,
-    `Audience: ${section.audience ?? "general readers"}`,
-    section.includeDialogue
-      ? "Include natural dialogue where appropriate."
-      : "Minimize or avoid dialogue.",
-    section.includeExamples
-      ? "Include concrete examples where useful."
-      : "Prefer narrative/exposition over instructional examples.",
-    section.style ? `Style guide: ${section.style}` : null,
-    section.customInstructions
-      ? `Custom instructions: ${section.customInstructions}`
-      : null,
-    bible?.styleNotes ? `Bible style notes: ${bible.styleNotes}` : null,
-    bible?.worldRules ? `World rules: ${bible.worldRules}` : null,
-    bible?.themes ? `Themes: ${formatList(bible.themes)}` : null,
-    section.forbiddenTopics ? `Avoid: ${section.forbiddenTopics}` : null,
-  ].filter(Boolean);
-
-  const format = resolveContentFormat({
-    genre: section.genre,
-    templateId: section.templateId,
-    description: section.description,
-    customInstructions: section.customInstructions,
-    includeExamples: section.includeExamples,
-  });
-  styleParts.push(format.instructions);
-
-  const systemStyle = styleParts.join("\n");
-  const core = [
-    `Book: "${section.bookTitle}" (${section.genre ?? "general"})`,
-    `Synopsis: ${outline?.synopsis ?? section.description ?? ""}`,
-    systemStyle,
-  ].join("\n");
-
-  const chapterSummaries = priorChapters
-    .map(
-      (c) =>
-        `Ch ${c.number} "${c.title}": ${c.stateSummary ?? c.summary ?? ""}`
-    )
-    .join("\n");
-
-  const current = [
-    story?.plotPhase ? `Plot phase: ${story.plotPhase}` : null,
-    story?.openThreads
-      ? `Open book threads: ${formatList(story.openThreads)}`
-      : null,
-    story?.bookSummary
-      ? `Book state: ${clipToBudget(story.bookSummary, 400)}`
-      : null,
-    `Current chapter ${section.chapterNumber}: "${section.chapterTitle}"`,
-    section.chapterSummary
-      ? `Chapter summary: ${section.chapterSummary}`
-      : null,
-    chState?.summary ? `Chapter state: ${chState.summary}` : null,
-    chState?.location ? `Location: ${chState.location}` : null,
-    chState?.charactersPresent
-      ? `Characters present: ${formatList(chState.charactersPresent)}`
-      : null,
-    chState?.events ? `Chapter events: ${formatList(chState.events)}` : null,
-    chState?.openThreads
-      ? `Chapter open threads: ${formatList(chState.openThreads)}`
-      : null,
-    secState?.objective
-      ? `Scene objective: ${secState.objective}`
-      : `Scene: ${section.title}`,
-    chapterSummaries
-      ? `Prior chapters:\n${clipToBudget(chapterSummaries, 800)}`
-      : null,
-    prev?.summary ? `Previous scene summary: ${prev.summary}` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const hints = extractEntityHints(
-    section.title,
-    section.chapterTitle,
-    section.chapterSummary,
-    chState?.location,
-    formatList(chState?.charactersPresent),
-    formatList(secState?.charactersPresent),
-    prev?.summary
-  );
-
-  let characters: { name: string; profile: string | null; aliases: unknown }[] =
-    [];
+  let characters: { name: string; profile: string | null; aliases: unknown }[] = [];
   let locations: { name: string; description: string | null }[] = [];
   let factions: { name: string }[] = [];
   if (bible) {
@@ -224,107 +127,88 @@ export async function assembleSectionContext(
       SELECT name, profile, aliases FROM "BibleCharacter"
       WHERE "bibleId" = ${bible.id}
       ORDER BY "createdAt" ASC
-      LIMIT 40
+      LIMIT 60
     `;
     locations = await sql`
       SELECT name, description FROM "BibleLocation"
       WHERE "bibleId" = ${bible.id}
-      LIMIT 30
+      ORDER BY "createdAt" ASC
+      LIMIT 40
     `;
     factions = await sql`
       SELECT name FROM "BibleFaction" WHERE "bibleId" = ${bible.id} LIMIT 12
     `;
   }
 
-  const hintLower = hints.map((h) => h.toLowerCase());
-  const matchedChars = characters.filter((c) =>
-    hintLower.some(
-      (h) =>
-        c.name.toLowerCase().includes(h) ||
-        h.includes(c.name.toLowerCase()) ||
-        asStringArray(c.aliases).some((a) => a.toLowerCase().includes(h))
-    )
-  );
-  const chars =
-    matchedChars.length > 0 ? matchedChars.slice(0, 8) : characters.slice(0, 5);
-  const matchedLocs = locations.filter((l) =>
-    hintLower.some(
-      (h) => l.name.toLowerCase().includes(h) || h.includes(l.name.toLowerCase())
-    )
-  );
-
   const facts = await sql<{ subject: string; predicate: string; object: string }[]>`
     SELECT subject, predicate, object FROM "CanonFact"
     WHERE "bookId" = ${bookId} AND status = 'CANON'
     ORDER BY "updatedAt" DESC
-    LIMIT 24
+    LIMIT 80
   `;
-  const filteredFacts =
-    hints.length > 0
-      ? facts
-          .filter((f) =>
-            hintLower.some(
-              (h) =>
-                f.subject.toLowerCase().includes(h) ||
-                f.object.toLowerCase().includes(h) ||
-                h.includes(f.subject.toLowerCase())
-            )
-          )
-          .slice(0, 24)
-      : facts.slice(0, 12);
 
-  const retrieved = [
-    chars.length
-      ? `Characters:\n${chars
-          .map(
-            (c) =>
-              `- ${c.name}${c.profile ? `: ${clipToBudget(c.profile, 80)}` : ""}`
-          )
-          .join("\n")}`
-      : null,
-    matchedLocs.length
-      ? `Locations:\n${matchedLocs
-          .map(
-            (l) =>
-              `- ${l.name}${l.description ? `: ${clipToBudget(l.description, 60)}` : ""}`
-          )
-          .join("\n")}`
-      : null,
-    factions.length
-      ? `Factions: ${factions
-          .slice(0, 6)
-          .map((f) => f.name)
-          .join(", ")}`
-      : null,
-    filteredFacts.length
-      ? `Canon facts:\n${filteredFacts
-          .map((f) => `- ${f.subject} ${f.predicate} ${f.object}`)
-          .join("\n")}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const next = chapters.find((c) => c.number > row.chapterNumber) ?? null;
+  const previousContent = prevInChapter?.content ?? prevChapterEnd?.content ?? null;
+  const openThreads = asStringArray(story?.openThreads);
 
-  const immediate = prev?.content ? clipToBudget(prev.content, 1800) : "(none)";
-
-  const assembled = buildAssembledUserPrompt({
-    core,
-    current,
-    retrieved,
-    immediate,
-    sectionTitle: section.title,
-    sectionNumber: section.number,
-    sectionsPerChapter: section.sectionsPerChapter || 4,
-    outputHint: sectionOutputHint(format),
-  });
+  const input: SectionContextInput = {
+    book: {
+      title: row.bookTitle,
+      genre: row.genre,
+      description: row.description,
+      templateId: row.templateId,
+      pov: row.pov,
+      tense: row.tense,
+      language: row.language,
+      tone: row.tone,
+      audience: row.audience,
+      style: row.style,
+      customInstructions: row.customInstructions,
+      forbiddenTopics: row.forbiddenTopics,
+      includeDialogue: row.includeDialogue,
+      includeExamples: row.includeExamples,
+      characters: row.characters,
+      themes: row.themes,
+      targetPages: row.targetPages,
+      wordsPerPage: row.wordsPerPage,
+    },
+    outline: row.outline,
+    bible: bible
+      ? { styleNotes: bible.styleNotes, worldRules: bible.worldRules, themes: bible.themes }
+      : null,
+    characters,
+    locations,
+    factions: factions.map((f) => f.name),
+    facts,
+    openThreads,
+    totalChapters: chapters.length,
+    chapter: {
+      number: row.chapterNumber,
+      title: row.chapterTitle,
+      summary: row.chapterSummary,
+      location: chState?.location ?? null,
+      charactersPresent: chState?.charactersPresent,
+    },
+    nextChapter: next,
+    priorChapters: chapters.filter((c) => c.number < row.chapterNumber),
+    chapterSections: siblings.map((s) => ({
+      number: s.number,
+      title: s.title,
+      done: s.wordCount > 0,
+      summary: s.summary,
+    })),
+    section: { number: row.number, title: row.title },
+    previousText: previousContent
+      ? { content: previousContent, fromPreviousChapter: !prevInChapter?.content }
+      : null,
+    bookPosition: { index: position?.before ?? 0, total: position?.total ?? 1 },
+  };
 
   return {
-    ...assembled,
-    systemStyle,
-    chapterId: section.chapterId,
-    factsBrief: filteredFacts
-      .slice(0, 16)
-      .map((f) => `${f.subject} ${f.predicate} ${f.object}`)
-      .join("\n"),
+    ...composeSectionPrompt(input),
+    chapterId: row.chapterId,
+    chapterTitle: row.chapterTitle,
+    sectionTitle: row.title,
+    openThreads,
   };
 }

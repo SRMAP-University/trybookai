@@ -1,111 +1,27 @@
 import { db } from "@/lib/db";
 import { dbTransaction } from "@/lib/db-transaction";
 import { DEFAULT_AI_MODEL, OUTLINE_AI_MODEL, isGroqModel, isModelAvailable } from "@/lib/ai-models";
-import {
-  createChatCompletion,
-  extractJsonPayload,
-  extractModelText,
-} from "@/lib/book-generator/llm";
-import {
-  applyBookProgress,
-  creditSectionPages,
-} from "@/lib/book-generator/progress";
+import { createChatCompletionDetailed } from "@/lib/book-generator/llm";
 import { resolveGenerationShape } from "@/lib/book-generator/shape";
-import { resolveContentFormat } from "@/lib/book-generator/content-format";
+import { writeSection } from "@/lib/book-generator/section-writer";
 import {
-  assembleSectionContext,
-  extractAndUpdateCanon,
+  buildStyleBlock,
+  planBookOutline,
+  type LlmCall,
+} from "@/lib/book-generator/core";
+import {
   hasIncompleteSections,
-  refreshChapterCanon,
   seedBibleFromOutline,
 } from "@/lib/book-context";
-interface BookOutline {
-  title: string;
-  synopsis: string;
-  chapters: {
-    number: number;
-    title: string;
-    summary: string;
-    sections: { number: number; title: string; summary: string }[];
-  }[];
-}
 
-type BookSettings = {
-  title: string;
-  description: string | null;
-  genre: string | null;
-  tone: string | null;
-  audience: string | null;
-  style: string | null;
-  targetPages: number;
-  pov: string;
-  tense: string;
-  language: string;
-  chapterCount: number | null;
-  sectionsPerChapter: number;
-  wordsPerPage: number;
-  includeDialogue: boolean;
-  includeExamples: boolean;
-  customInstructions: string | null;
-  characters: unknown;
-  themes: unknown;
-  forbiddenTopics: string | null;
-  model: string;
-  creativity: number;
-  outline: unknown;
-  templateId?: string | null;
-};
-
-function wordsForPages(pages: number, wordsPerPage: number): number {
-  return pages * wordsPerPage;
-}
-
-function formatList(value: unknown): string {
-  if (!value) return "";
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
-      .join(", ");
-  }
-  if (typeof value === "string") return value;
-  return JSON.stringify(value);
-}
-
-function buildStyleBlock(book: BookSettings): string {
-  const parts = [
-    `Point of view: ${book.pov}`,
-    `Tense: ${book.tense}`,
-    `Language: ${book.language}`,
-    `Tone: ${book.tone ?? "professional"}`,
-    `Audience: ${book.audience ?? "general readers"}`,
-    book.includeDialogue
-      ? "Include natural dialogue where appropriate."
-      : "Minimize or avoid dialogue.",
-    book.includeExamples
-      ? "Include concrete examples, frameworks, or case studies."
-      : "Focus on narrative or exposition without instructional examples.",
-  ];
-
-  if (book.style) parts.push(`Style guide: ${book.style}`);
-  if (book.customInstructions)
-    parts.push(`Custom instructions: ${book.customInstructions}`);
-  if (book.characters)
-    parts.push(`Characters / cast: ${formatList(book.characters)}`);
-  if (book.themes) parts.push(`Themes: ${formatList(book.themes)}`);
-  if (book.forbiddenTopics)
-    parts.push(`Avoid these topics: ${book.forbiddenTopics}`);
-
-  parts.push(
-    resolveContentFormat({
-      genre: book.genre,
-      templateId: book.templateId,
-      description: book.description,
-      customInstructions: book.customInstructions,
-      includeExamples: book.includeExamples,
-    }).instructions
-  );
-
-  return parts.join("\n");
+function completionCall(model: string): LlmCall {
+  return (messages, options) =>
+    createChatCompletionDetailed({
+      model,
+      messages,
+      max_tokens: options.max_tokens,
+      temperature: options.temperature,
+    });
 }
 
 export async function generateOutline(
@@ -121,60 +37,31 @@ export async function generateOutline(
     data: { status: "OUTLINING" },
   });
 
-  onProgress?.(
-    `Planning ${chapterCount} chapters × ${sectionsPerChapter} sections…`
+  const outline = await planBookOutline(
+    {
+      title: book.title,
+      genre: book.genre,
+      description: book.description,
+      templateId: book.templateId,
+      customInstructions: book.customInstructions,
+      includeExamples: book.includeExamples,
+      language: book.language,
+      targetPages: book.targetPages,
+      wordsPerPage,
+      chapterCount,
+      sectionsPerChapter,
+      styleBlock: buildStyleBlock(book, { includeCast: true }),
+    },
+    completionCall(isGroqModel(book.model) ? book.model : OUTLINE_AI_MODEL),
+    onProgress
   );
-
-  const styleBlock = buildStyleBlock(book);
-  const outlineTokens = Math.min(
-    8192,
-    400 + chapterCount * sectionsPerChapter * 100
-  );
-
-  onProgress?.("Generating outline with AI…");
-
-  const raw = await createChatCompletion({
-    model: isGroqModel(book.model) ? book.model : OUTLINE_AI_MODEL,
-    temperature: 0.5,
-    json: true,
-    max_tokens: outlineTokens,
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert book architect. Create book outlines with exactly ${chapterCount} chapters, each with exactly ${sectionsPerChapter} sections. Return JSON with: title, synopsis, chapters[{number, title, summary, sections[{number, title, summary}]}]. Write all titles and summaries in the requested language. Keep summaries to 1–2 sentences each — concise for a ${book.targetPages}-page book. For practical, educational, business, or handbook books, plan sections that naturally include comparisons, frameworks, tables, or visual explanations when those help the reader.`,
-      },
-      {
-        role: "user",
-        content: `Create an outline for a ${book.targetPages}-page ${book.genre ?? "general"} book titled "${book.title}".
-${book.description ? `Description: ${book.description}` : ""}
-
-Writing requirements:
-${styleBlock}`,
-      },
-    ],
-  });
 
   onProgress?.("Saving outline…");
-
-  const outline = JSON.parse(extractJsonPayload(raw)) as BookOutline;
-
-  // Sanitize LLM output so duplicate or non-sequential chapter/section numbers
-  // never violate the (bookId, number) unique constraint.
-  const normalizedChapters = outline.chapters.map((chapter, chapterIndex) => ({
-    number: chapterIndex + 1,
-    title: chapter.title ?? `Chapter ${chapterIndex + 1}`,
-    summary: chapter.summary ?? "",
-    sections: (chapter.sections ?? []).map((section, sectionIndex) => ({
-      number: sectionIndex + 1,
-      title: section.title ?? `Section ${sectionIndex + 1}`,
-      summary: section.summary ?? "",
-    })),
-  }));
 
   await dbTransaction(async (tx) => {
     await tx.chapter.deleteMany({ where: { bookId } });
 
-    for (const chapter of normalizedChapters) {
+    for (const chapter of outline.chapters) {
       await tx.chapter.create({
         data: {
           bookId,
@@ -194,7 +81,7 @@ ${styleBlock}`,
     await tx.book.update({
       where: { id: bookId },
       data: {
-        outline: { ...outline, chapters: normalizedChapters } as object,
+        outline: outline as object,
         status: "DRAFT",
         progress: 5,
         chapterCount,
@@ -217,120 +104,25 @@ ${styleBlock}`,
 export async function generateSection(sectionId: string) {
   const section = await db.section.findUniqueOrThrow({
     where: { id: sectionId },
-    include: {
-      chapter: {
-        include: {
-          book: true,
-          sections: { orderBy: { number: "asc" } },
-        },
-      },
+    select: {
+      chapterId: true,
+      chapter: { select: { bookId: true, book: { select: { model: true } } } },
     },
   });
 
-  const { chapter } = section;
-  const { book } = chapter;
-  const shape = resolveGenerationShape(book);
-  const { sectionsPerChapter, wordsPerPage, pagesPerSection } = shape;
-
   await db.chapter.update({
-    where: { id: chapter.id },
+    where: { id: section.chapterId },
     data: { status: "GENERATING" },
   });
 
   await db.book.update({
-    where: { id: book.id },
+    where: { id: section.chapter.bookId },
     data: { status: "GENERATING" },
   });
 
-  const targetWords = wordsForPages(pagesPerSection, wordsPerPage);
-  const assembled = await assembleSectionContext(book.id, sectionId).catch(
-    (error) => {
-      console.warn(
-        "[section] assemble failed:",
-        error instanceof Error ? error.message : error
-      );
-      return null;
-    }
-  );
-  const styleBlock = buildStyleBlock(book);
-
-  const raw = await createChatCompletion({
-    model: book.model || DEFAULT_AI_MODEL,
-    temperature: book.creativity ?? 0.7,
-    max_tokens: Math.min(8192, Math.max(2048, targetWords * 2)),
-    messages: [
-      {
-        role: "system",
-        content: `You are a professional author writing "${book.title}", a ${book.genre} book. Write approximately ${targetWords} words (~${pagesPerSection} pages). Maintain narrative consistency with the provided CORE/CURRENT/RETRIEVED context. Follow FORMAT RULES in the writing requirements. Output only the section manuscript — no preamble, no thinking notes.
-
-Writing requirements:
-${assembled?.systemStyle ?? styleBlock}`,
-      },
-      {
-        role: "user",
-        content:
-          assembled?.userPrompt ??
-          `Write section "${section.title}" (Section ${section.number} of ${sectionsPerChapter}).`,
-      },
-    ],
+  const { content, wordCount, pageCount } = await writeSection(sectionId, {
+    call: completionCall(section.chapter.book.model || DEFAULT_AI_MODEL),
   });
-
-  const content = extractModelText(raw);
-  const wordCount = content.split(/\s+/).filter(Boolean).length;
-  const pageCount = Math.min(
-    pagesPerSection,
-    Math.max(1, Math.ceil(wordCount / wordsPerPage))
-  );
-
-  await db.section.update({
-    where: { id: sectionId },
-    data: { content, wordCount, pageCount },
-  });
-
-  await extractAndUpdateCanon({
-    bookId: book.id,
-    chapterId: chapter.id,
-    sectionId,
-    sectionTitle: section.title,
-    content,
-  }).catch((error) => {
-    console.warn(
-      "[section] extract canon failed:",
-      error instanceof Error ? error.message : error
-    );
-  });
-
-  const allSections = await db.section.findMany({
-    where: { chapterId: chapter.id },
-  });
-  const chapterComplete = allSections.every((s) =>
-    s.id === sectionId ? true : s.wordCount > 0
-  );
-
-  if (chapterComplete) {
-    const chapterContent = allSections
-      .sort((a, b) => a.number - b.number)
-      .map((s) => (s.id === sectionId ? content : s.content))
-      .join("\n\n");
-
-    const chapterPages = allSections.reduce(
-      (sum, s) => sum + (s.id === sectionId ? pageCount : s.pageCount),
-      0
-    );
-
-    await db.chapter.update({
-      where: { id: chapter.id },
-      data: {
-        content: chapterContent,
-        pageCount: chapterPages,
-        status: "COMPLETED",
-      },
-    });
-    await refreshChapterCanon(book.id, chapter.id).catch(() => undefined);
-  }
-
-  await creditSectionPages(book.userId, pageCount);
-  await applyBookProgress(book.id, { wordsPerPage });
 
   return { content, wordCount, pageCount };
 }
@@ -349,6 +141,27 @@ export async function regenerateChapter(chapterId: string, userId: string) {
   await db.section.updateMany({
     where: { chapterId },
     data: { content: null, wordCount: 0, pageCount: 0 },
+  });
+
+  // The old draft's notes would read as "already written" to the new one.
+  await db.sectionState.deleteMany({ where: { section: { chapterId } } });
+  await db.chapterState.upsert({
+    where: { chapterId },
+    create: {
+      chapterId,
+      charactersPresent: [],
+      events: [],
+      newFacts: [],
+      openThreads: [],
+    },
+    update: {
+      summary: null,
+      location: null,
+      charactersPresent: [],
+      events: [],
+      newFacts: [],
+      openThreads: [],
+    },
   });
 
   await db.chapter.update({
