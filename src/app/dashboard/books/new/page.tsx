@@ -2,8 +2,11 @@ import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { NewBookForm } from "./new-book-form";
 import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
+import { getTemplateCovers } from "@/lib/template-covers";
 
-export default function NewBookPage() {
+export default async function NewBookPage() {
+  const templateCovers = await getTemplateCovers();
+
   return (
     <AnonymousRouteFallback
       title="New book"
@@ -16,7 +19,7 @@ export default function NewBookPage() {
           </div>
         }
       >
-        <NewBookForm />
+        <NewBookForm templateCovers={templateCovers} />
       </Suspense>
     </AnonymousRouteFallback>
   );
