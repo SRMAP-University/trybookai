@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getAppUrl } from "@/lib/book-public";
 import { SITE_FAQS } from "@/lib/faqs";
+import { SUPPORT_EMAIL } from "@/lib/legal";
 
 export const SITE_NAME = "BookAI";
 export const SITE_TAGLINE = "AI Book Generator";
@@ -42,6 +43,15 @@ type PageMetaInput = {
   absolute?: boolean;
   keywords?: string[];
 };
+
+/** Trim to a meta-description length on a word boundary instead of mid-word. */
+export function truncateForMeta(text: string, max = 155): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:—-]+$/, "")}…`;
+}
 
 export function brandedTitle(title: string): string {
   return title.includes(SITE_NAME) ? title : `${title} — ${SITE_NAME}`;
@@ -117,10 +127,11 @@ export function organizationJsonLd() {
     url: base,
     logo: `${base}/icon-512.png`,
     description: DEFAULT_DESCRIPTION,
-    sameAs: [base, `${base}/blog`, `${base}/books`],
+    // sameAs is for external profiles (X, LinkedIn, Product Hunt…) — add them here when they exist.
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer support",
+      email: SUPPORT_EMAIL,
       url: `${base}/about`,
     },
   };
@@ -236,6 +247,8 @@ export function bookJsonLd(input: {
     url: input.url,
     identifier: input.slug,
     image: input.coverUrl,
+    bookFormat: "https://schema.org/EBook",
+    isAccessibleForFree: true,
     numberOfPages: input.pageCount || undefined,
     author: {
       "@type": "Person",

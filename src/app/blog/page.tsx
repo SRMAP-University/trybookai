@@ -9,7 +9,7 @@ import { breadcrumbJsonLd, buildPageMetadata, itemListJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
   ...buildPageMetadata({
-    title: "Blog",
+    title: "AI Book Writing Blog: Guides for Authors",
     description:
       "Guides for writing a book with AI, publishing ethically, creating audiobooks, and marketing your manuscript.",
     path: "/blog",

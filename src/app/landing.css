@@ -169,10 +169,20 @@
   animation-delay: calc(var(--i, 0) * 70ms);
 }
 
-/* Headline: each word rises in turn. */
+/* Headline: each word rises in turn. Transform-only: the headline is the LCP
+   text, so it must not ship invisible in the server HTML. */
+@keyframes home-word-rise {
+  from {
+    transform: translateY(14px);
+  }
+  to {
+    transform: none;
+  }
+}
+
 .home-word {
   display: inline-block;
-  animation: home-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: home-word-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   animation-delay: calc(80ms + var(--i, 0) * 70ms);
 }
 

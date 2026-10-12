@@ -16,7 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     [books, genreRows] = await Promise.all([
       db.book.findMany({
-        where: { isPublic: true },
+        // Skip placeholder pages for books with no finished chapters (they're noindex).
+        where: { isPublic: true, chapters: { some: { status: "COMPLETED" } } },
         select: { slug: true, updatedAt: true },
         orderBy: { updatedAt: "desc" },
         take: 5000,

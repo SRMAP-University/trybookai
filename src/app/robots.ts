@@ -7,7 +7,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
+        // Cover images are referenced by og:image and Book JSON-LD on public pages.
+        allow: ["/", "/api/books/cover/"],
         disallow: [
           "/dashboard",
           "/dashboard/",

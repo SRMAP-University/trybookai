@@ -29,7 +29,7 @@ Every great book starts with a clear premise. Ask yourself: what question does y
 
 ## Build a detailed outline
 
-AI excels at turning a premise into a chapter-by-chapter outline. Feed it your genre, audience, and tone, then iterate until the structure feels right. The best outlines include scene summaries, character beats, and key takeaways.
+AI excels at turning a premise into a chapter-by-chapter outline — it is the first thing an [AI book generator](/features) like BookAI produces. Feed it your genre, audience, and tone, then iterate until the structure feels right. The best outlines include scene summaries, character beats, and key takeaways.
 
 ## Generate drafts in sections
 
@@ -45,7 +45,7 @@ AI can speed up drafting, but editing is still a human job. Read aloud, cut fluf
 
 ## Publish with confidence
 
-Once your manuscript is ready, export to Markdown or DOCX, design your cover, and publish. Whether you choose Amazon KDP, a personal website, or a newsletter, the world needs more books from thoughtful authors.
+Once your manuscript is ready, export to PDF, EPUB, or Markdown, design your cover, and publish. Before you do, read our guide on [publishing an AI-generated book legally and ethically](/blog/how-to-publish-ai-generated-book). Whether you choose Amazon KDP, a personal website, or a newsletter, the world needs more books from thoughtful authors.
     `.trim(),
   },
   {
@@ -74,7 +74,7 @@ AI narration is ideal for rapid releases, budget-conscious projects, and books w
 
 ## When to choose a human
 
-Choose a human narrator for character-driven fiction, memoirs, or any project where emotional range and unique voice are central to the experience.
+Choose a human narrator for character-driven fiction, memoirs, or any project where emotional range and unique voice are central to the experience. You can hear AI narration on many of the [public books in our library](/books).
 
 ## Distribution
 
@@ -99,7 +99,7 @@ When evaluating an AI book writing tool, consider: maximum output length, outlin
 
 ## BookAI
 
-Built from the ground up for books. Supports outlines up to 1,000 pages, custom styles and branding, AI audiobooks, and public book pages. Best for authors who want a complete pipeline from idea to published manuscript.
+Built from the ground up for books. Supports outlines up to 1,000 pages, custom styles and branding, AI audiobooks, and public book pages. Best for authors who want a complete pipeline from idea to published manuscript. [See the full feature list](/features).
 
 ## Sudowrite
 
@@ -115,7 +115,7 @@ Strong for marketing copy and outlines. Less suited for generating full chapters
 
 ## The verdict
 
-If your goal is a complete book, choose a tool designed for long-form manuscripts. If your goal is inspiration and experimentation, a general-purpose AI may be enough.
+If your goal is a complete book, choose a tool designed for long-form manuscripts — and see our step-by-step guide on [how to write a book with AI](/blog/how-to-write-a-book-with-ai). If your goal is inspiration and experimentation, a general-purpose AI may be enough.
     `.trim(),
   },
   {
@@ -148,7 +148,7 @@ Be honest with readers about your process. Many successful authors already use t
 
 ## Builds your brand
 
-Publishing consistently helps you build authority. Use your books as lead magnets, course companions, or SEO assets. The key is to publish work you are proud to put your name on.
+Publishing consistently helps you build authority (see our [book marketing strategy](/blog/book-marketing-strategy) guide). Use your books as lead magnets, course companions, or SEO assets. The key is to publish work you are proud to put your name on.
     `.trim(),
   },
   {
@@ -169,7 +169,7 @@ A website with a mailing list is the most durable marketing asset you can build.
 
 ## Optimize for search
 
-Every public book page is an SEO opportunity. Use clear titles, descriptive subtitles, and relevant keywords. Link between books and blog posts to build topical authority.
+Every [public book page](/books) is an SEO opportunity. Use clear titles, descriptive subtitles, and relevant keywords. Link between books and blog posts to build topical authority.
 
 ## Build social proof
 

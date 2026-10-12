@@ -18,15 +18,20 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const { q } = await searchParams;
   const query = q?.trim();
   if (query) {
-    return buildPageMetadata({
-      title: `Search books: ${query}`,
-      description: `Public AI-generated books matching “${query}” on BookAI.`,
-      path: `/books?q=${encodeURIComponent(query)}`,
-    });
+    // Internal search results are unbounded and thin — keep them out of the index
+    // but let crawlers follow through to the books.
+    return {
+      ...buildPageMetadata({
+        title: `Search books: ${query}`,
+        description: `Public AI-generated books matching “${query}” on BookAI.`,
+        path: `/books?q=${encodeURIComponent(query)}`,
+      }),
+      robots: { index: false, follow: true },
+    };
   }
 
   return buildPageMetadata({
-    title: "Public AI books library",
+    title: "Read Free AI-Generated Books Online",
     description:
       "Browse free AI-generated books on BookAI. Read outlines, chapters, and full manuscripts from authors using AI.",
     path: "/books",

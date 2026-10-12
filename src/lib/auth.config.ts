@@ -26,8 +26,11 @@ export const authConfig = {
       const isAuthPage =
         path.startsWith("/login") || path.startsWith("/register");
 
+      // Public cover images back og:image and Book schema; crawlers have no session.
+      const isPublicCover = path.startsWith("/api/books/cover/");
+
       const isApiProtected =
-        path.startsWith("/api/books") ||
+        (path.startsWith("/api/books") && !isPublicCover) ||
         path.startsWith("/api/billing") ||
         path.startsWith("/api/generate") ||
         path.startsWith("/api/audio") ||

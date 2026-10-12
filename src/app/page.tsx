@@ -25,7 +25,7 @@ import {
 export const revalidate = 120;
 
 export const metadata: Metadata = buildPageMetadata({
-  title: "BookAI — AI Book Generator",
+  title: "AI Book Generator: Write a Full-Length Book with AI — BookAI",
   description:
     "Write a full-length book with AI. BookAI outlines chapters, drafts the manuscript, generates a cover, narrates an audiobook, and exports PDF or EPUB.",
   path: "/",
