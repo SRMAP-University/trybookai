@@ -176,7 +176,7 @@ export function LiveGenerationDock({
       <aside
         className={cn(
           "fixed right-0 top-14 z-40 flex w-[min(100vw,420px)] flex-col border-l border-[#e6ebf1] bg-[#f6f9fc] shadow-[-12px_0_40px_rgba(10,37,64,0.12)]",
-          "bottom-16 lg:top-16 lg:bottom-0"
+          "bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:top-16 lg:bottom-0"
         )}
       >
         <div className="flex items-center gap-2 border-b border-[#e6ebf1] bg-white px-4 py-3">

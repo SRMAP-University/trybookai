@@ -27,7 +27,7 @@ export function DashboardShell({
           <div className="lg:pl-[240px]">
             <DashboardHeader />
             <ExplorationNotice />
-            <main className="px-4 py-8 pb-24 lg:px-10 lg:pb-10">
+            <main className="px-4 py-8 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:px-10 lg:pb-10">
               <div className="mx-auto max-w-[960px]">{children}</div>
             </main>
           </div>

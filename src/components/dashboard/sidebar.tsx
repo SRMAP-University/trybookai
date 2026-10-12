@@ -284,23 +284,35 @@ export function MobileDashboardNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-20 flex border-t border-[#e6ebf1] bg-white lg:hidden">
-      {mobileNav.map((item) => {
-        const active = isActive(pathname, item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px]",
-              active ? "text-[#635bff]" : "text-[#697386]"
-            )}
-          >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </Link>
-        );
-      })}
+    // 64px tall (plus the iPhone home-indicator area); fixed elements that sit
+    // above it use bottom-[calc(4rem+env(safe-area-inset-bottom))].
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[#e6ebf1] bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_-12px_rgba(10,37,64,0.25)] lg:hidden">
+      <div className="flex h-16">
+        {mobileNav.map((item) => {
+          const active = isActive(pathname, item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+                active ? "text-[#635bff]" : "text-[#425466] active:text-[#0a2540]"
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                  active && "bg-[#f0efff]"
+                )}
+              >
+                <item.icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.2 : 1.8} />
+              </span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

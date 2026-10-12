@@ -4,6 +4,7 @@ import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { TawkVisibility } from "@/components/tawk-visibility";
 import { getAppUrl } from "@/lib/book-public";
 import {
   PWA_THEME_COLOR,
@@ -127,6 +128,7 @@ export default function RootLayout({
         <Toaster richColors position="top-right" />
         <ServiceWorkerRegister />
         <InstallPrompt />
+        <TawkVisibility />
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=AW-18336512996"
           strategy="afterInteractive"
@@ -149,6 +151,14 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
+              // On phones, sit above the dashboard's bottom nav (64px plus the
+              // iPhone home-indicator area).
+              Tawk_API.customStyle = {
+                visibility: {
+                  desktop: { position: "br", xOffset: 20, yOffset: 20 },
+                  mobile: { position: "br", xOffset: 12, yOffset: 104 }
+                }
+              };
               (function () {
                 var s1 = document.createElement("script"),
                   s0 = document.getElementsByTagName("script")[0];

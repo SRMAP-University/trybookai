@@ -898,7 +898,7 @@ export function NewBookForm({
         featureLabel={premiumFeatureLabel}
       />
 
-      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-[#e6ebf1] bg-white/95 px-4 py-3 lg:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-[#e6ebf1] bg-white/95 px-4 py-3 lg:hidden">
         <Button
           form="new-book-form"
           type="submit"
