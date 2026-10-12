@@ -128,50 +128,6 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
-.landing-book-stage {
-  overflow: visible;
-}
-
-@keyframes landing-write {
-  0% { transform: scaleX(0.35); }
-  50% { transform: scaleX(1); }
-  100% { transform: scaleX(0.58); }
-}
-
-@keyframes landing-audio {
-  0%,
-  100% { transform: scaleY(1); }
-  50% { transform: scaleY(1.55); }
-}
-
-@keyframes landing-pulse {
-  0%,
-  100% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.28); opacity: 0.55; }
-}
-
-.landing-write-bar {
-  transform-origin: left center;
-  animation: landing-write 2.8s ease-in-out infinite;
-}
-
-.landing-audio-bar {
-  transform-origin: bottom;
-  animation: landing-audio 1.15s ease-in-out infinite;
-}
-
-.landing-pulse-dot {
-  animation: landing-pulse 2.2s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-write-bar,
-  .landing-audio-bar,
-  .landing-pulse-dot {
-    animation: none;
-  }
-}
-
 .landing-hero-stack {
   display: flex;
   flex-direction: column;
@@ -230,4 +186,286 @@
 
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* Home — matches the dashboard palette (see globals.css :root) */
+
+.home-root {
+  --landing-bg: #ffffff;
+  --home-bg: #ffffff;
+  --home-ink: #0a2540;
+  --home-muted: #697386;
+  --home-primary: #635bff;
+  --home-primary-hover: #5851e5;
+
+  background-color: var(--home-bg);
+  color: var(--home-ink);
+}
+
+/* Shared navbar CTA picks up the dashboard primary on the home page. */
+.home-root .landing-btn-dark {
+  background: var(--home-primary);
+}
+
+.home-root .landing-btn-dark:hover {
+  background: var(--home-primary-hover);
+}
+
+.home-serif {
+  font-family: var(--font-serif-display), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.home-eyebrow {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--home-muted);
+}
+
+/* Physical-book feel: spine shading on the left edge, soft drop shadow. */
+.home-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 3px 6px 6px 3px;
+  background: #0a2540;
+  box-shadow:
+    0 1px 2px rgba(10, 37, 64, 0.12),
+    0 18px 32px -14px rgba(10, 37, 64, 0.45);
+}
+
+.home-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.28) 0%,
+    rgba(255, 255, 255, 0.14) 1.6%,
+    rgba(0, 0, 0, 0.06) 3.5%,
+    transparent 7%
+  );
+}
+
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.home-rise {
+  animation: home-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* Headline: each word rises in turn. */
+.home-word {
+  display: inline-block;
+  animation: home-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(80ms + var(--i, 0) * 70ms);
+}
+
+/* Hero covers fan out from a stack, then drift. Tailwind's rotate/translate
+   utilities use the individual properties, so these compose with them. */
+@keyframes home-fan {
+  from {
+    opacity: 0;
+    rotate: 0deg;
+    transform: translateY(48px) scale(0.94);
+  }
+}
+
+@keyframes home-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.home-fan {
+  animation: home-fan 1s cubic-bezier(0.2, 0.75, 0.15, 1) both;
+  animation-delay: calc(250ms + var(--i, 0) * 110ms);
+}
+
+.home-float {
+  animation: home-float var(--dur, 6s) ease-in-out infinite;
+  animation-delay: calc(1.3s + var(--i, 0) * -1.7s);
+  will-change: transform;
+}
+
+/* Hero deck: cards deal in once, then glide between slots (hero-covers.tsx). */
+@keyframes home-deal {
+  from {
+    opacity: 0;
+    transform: translateY(48px) scale(0.94);
+  }
+}
+
+.home-deal {
+  animation: home-deal 1s cubic-bezier(0.2, 0.75, 0.15, 1) both;
+  animation-delay: calc(250ms + var(--i, 0) * 110ms);
+}
+
+.home-slot {
+  transition:
+    transform 0.9s cubic-bezier(0.65, 0, 0.35, 1),
+    opacity 0.6s ease;
+  will-change: transform;
+}
+
+@keyframes home-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+.home-pulse {
+  animation: home-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes home-eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.home-eq {
+  transform-origin: bottom;
+  animation: home-eq 0.9s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -0.23s);
+}
+
+/* Cover shelf marquee: the track holds identical halves, so -50% loops. */
+@keyframes home-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.home-marquee {
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 6%,
+    #000 94%,
+    transparent
+  );
+}
+
+.home-marquee-track {
+  animation: home-marquee 55s linear infinite;
+}
+
+.home-marquee:hover .home-marquee-track,
+.home-marquee:focus-within .home-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Scroll reveal. <InView> arms off-screen blocks after mount (so nothing is
+   hidden without JS) and flags them when they scroll into view. */
+[data-armed] .rv {
+  opacity: 0;
+}
+
+[data-armed][data-inview] .rv {
+  animation: home-rise 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Reveal keyframes need explicit end states: the armed `.rv` rule computes
+   opacity 0, which a `from`-only keyframe would animate back to. */
+@keyframes home-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-armed][data-inview] .rv-slide {
+  animation-name: home-slide;
+}
+
+@keyframes home-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-armed][data-inview] .rv-pop {
+  animation-name: home-pop;
+  animation-timing-function: cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+@keyframes home-lines {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+[data-armed][data-inview] .rv-lines {
+  opacity: 1;
+  animation: home-lines 2.4s steps(7, end) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Re-runs when the price element is re-keyed (billing toggle). */
+.home-tick {
+  display: inline-block;
+  animation: home-rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-rise,
+  .home-word,
+  .home-fan,
+  .home-deal,
+  .home-float,
+  .home-pulse,
+  .home-eq,
+  .home-marquee-track,
+  .home-tick,
+  [data-armed] .rv,
+  [data-armed][data-inview] .rv {
+    animation: none;
+    opacity: 1;
+  }
+
+  .home-slot {
+    transition: none;
+  }
 }
