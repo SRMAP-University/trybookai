@@ -14,6 +14,8 @@ type BookManuscriptProps = {
   genre?: string | null;
   templateId?: string | null;
   compact?: boolean;
+  /** Larger, darker text for reading pages; serif layouts inherit the page's reading font. */
+  variant?: "default" | "reader";
   className?: string;
 };
 
@@ -59,17 +61,25 @@ function inlineMarkdown(text: string) {
 function headingClass(
   level: 1 | 2 | 3 | 4,
   layout: ManuscriptLayout,
-  compact: boolean
+  compact: boolean,
+  reader = false
 ) {
+  // Reading pages supply their own serif; don't override it with the system one.
+  const serif = reader ? "" : "font-serif ";
   const base =
     layout === "literary"
-      ? "font-serif italic tracking-[-0.02em]"
+      ? `${serif}italic tracking-[-0.02em]`
       : layout === "youth"
         ? "font-sans font-semibold tracking-[-0.02em]"
         : layout === "academic"
-          ? "font-serif font-semibold tracking-[-0.02em]"
+          ? `${serif}font-semibold tracking-[-0.02em]`
           : "font-sans font-semibold tracking-[-0.02em]";
 
+  if (reader) {
+    if (level <= 2) return cn(base, "text-[24px] leading-snug text-[#0a2540]");
+    if (level === 3) return cn(base, "text-[20px] leading-snug text-[#0a2540]");
+    return cn(base, "text-[17px] text-[#0a2540]");
+  }
   if (compact) {
     if (level <= 2) return cn(base, "text-[14px] text-[#0a2540]");
     if (level === 3) return cn(base, "text-[13px] text-[#0a2540]");
@@ -85,12 +95,18 @@ export function BookManuscript({
   genre,
   templateId,
   compact = false,
+  variant = "default",
   className,
 }: BookManuscriptProps) {
   const layout = resolveManuscriptLayout({ genre, templateId } satisfies ContentFormatInput);
   const blocks = parseManuscriptBlocks(content || "");
-  const body =
-    layout === "youth"
+  const reader = variant === "reader";
+  // On reading pages, serif layouts use the page's reading font instead of the system serif.
+  const fontClass =
+    reader && (layout === "literary" || layout === "academic") ? "" : layoutClassName(layout);
+  const body = reader
+    ? "text-[18px] leading-[1.8] sm:text-[19px]"
+    : layout === "youth"
       ? compact
         ? "text-[13px] leading-relaxed"
         : "text-[16px] leading-[1.8]"
@@ -102,7 +118,7 @@ export function BookManuscript({
 
   if (!blocks.length) {
     return (
-      <p className={cn(layoutClassName(layout), body, "text-[#697386]", className)}>
+      <p className={cn(fontClass, body, "text-[#697386]", className)}>
         Not generated yet.
       </p>
     );
@@ -111,17 +127,17 @@ export function BookManuscript({
   return (
     <div
       className={cn(
-        layoutClassName(layout),
+        fontClass,
         body,
-        "space-y-3 text-[#425466] sm:space-y-4",
+        reader ? "space-y-5 text-[#1f2d3d]" : "space-y-3 text-[#425466] sm:space-y-4",
         className
       )}
     >
       {blocks.map((block, index) => {
         if (block.type === "heading") {
           const className = cn(
-            headingClass(block.level, layout, compact),
-            index === 0 ? "mt-0" : compact ? "mt-4" : "mt-6"
+            headingClass(block.level, layout, compact, reader),
+            index === 0 ? "mt-0" : compact ? "mt-4" : reader ? "mt-10" : "mt-6"
           );
           const children = inlineMarkdown(block.text);
           if (block.level <= 2) {
