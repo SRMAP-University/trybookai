@@ -19,7 +19,8 @@ import { toast } from "sonner";
 import { BackgroundScorePlayer } from "@/components/dashboard/background-score";
 import { RailButton, ReelStage, formatReelTime } from "@/components/reels/reel-stage";
 import { cn } from "@/lib/utils";
-import { shotIndexAt, type ReelFeedItem, type ReelFeedPage } from "@/lib/reel-generator/types";
+import type { ScoreMood } from "@/lib/audio-generator/score-types";
+import type { ReelFeedItem, ReelFeedPage } from "@/lib/reel-generator/types";
 
 /**
  * Public Story Reels, one full-screen card per reel, scrolled with snap like
@@ -41,7 +42,7 @@ export function ReelFeed() {
   const activeRef = useRef(0);
   const [parts, setParts] = useState<Record<string, number>>({});
   const [partsOpen, setPartsOpen] = useState<string | null>(null);
-  const [ms, setMs] = useState(0);
+  const [mood, setMood] = useState<ScoreMood | null>(null);
   const [playing, setPlaying] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const unlockedRef = useRef(false);
@@ -101,7 +102,6 @@ export function ReelFeed() {
             // Each card starts from the top, even if its audio file is the same.
             if (audioRef.current) audioRef.current.currentTime = 0;
             setActive(index);
-            setMs(0);
             setPartsOpen(null);
           }
           if (index >= itemsRef.current.length - 2) void loadMore();
@@ -130,18 +130,9 @@ export function ReelFeed() {
   }, [item?.reel.music, musicOn]);
   useEffect(() => () => scoreRef.current?.dispose(), []);
 
-  // Frame clock while playing.
-  useEffect(() => {
-    if (!playing) return;
-    let raf = 0;
-    const tick = () => {
-      const el = audioRef.current;
-      if (el) setMs(el.currentTime * 1000);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [playing]);
+  // The stage in view reads the shared audio clock itself, every frame.
+  const getTime = useCallback(() => (audioRef.current?.currentTime ?? 0) * 1000, []);
+  const openingFrame = useCallback(() => 0, []);
 
   function syncMusic(el: HTMLAudioElement) {
     if (episode) scoreRef.current?.sync(episode.number, el.currentTime, !el.paused && !el.ended);
@@ -176,7 +167,6 @@ export function ReelFeed() {
   function pickPart(reelId: string, part: number) {
     if (audioRef.current) audioRef.current.currentTime = 0;
     setParts((prev) => ({ ...prev, [reelId]: part }));
-    setMs(0);
     setPartsOpen(null);
   }
 
@@ -218,8 +208,6 @@ export function ReelFeed() {
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
   }, []);
-
-  const duration = episode?.durationMs ?? 0;
 
   return (
     <div
@@ -308,7 +296,6 @@ export function ReelFeed() {
         const ep = feedItem.reel.episodes[part];
         if (!ep) return null;
         const live = Math.abs(i - active) <= 1;
-        const shotNow = isActive && ep.shots.length ? ep.shots[shotIndexAt(ep.shots, ms)] : null;
         return (
           <section
             key={feedItem.reel.id}
@@ -324,11 +311,15 @@ export function ReelFeed() {
               onClick={() => tap(i)}
             >
               <ReelStage
+                key={ep.id}
                 episode={ep}
-                ms={isActive ? ms : 0}
+                getTime={isActive ? getTime : openingFrame}
+                animate={isActive}
                 live={live}
                 captionsOn={captionsOn && isActive}
+                showProgress={isActive}
                 topInset="max(8px,env(safe-area-inset-top))"
+                onShotChange={isActive ? (index) => setMood(ep.shots[index]?.mood ?? null) : undefined}
               />
 
               <p className="pointer-events-none absolute left-16 right-3 top-[calc(max(8px,env(safe-area-inset-top))+22px)] truncate text-[12px] font-medium text-white/80 sm:left-4">
@@ -380,22 +371,13 @@ export function ReelFeed() {
                   by {feedItem.book.author}
                   {feedItem.reel.voiceName ? ` · Narrated by ${feedItem.reel.voiceName}` : ""}
                 </p>
-                {shotNow && (
+                {isActive && mood && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium capitalize backdrop-blur-sm">
                     <Music2 className="h-3 w-3" />
-                    {shotNow.mood}
+                    {mood}
                   </span>
                 )}
               </div>
-
-              {isActive && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-white/15">
-                  <div
-                    className="h-full bg-[#ffd84d]"
-                    style={{ width: `${duration ? Math.min(100, (ms / duration) * 100) : 0}%` }}
-                  />
-                </div>
-              )}
 
               {isActive && !playing && (
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3">

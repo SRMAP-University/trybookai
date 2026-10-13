@@ -36,6 +36,12 @@ export function reelTargetWords(voiceSettings: unknown, fallback: number): numbe
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+/** Seconds of narration per picture, from the pacing chosen at creation. Older reels used 6. */
+export function reelShotSeconds(voiceSettings: unknown): number {
+  const value = Number((voiceSettings as { shotSeconds?: unknown } | null)?.shotSeconds);
+  return Number.isFinite(value) && value >= 2 && value <= 12 ? value : 6;
+}
+
 export function toReelView(reel: ReelWithEpisodes): ReelView {
   return {
     id: reel.id,

@@ -12,7 +12,7 @@ import {
 import { narrateScript } from "@/lib/reel-generator/narration";
 import { writeEpisodeScript, type ReelBook } from "@/lib/reel-generator/script";
 import { planShots } from "@/lib/reel-generator/shots";
-import { reelTargetWords } from "@/lib/reel-generator/timeline";
+import { reelShotSeconds, reelTargetWords } from "@/lib/reel-generator/timeline";
 import {
   SHORT_TARGET_WORDS,
   TRAILER_TARGET_WORDS,
@@ -20,8 +20,8 @@ import {
   type ReelMotion,
 } from "@/lib/reel-generator/types";
 
-/** Images drawn at once per episode. */
-const IMAGE_CONCURRENCY = 3;
+/** Images drawn at once per episode (dynamic pacing needs about two dozen). */
+const IMAGE_CONCURRENCY = 4;
 
 /** A claim older than this belongs to a server that died. */
 export const SHOT_CLAIM_TTL_MS = 3 * 60_000;
@@ -153,6 +153,7 @@ export async function buildEpisode(episodeId: string, ctx: EpisodeContext): Prom
       bible: ctx.bible,
       narrative: isNarrativeBook(ctx.book),
       title: ctx.book.title,
+      shotSeconds: reelShotSeconds(ctx.reel.voiceSettings),
     });
     await db.reelShot.createMany({
       data: planned.map((shot, i) => ({

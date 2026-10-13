@@ -17,6 +17,7 @@ const startSchema = z.object({
   format: z.enum(["SHORTS", "TRAILER", "AUDIOBOOK"]),
   chapterIds: z.array(z.string().min(1)).max(200).optional(),
   stylePreset: z.string().max(40).optional(),
+  pacing: z.enum(["dynamic", "calm"]).optional(),
   voiceId: z.string().optional(),
   voiceName: z.string().optional(),
   voiceSettings: z
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
       format: parsed.data.format,
       chapterIds: parsed.data.chapterIds,
       stylePreset: parsed.data.stylePreset,
+      pacing: parsed.data.pacing,
       voiceId: parsed.data.voiceId,
       voiceName: parsed.data.voiceName,
       voiceSettings: normalizeVoiceSettings({

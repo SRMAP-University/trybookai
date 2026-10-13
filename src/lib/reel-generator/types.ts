@@ -18,6 +18,9 @@ export const REEL_MOTIONS = [
   "pan-left",
   "pan-right",
   "rise",
+  "tilt-down",
+  "drift",
+  "punch-in",
 ] as const;
 export type ReelMotion = (typeof REEL_MOTIONS)[number];
 
@@ -27,6 +30,9 @@ export const MOTION_LABELS: Record<ReelMotion, string> = {
   "pan-left": "Pan left",
   "pan-right": "Pan right",
   rise: "Rise",
+  "tilt-down": "Tilt down",
+  drift: "Drift",
+  "punch-in": "Punch in",
 };
 
 export function normalizeMotion(value: unknown): ReelMotion {
@@ -106,8 +112,31 @@ export function reelStyle(id: string | null | undefined): ReelStyle {
 /** Narration pace used for estimates; matches the audiobook quota estimate. */
 export const REEL_WORDS_PER_MINUTE = 150;
 
-/** About one illustration per this many seconds of a Short. */
-export const SHOT_SECONDS = 6;
+/** How often the picture changes. Dynamic cuts like a film edit, with close-ups and details. */
+export const REEL_PACING = {
+  dynamic: {
+    label: "Dynamic",
+    seconds: 3,
+    description: "A new picture about every 3 s, with close-ups and details",
+  },
+  calm: {
+    label: "Calm",
+    seconds: 6,
+    description: "A new picture about every 6 s, slower and quieter",
+  },
+} as const;
+export type ReelPacing = keyof typeof REEL_PACING;
+export const DEFAULT_PACING: ReelPacing = "dynamic";
+
+/** Seconds of narration per picture at the default pacing. */
+export const SHOT_SECONDS: number = REEL_PACING[DEFAULT_PACING].seconds;
+
+/** Seconds per picture for a pacing value from a request or stored settings. */
+export function pacingSeconds(value: unknown): number {
+  return value === "calm" || value === "dynamic"
+    ? REEL_PACING[value].seconds
+    : SHOT_SECONDS;
+}
 
 /** Words per Short on paid plans (~75 s). */
 export const SHORT_TARGET_WORDS = 190;

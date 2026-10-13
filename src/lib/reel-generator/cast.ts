@@ -12,6 +12,8 @@ import type { ReelBook } from "@/lib/reel-generator/script";
  */
 export type VisualBible = {
   style: string;
+  /** One color palette, light quality, lens and texture for the whole reel. */
+  look?: string;
   cast: { name: string; look: string }[];
   places: { name: string; look: string }[];
 };
@@ -63,9 +65,16 @@ export function parseVisualBible(value: unknown): VisualBible | null {
   if (typeof v.style !== "string") return null;
   return {
     style: v.style,
+    look: typeof v.look === "string" ? v.look : undefined,
     cast: Array.isArray(v.cast) ? v.cast : [],
     places: Array.isArray(v.places) ? v.places : [],
   };
+}
+
+/** A look from the book's tone when the art director call is skipped or fails. */
+function fallbackLook(book: ReelBook): string {
+  const tone = book.tone?.trim().toLowerCase();
+  return `${tone ? `${tone} tone, ` : ""}one consistent color palette and lighting across every shot, coherent production design`;
 }
 
 export async function buildVisualBible(
@@ -73,16 +82,15 @@ export async function buildVisualBible(
   styleId: string
 ): Promise<VisualBible> {
   const style = reelStyle(styleId).prompt;
-  const characters = bookCharacters(book);
-  const places = bookPlaces(book);
-  const empty: VisualBible = { style, cast: [], places: [] };
-  if (!isNarrativeBook(book) || (characters.length === 0 && places.length === 0)) {
-    return empty;
-  }
+  const narrative = isNarrativeBook(book);
+  const characters = narrative ? bookCharacters(book) : [];
+  const places = narrative ? bookPlaces(book) : [];
+  const empty: VisualBible = { style, look: fallbackLook(book), cast: [], places: [] };
 
   const outline = book.outline as { synopsis?: string } | null;
   const listing = [
-    `Book: "${book.title}"${book.genre ? ` (${book.genre})` : ""}`,
+    `Book: "${book.title}"${book.genre ? ` (${book.genre})` : ""}${book.tone ? `, tone: ${book.tone}` : ""}`,
+    `Art style: ${style}`,
     `Synopsis: ${clipText(book.storyState?.bookSummary || outline?.synopsis || book.description || "", 1200)}`,
     book.bible?.styleNotes ? `World notes: ${clipText(book.bible.styleNotes, 600)}` : "",
     characters.length
@@ -104,27 +112,30 @@ export async function buildVisualBible(
       messages: [
         {
           role: "system",
-          content: `You are the art director for an illustrated video of a book. Write a fixed visual description for each main character and place, to be pasted into every image prompt so they look the same in every picture.
+          content: `You are the art director for an illustrated video of a book. Everything you write is pasted into every image prompt, so the whole video looks like one film and each character looks the same in every picture.
 
 Rules:
+- "look": the visual identity of the whole video in 25 words or fewer: a specific color palette, light quality, lens or camera feel, and texture, fitting the book's genre, era and tone.
 - Characters: 25 words or fewer each. Apparent age, build, hair, skin tone if the book states it, clothing, and one signature detail. Only things a camera can see.
 - Where the book is silent, invent plausible details that fit the genre and era, and keep them simple.
 - Places: 20 words or fewer each. Architecture or landscape, materials, light, one signature detail.
-- At most 6 characters and 5 places; pick the most important.
+- At most 6 characters and 5 places; pick the most important. Use empty lists when none are given.
 - If a character is a real, identifiable person, describe only their period clothing and role, never their face.
 
-Return only JSON: {"cast": [{"name": string, "look": string}], "places": [{"name": string, "look": string}]}`,
+Return only JSON: {"look": string, "cast": [{"name": string, "look": string}], "places": [{"name": string, "look": string}]}`,
         },
         { role: "user", content: listing },
       ],
     });
 
     const parsed = parseJsonLoose(raw) as {
+      look?: unknown;
       cast?: Array<{ name?: unknown; look?: unknown }>;
       places?: Array<{ name?: unknown; look?: unknown }>;
     };
     return {
       style,
+      look: clean(parsed.look, 240) || empty.look,
       cast: (parsed.cast ?? [])
         .map((c) => ({ name: clean(c.name, 60), look: clean(c.look, 220) }))
         .filter((c) => c.name && c.look)

@@ -33,13 +33,16 @@ import {
 } from "@/lib/elevenlabs-voices";
 import type { MusicLevel } from "@/lib/audio-generator/score-types";
 import {
+  DEFAULT_PACING,
   DEFAULT_REEL_STYLE,
+  REEL_PACING,
   REEL_STYLES,
   TRAILER_TARGET_WORDS,
   estimateReelSeconds,
   formatReelSeconds,
   type ReelAllowance,
   type ReelFormat,
+  type ReelPacing,
   type ReelView,
 } from "@/lib/reel-generator/types";
 
@@ -73,6 +76,7 @@ export function CreateReelDialog({
   const [format, setFormat] = useState<ReelFormat>("SHORTS");
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [style, setStyle] = useState(DEFAULT_REEL_STYLE);
+  const [pacing, setPacing] = useState<ReelPacing>(DEFAULT_PACING);
   const [pickedVoiceId, setVoiceId] = useState("");
   const [music, setMusic] = useState<MusicLevel>("subtle");
   const [busy, setBusy] = useState(false);
@@ -110,6 +114,7 @@ export function CreateReelDialog({
           format,
           chapterIds: format === "SHORTS" ? [...selected] : undefined,
           stylePreset: style,
+          pacing,
           voiceId: voice?.id,
           voiceName: voice?.name,
           voiceSettings: {
@@ -294,6 +299,44 @@ export function CreateReelDialog({
                   <span className={cn(style === option.id && "text-[#0a2540]")}>{option.label}</span>
                 </button>
               ))}
+            </div>
+          </section>
+
+          <section>
+            <Label className="text-[13px] text-[#0a2540]">Pacing</Label>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Pacing">
+              {(Object.keys(REEL_PACING) as ReelPacing[]).map((id) => {
+                const option = REEL_PACING[id];
+                const pictures = Math.max(
+                  3,
+                  Math.round(estimateReelSeconds(wordsEach) / option.seconds)
+                );
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={pacing === id}
+                    onClick={() => setPacing(id)}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-colors",
+                      pacing === id
+                        ? "border-[#635bff] shadow-[0_0_0_3px_#ebe9ff]"
+                        : "border-[#e6ebf1] hover:border-[#c9c5ff]"
+                    )}
+                  >
+                    <span className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-[#0a2540]">{option.label}</span>
+                      <span className="text-[11px] tabular-nums text-[#697386]">
+                        ~{pictures} pictures per video
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-[12px] leading-snug text-[#697386]">
+                      {option.description}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
 

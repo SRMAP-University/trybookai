@@ -13,8 +13,10 @@ import {
   TRAILER_TARGET_WORDS,
   estimateReelSeconds,
   formatReelSeconds,
+  pacingSeconds,
   reelStyle,
   type ReelFormat,
+  type ReelPacing,
 } from "@/lib/reel-generator/types";
 
 /** An error with the HTTP status the API should answer with. */
@@ -37,6 +39,8 @@ export type CreateReelInput = {
   voiceId?: string;
   voiceName?: string;
   voiceSettings: VoiceSettingsConfig;
+  /** How often the picture changes; dynamic by default. */
+  pacing?: ReelPacing;
 };
 
 /**
@@ -126,7 +130,11 @@ export async function createReel(input: CreateReelInput) {
         stylePreset: style.id,
         voiceId: voice.voiceId,
         voiceName: voice.voiceName,
-        voiceSettings: { ...input.voiceSettings, targetWords },
+        voiceSettings: {
+          ...input.voiceSettings,
+          targetWords,
+          shotSeconds: pacingSeconds(input.pacing),
+        },
         billedSeconds: estimate,
         episodes: { create: episodes },
       },

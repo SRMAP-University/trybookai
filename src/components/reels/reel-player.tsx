@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Captions,
   CaptionsOff,
@@ -69,18 +69,9 @@ export function ReelPlayer({
     scoreRef.current?.setEnabled(musicOn);
   }, [musicOn]);
 
-  // Frame clock while playing.
-  useEffect(() => {
-    if (!playing) return;
-    let raf = 0;
-    const tick = () => {
-      const el = audioRef.current;
-      if (el) setMs(el.currentTime * 1000);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [playing]);
+  // The stage reads the audio clock every frame; the scrubber below only needs
+  // the audio's timeupdate events.
+  const getTime = useCallback(() => (audioRef.current?.currentTime ?? 0) * 1000, []);
 
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -194,7 +185,10 @@ export function ReelPlayer({
           setMs(e.currentTarget.currentTime * 1000);
           syncMusic(e.currentTarget);
         }}
-        onTimeUpdate={(e) => syncMusic(e.currentTarget)}
+        onTimeUpdate={(e) => {
+          setMs(e.currentTarget.currentTime * 1000);
+          syncMusic(e.currentTarget);
+        }}
         onEnded={(e) => {
           setPlaying(false);
           syncMusic(e.currentTarget);
@@ -225,7 +219,7 @@ export function ReelPlayer({
           goTo(dy < 0 ? index + 1 : index - 1);
         }}
       >
-        <ReelStage episode={episode} ms={ms} captionsOn={captionsOn} />
+        <ReelStage key={episode.id} episode={episode} getTime={getTime} captionsOn={captionsOn} />
 
         <div className="absolute inset-x-3 top-[max(24px,calc(env(safe-area-inset-top)+12px))] flex items-center justify-between gap-3">
           <p className="truncate text-[12px] font-medium text-white/80">

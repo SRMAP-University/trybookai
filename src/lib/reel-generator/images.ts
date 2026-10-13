@@ -60,10 +60,13 @@ export function buildShotPrompt(
   bible: VisualBible,
   shot: { description: string; characters: string[]; mood: ScoreMood }
 ): string {
+  // Style and look lead every prompt and never change within a reel, so the
+  // pictures read as one film; the shot description carries the variety.
   const parts = [
     bible.style,
-    ...castLines(bible, shot.characters, shot.description),
+    bible.look,
     shot.description,
+    ...castLines(bible, shot.characters, shot.description),
     placeLine(bible, shot.description),
     MOOD_LIGHTING[shot.mood],
     FRAME_RULES,
@@ -80,10 +83,13 @@ export function buildSafeShotPrompt(
   return sanitizeImagePrompt(
     [
       bible.style,
+      bible.look,
       `atmospheric establishing shot${place ? ` of ${place}` : " of the story's setting"}, no people in focus`,
       MOOD_LIGHTING[shot.mood],
       FRAME_RULES,
-    ].join(". "),
+    ]
+      .filter(Boolean)
+      .join(". "),
     `${bible.style}. ${FRAME_RULES}`
   );
 }

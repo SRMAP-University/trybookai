@@ -19,8 +19,8 @@ const EPISODE_CONCURRENCY = 2;
 /** How often a running job proves it's alive. */
 export const HEARTBEAT_MS = 15_000;
 
-/** Images assumed per episode before its shot list exists. */
-const EXPECTED_SHOTS = 13;
+/** Images assumed per episode before its shot list exists (dynamic pacing draws about two dozen). */
+const EXPECTED_SHOTS = 22;
 
 /** Weighted progress: script 1, shot list 1, narration 2, each image 1. */
 async function computeProgress(reelId: string): Promise<number> {
