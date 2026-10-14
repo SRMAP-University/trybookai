@@ -59,6 +59,21 @@ function clean(value: unknown, max: number): string {
     .slice(0, max);
 }
 
+/**
+ * A character's look as appearance and clothing only. Props, actions and
+ * expressions ("holding a mug", "— eyes downcast") would otherwise appear in
+ * every picture of that character, whatever the shot is about.
+ */
+export function appearanceOnly(look: string): string {
+  return look
+    .replace(/\s+[—–-]\s+.*$/, "")
+    .replace(/,?\s*\b(holding|carrying|clutching|gripping|wielding|with a|with an)\b[^,.;]*/gi, "")
+    .replace(/,?\s*\b(eyes|expression|gaze|smile|frown)\b[^,.;]*/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[\s,;]+$/, "")
+    .trim();
+}
+
 export function parseVisualBible(value: unknown): VisualBible | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Partial<VisualBible>;
@@ -116,7 +131,7 @@ export async function buildVisualBible(
 
 Rules:
 - "look": the visual identity of the whole video in 25 words or fewer: a specific color palette, light quality, lens or camera feel, and texture, fitting the book's genre, era and tone.
-- Characters: 25 words or fewer each. Apparent age, build, hair, skin tone if the book states it, clothing, and one signature detail. Only things a camera can see.
+- Characters: 25 words or fewer each. Appearance and clothing only: apparent age, build, face shape, hair, skin tone if the book states it, outfit, and one signature physical or clothing detail. No props or objects held, no actions, no expressions or moods; those change from shot to shot.
 - Where the book is silent, invent plausible details that fit the genre and era, and keep them simple.
 - Places: 20 words or fewer each. Architecture or landscape, materials, light, one signature detail.
 - At most 6 characters and 5 places; pick the most important. Use empty lists when none are given.
@@ -137,7 +152,7 @@ Return only JSON: {"look": string, "cast": [{"name": string, "look": string}], "
       style,
       look: clean(parsed.look, 240) || empty.look,
       cast: (parsed.cast ?? [])
-        .map((c) => ({ name: clean(c.name, 60), look: clean(c.look, 220) }))
+        .map((c) => ({ name: clean(c.name, 60), look: appearanceOnly(clean(c.look, 220)) }))
         .filter((c) => c.name && c.look)
         .slice(0, 6),
       places: (parsed.places ?? [])

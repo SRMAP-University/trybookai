@@ -129,6 +129,10 @@ export async function writeEpisodeScript(input: {
   const narrative = isNarrativeBook(book);
   const language = languageName(book.language);
   const seconds = Math.round((targetWords / 150) * 60);
+  // The writer runs about a fifth long, so ask for less than the target and
+  // cut back to whole sentences if it still overshoots.
+  const askWords = Math.round(targetWords * 0.85);
+  const maxWords = targetWords + 15;
 
   const subject = chapter
     ? `chapter ${chapter.number}, "${chapter.title}"`
@@ -175,7 +179,7 @@ export async function writeEpisodeScript(input: {
         content: `You adapt books into short narrated vertical videos for TikTok, Instagram Reels and YouTube Shorts. Write the voice-over for one ${seconds}-second video covering ${subject}.
 
 Rules:
-- About ${targetWords} words, never more than ${targetWords + 15}.
+- About ${askWords} words, never more than ${targetWords}. Count them; this is read aloud in ${seconds} seconds.
 - Open with a hook: the first sentence must make someone stop scrolling.
 ${storyRules.join("\n")}
 - Short, spoken sentences. Two to four short paragraphs.
@@ -198,7 +202,7 @@ Return only the narration text.`,
     ],
   });
 
-  const script = capWords(cleanModelScript(raw), Math.round(targetWords * 1.25));
+  const script = capWords(cleanModelScript(raw), maxWords);
   if (script.split(/\s+/).filter(Boolean).length < Math.min(40, targetWords / 3)) {
     throw new Error("The writer returned an empty script. Try again.");
   }

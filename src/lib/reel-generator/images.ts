@@ -1,7 +1,7 @@
 import type { ScoreMood } from "@/lib/audio-generator/score-types";
 import { runFluxImage, sanitizeImagePrompt } from "@/lib/image-gen";
 import { uploadReelFileToR2 } from "@/lib/r2";
-import type { VisualBible } from "@/lib/reel-generator/cast";
+import { appearanceOnly, type VisualBible } from "@/lib/reel-generator/cast";
 
 /** 9:16, multiples of 16 for Flux. */
 export const REEL_IMAGE_SIZE = { width: 720, height: 1280 } as const;
@@ -47,13 +47,30 @@ function castLines(bible: VisualBible, names: string[], description: string): st
   return bible.cast
     .filter((c) => wanted.has(c.name.toLowerCase()) || lower.includes(c.name.toLowerCase()))
     .slice(0, 3)
-    .map((c) => `${c.name}: ${c.look}`);
+    .map((c) => `${c.name}: ${appearanceOnly(c.look)}`);
 }
 
 function placeLine(bible: VisualBible, description: string): string | null {
   const lower = description.toLowerCase();
   const place = bible.places.find((p) => lower.includes(p.name.toLowerCase()));
-  return place ? `${place.name}: ${place.look}` : null;
+  // A trailing "— Elias sits at the table" would put people into every shot of the place.
+  return place ? `${place.name}: ${place.look.replace(/\s+[—–]\s+.*$/, "")}` : null;
+}
+
+/**
+ * Image models render requested lettering as garbled text, so quoted words a
+ * description asks to show ("lettering reads 'For Distinguished…'") become
+ * "illegible".
+ */
+export function withoutLettering(description: string): string {
+  return description
+    .replace(
+      /\b(reads|reading|says|saying|labeled|labelled|titled|inscribed|engraved|spelling)\b[:\s]*["“'‘][^"”'’]{1,120}["”'’]?/gi,
+      "$1 illegible"
+    )
+    .replace(/["“][^"”]{1,120}["”]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 export function buildShotPrompt(
@@ -65,7 +82,7 @@ export function buildShotPrompt(
   const parts = [
     bible.style,
     bible.look,
-    shot.description,
+    withoutLettering(shot.description),
     ...castLines(bible, shot.characters, shot.description),
     placeLine(bible, shot.description),
     MOOD_LIGHTING[shot.mood],
