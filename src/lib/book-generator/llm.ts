@@ -3,6 +3,7 @@ import {
   runCloudflareAiStream,
 } from "@/lib/book-generator/cloudflare-ai";
 import { CF_FALLBACK_MODEL } from "@/lib/book-generator/core/models";
+import { stripReasoning } from "@/lib/book-generator/core/text";
 import type { LlmResult } from "@/lib/book-generator/core/types";
 import {
   DEFAULT_AI_MODEL,
@@ -91,7 +92,10 @@ export function extractModelText(text: string): string {
   }
 
   cleaned = cleaned.replace(/<\|im_start\|>[\s\S]*?<\|im_end\|>/gi, "").trim();
-  return cleaned;
+  // Also drop a stray </think> (opener swallowed by the provider) and an
+  // unclosed <think>, which the paired-tag loop above misses. Editor AI
+  // actions save this text directly.
+  return stripReasoning(cleaned);
 }
 
 /** Filters reasoning tokens out of a live stream. */
@@ -330,7 +334,8 @@ async function runCloudflareWithFallback(
 ): Promise<LlmResult> {
   try {
     const result = await runCloudflareAiDetailed(model, options);
-    if (result.text.trim()) return result;
+    // A reply that is all reasoning is as good as empty: try the fallback model.
+    if (stripReasoning(result.text).trim()) return result;
     throw new Error("empty response");
   } catch (error) {
     if (model === CF_FALLBACK_MODEL) throw error;

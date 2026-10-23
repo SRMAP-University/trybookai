@@ -381,8 +381,11 @@ export async function ensureGenerationRunning(
     throw new GenerationPausedError();
   }
 
+  // Pages are charged per section as they're written, so a resumed book only
+  // needs credits for what's left, not the whole book again.
   const remaining = freshBook.user.pagesLimit - freshBook.user.pagesUsed;
-  if (freshBook.targetPages > remaining) {
+  const needed = Math.max(0, freshBook.targetPages - freshBook.currentPages);
+  if (needed > remaining) {
     throw new Error(
       `Insufficient page credits. You have ${remaining} pages remaining.`
     );

@@ -23,5 +23,5 @@ export default async function ReadPublicBookPage({ params }: Props) {
     (b) => `/api/books/cover/${b.slug}`
   );
   if (!book || book.chapters.length === 0) notFound();
-  return <BookReader book={book} exitHref={`/books/${slug}`} />;
+  return <BookReader book={book} exitHref={`/books/${slug}`} visitor />;
 }

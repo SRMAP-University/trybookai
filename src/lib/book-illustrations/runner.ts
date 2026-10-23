@@ -167,6 +167,9 @@ async function placeChapter(chapterId: string): Promise<boolean> {
     where: { chapterId },
     orderBy: { position: "asc" },
   });
+  // Not planned yet (the run stopped before reaching it): leave it for the next run.
+  // Chapters that need no pictures are marked done by the planner instead.
+  if (rows.length === 0) return false;
   if (rows.some((r) => r.status === "PENDING" || r.status === "DRAWING")) return false;
 
   const opener = rows.find((r) => r.kind === "OPENER" && r.status === "READY" && r.imageUrl);

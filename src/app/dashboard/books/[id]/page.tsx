@@ -459,10 +459,11 @@ function BookDetailPageContent() {
               : "Failed to start audiobook";
           toast.error(message);
         });
+        void promptGenerationReview("completed");
       } else {
+        // Let them read it first; the rating question can wait for another visit.
         setReadyOpen(true);
       }
-      void promptGenerationReview("completed");
     }
 
     if (evt.type === "error") {
@@ -602,10 +603,10 @@ function BookDetailPageContent() {
         if (latest?.generateAudiobookOnComplete) {
           // Audiobook kickoff handled on "done" event / server side
           setAudios(latest.audios ?? []);
+          void promptGenerationReview("completed");
         } else {
           setReadyOpen(true);
         }
-        void promptGenerationReview("completed");
       } else if (status === "FAILED") {
         void promptGenerationReview("failed");
       }
@@ -620,13 +621,15 @@ function BookDetailPageContent() {
 
     const pagesRemaining =
       user != null ? Math.max(0, user.pagesLimit - user.pagesUsed) : null;
+    // Written pages are already paid for; resuming only needs the rest.
+    const pagesNeeded = book ? Math.max(0, book.targetPages - book.currentPages) : 0;
     if (
       book &&
       pagesRemaining != null &&
-      book.targetPages > pagesRemaining
+      pagesNeeded > pagesRemaining
     ) {
       setPremiumFeatureLabel(
-        `Insufficient page credits — you have ${pagesRemaining} pages remaining, but this book needs ${book.targetPages}. Upgrade for more monthly pages.`
+        `Insufficient page credits — you have ${pagesRemaining} pages remaining, but this book needs ${pagesNeeded} more. Upgrade for more monthly pages.`
       );
       setPremiumUpgradeOpen(true);
       return;

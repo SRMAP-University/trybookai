@@ -45,7 +45,7 @@ export default async function GenreBooksPage({ params }: Props) {
   if (!genre) notFound();
 
   const books = await db.book.findMany({
-    where: { isPublic: true, genre },
+    where: { isPublic: true, genre, chapters: { some: { status: "COMPLETED" } } },
     orderBy: { updatedAt: "desc" },
     take: 80,
     select: {

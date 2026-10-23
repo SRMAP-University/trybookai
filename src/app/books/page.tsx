@@ -45,6 +45,8 @@ export default async function PublicBooksPage({ searchParams }: Props) {
   const books = await db.book.findMany({
     where: {
       isPublic: true,
+      // Same rule as the sitemap: drafts and failed books with nothing to read stay out.
+      chapters: { some: { status: "COMPLETED" } },
       ...(query
         ? {
             OR: [

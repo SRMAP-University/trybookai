@@ -131,11 +131,14 @@ export function BookReader({
   book,
   exitHref,
   fresh = false,
+  visitor = false,
 }: {
   book: ReaderBook;
   exitHref: string;
   /** Just finished writing: open on the closed book, ready to be opened */
   fresh?: boolean;
+  /** A reader of someone else's public book: the last page invites them to write their own */
+  visitor?: boolean;
 }) {
   const size = useSyncExternalStore(
     subscribeResize,
@@ -363,6 +366,8 @@ export function BookReader({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.target instanceof Element && e.target.closest("input, textarea, select")) return;
+      // Space on a focused button presses the button; don't also turn the page.
+      if (e.key === " " && e.target instanceof Element && e.target.closest("button, a")) return;
       if (e.key === "Escape") setPanel(null);
       if (["ArrowRight", "PageDown", " "].includes(e.key)) {
         e.preventDefault();
@@ -519,6 +524,14 @@ export function BookReader({
                   Close the book
                 </Link>
               </div>
+              {visitor && (
+                <Link
+                  href="/register?callbackUrl=/dashboard/books/new"
+                  className="mt-6 font-sans text-[13px] font-medium text-[var(--bkr-accent)] underline-offset-4 hover:underline"
+                >
+                  Write your own book with BookAI
+                </Link>
+              )}
             </div>
           </div>
         );
