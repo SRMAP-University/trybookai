@@ -23,6 +23,7 @@ import {
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { LogoMark } from "@/components/marketing/landing-showcase";
 import { PLANS } from "@/lib/constants";
+import { HeaderJobsIndicator } from "@/components/dashboard/global-generation-widget";
 
 export function DashboardHeader() {
   const { data: session, status } = useSession();
@@ -84,6 +85,7 @@ export function DashboardHeader() {
             </>
           ) : (
             <>
+              <HeaderJobsIndicator />
               {isFree ? (
                 <UpgradeButton
                   plan="PRO"

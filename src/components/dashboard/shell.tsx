@@ -8,6 +8,7 @@ import {
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardUserProvider } from "@/components/dashboard/user-context";
 import { GlobalGenerationWidget } from "@/components/dashboard/global-generation-widget";
+import { ActiveJobsProvider } from "@/components/dashboard/active-jobs";
 import { ExplorationNotice } from "@/components/dashboard/exploration-notice";
 import { AppDownloadDrawer } from "@/components/app-download-drawer";
 import type { DashboardUser } from "@/components/dashboard/user-context";
@@ -22,6 +23,7 @@ export function DashboardShell({
   return (
     <SessionProvider refetchOnWindowFocus={false} refetchInterval={0}>
       <DashboardUserProvider initialUser={initialUser}>
+        <ActiveJobsProvider>
         <div className="min-h-screen bg-white">
           <DashboardSidebar />
           <div className="lg:pl-[240px]">
@@ -35,6 +37,7 @@ export function DashboardShell({
           <GlobalGenerationWidget />
           <AppDownloadDrawer />
         </div>
+        </ActiveJobsProvider>
       </DashboardUserProvider>
     </SessionProvider>
   );
