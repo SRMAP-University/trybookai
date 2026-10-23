@@ -50,6 +50,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Entitlements sent by the client can't be trusted; without the secret key
+  // there's nothing to verify them against, so don't grant anything.
+  if (process.env.NODE_ENV === "production" && !process.env.REVENUECAT_SECRET_API_KEY?.trim()) {
+    return NextResponse.json(
+      { error: "In-app purchase verification is not configured." },
+      { status: 503 }
+    );
+  }
+
   try {
     let entitlements = parsed.data.entitlements ?? [];
     let productIds = parsed.data.productIds ?? [];

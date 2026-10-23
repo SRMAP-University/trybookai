@@ -55,6 +55,14 @@ export async function POST(request: Request) {
     const paidPlan = plan as PaidPlan;
 
     if (!isStripeBillingEnabled()) {
+      // Instant upgrades are for local development only; in production a
+      // missing Stripe setting must not hand out paid plans for free.
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { error: "Billing is temporarily unavailable. Please try again soon." },
+          { status: 503 }
+        );
+      }
       const user = await upgradeUserPlan(session.user.id, paidPlan);
       return NextResponse.json({
         upgraded: true,
@@ -109,6 +117,7 @@ export async function POST(request: Request) {
     const offerTrial =
       paidPlan === "ENTERPRISE" &&
       !hasActive &&
+      !user.hasUsedPremiumTrial &&
       parsed.data.withTrial !== false;
 
     const checkoutSession = await createCheckoutSession({

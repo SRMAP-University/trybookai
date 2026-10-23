@@ -45,6 +45,10 @@ const REVOKE_TYPES = new Set([
  */
 export async function POST(request: Request) {
   const secret = cleanEnv(process.env.REVENUECAT_WEBHOOK_SECRET);
+  // Without a secret anyone could post plan changes; refuse in production.
+  if (!secret && process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 503 });
+  }
   if (secret) {
     const authHeader = request.headers.get("authorization") ?? "";
     const token = authHeader.startsWith("Bearer ")

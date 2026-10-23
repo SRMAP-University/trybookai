@@ -87,21 +87,9 @@ export function planFromRevenueCatSignals(input: {
     if (planRank(plan) > planRank(best)) best = plan;
   }
 
-  // The plan button the user tapped wins when it is a paid plan.
-  // Prevents Test Store default "pro" entitlements from overriding Unlimited.
-  if (input.requestedPlan) {
-    const requested = input.requestedPlan.toUpperCase();
-    if (
-      requested === "PRO" ||
-      requested === "ENTERPRISE" ||
-      requested === "UNLIMITED"
-    ) {
-      if (planRank(requested) >= planRank(best)) {
-        best = requested;
-      }
-    }
-  }
-
+  // `requestedPlan` comes from the client, so it never raises the plan: letting
+  // it win over verified entitlements granted any paid plan to anyone who
+  // asked. Purchases show up in the verified product IDs above.
   return best;
 }
 

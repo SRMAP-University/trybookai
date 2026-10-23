@@ -69,10 +69,21 @@ export async function POST(request: Request) {
     const interval = parsed.data.interval === "year" ? "year" : "month";
 
     if (action === "start") {
+      // A card-free local trial only exists when Stripe isn't set up. With
+      // Stripe on, every trial goes through Checkout (a card on file).
       const localOnly =
-        parsed.data.action === "start" && parsed.data.localOnly === true;
+        parsed.data.action === "start" &&
+        parsed.data.localOnly === true &&
+        !isStripeBillingEnabled();
 
       if (isStripeBillingEnabled() && !localOnly) {
+        // One trial per account, through Stripe too (cancel-and-restart would repeat it).
+        if (user.hasUsedPremiumTrial) {
+          return NextResponse.json(
+            { error: "You've already used your Premium free trial." },
+            { status: 400 }
+          );
+        }
         const priceId = planPriceId("ENTERPRISE", interval);
         if (!priceId) {
           return NextResponse.json(
@@ -234,7 +245,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Local-only trial (no Stripe)
+    // Local-only trial (no Stripe). With Stripe on, ending a trial without a
+    // subscription must not unlock Premium for free.
+    if (isStripeBillingEnabled()) {
+      return NextResponse.json(
+        {
+          error: "Choose a plan to keep Premium after your trial.",
+          needsCheckout: true,
+        },
+        { status: 400 }
+      );
+    }
     const updated = await endPremiumTrial(session.user.id);
     return NextResponse.json({
       ok: true,

@@ -147,7 +147,14 @@ export async function POST(request: Request) {
     });
   }
 
-  // Instant / no-Stripe path
+  // Instant / no-Stripe path: local development only. In production a missing
+  // Stripe setting must not credit paid capacity for free.
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Billing is temporarily unavailable. Please try again soon." },
+      { status: 503 }
+    );
+  }
   const limits = limitsFromPlanAndBonuses({
     plan: user.plan,
     isTrialing: false,
