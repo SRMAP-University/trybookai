@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Headphones } from "lucide-react";
+import { BookOpen, Headphones, Share2 } from "lucide-react";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -14,6 +15,8 @@ type Props = {
   chapters: number;
   pages: number;
   onCreateAudio: () => void;
+  /** Public page path, when the book is public, to offer sharing */
+  sharePath?: string | null;
 };
 
 /** Shown the moment a book finishes writing: the cover, and an invitation to open it. */
@@ -26,7 +29,24 @@ export function BookReadyDialog({
   chapters,
   pages,
   onCreateAudio,
+  sharePath,
 }: Props) {
+  async function share() {
+    if (!sharePath) return;
+    const url = `${window.location.origin}${sharePath}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: `Read “${title}” on BookAI`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      toast.error("Couldn't share the link.");
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] overflow-hidden border-0 bg-[#0d1524] p-0 text-white">
@@ -70,6 +90,16 @@ export function BookReadyDialog({
               <Headphones className="h-4 w-4" />
               Make an audiobook
             </Button>
+            {sharePath && (
+              <Button
+                variant="ghost"
+                className="h-10 rounded-full text-[13.5px] text-white/80 hover:bg-white/10 hover:text-white"
+                onClick={() => void share()}
+              >
+                <Share2 className="h-4 w-4" />
+                Share it
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

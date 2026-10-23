@@ -25,7 +25,9 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
+  Share2,
   Square,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -50,6 +52,7 @@ import { useDashboardUser } from "@/components/dashboard/user-context";
 import { StoryReelPanel } from "@/components/reels/story-reel-panel";
 import { IllustrationsPanel } from "@/components/book/illustrations-panel";
 import { BookReadyDialog } from "@/components/book/book-ready-dialog";
+import { DeleteBookDialog } from "@/components/book/delete-book-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
@@ -144,6 +147,22 @@ const POV_LABELS: Record<string, string> = {
 type ChapterState = "done" | "writing" | "pending";
 
 /** Secondary buttons on the dark hero stage. */
+/** Share a public book: the system share sheet on phones, else copy the link. */
+async function shareBook(book: { slug: string; title: string }) {
+  const url = `${window.location.origin}/books/${book.slug}`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: book.title, text: `Read “${book.title}” on BookAI`, url });
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copied");
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") return;
+    toast.error("Couldn't share. Copy the link from the public page instead.");
+  }
+}
+
 const stageButton =
   "h-10 rounded-full border border-white/15 bg-white/10 px-3 text-[13.5px] text-white hover:bg-white/20 hover:text-white sm:px-4";
 
@@ -225,6 +244,7 @@ function BookDetailPageContent() {
   const [derivativesOpen, setDerivativesOpen] = useState(false);
   // "Your book is ready": shown when writing finishes while the page is open.
   const [readyOpen, setReadyOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [reelCreateOpen, setReelCreateOpen] = useState(false);
   const [coverGenerating, setCoverGenerating] = useState(false);
   const [creatingEdition, setCreatingEdition] = useState(false);
@@ -1044,6 +1064,13 @@ function BookDetailPageContent() {
 
   return (
     <>
+      <DeleteBookDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        bookId={book.id}
+        title={book.title}
+        isPublic={book.isPublic}
+      />
       <BookReadyDialog
         open={readyOpen}
         onOpenChange={setReadyOpen}
@@ -1053,6 +1080,7 @@ function BookDetailPageContent() {
         chapters={doneCount}
         pages={book.currentPages}
         onCreateAudio={() => setDerivativesOpen(true)}
+        sharePath={book.isPublic ? `/books/${book.slug}` : null}
       />
       <BookDerivativesDialog
         open={derivativesOpen}
@@ -1364,6 +1392,12 @@ function BookDetailPageContent() {
                         <ExportItems bookId={book.id} />
                       </>
                     )}
+                    {book.isPublic && chapterCount > 0 && (
+                      <DropdownMenuItem onSelect={() => void shareBook(book)}>
+                        <Share2 className="h-4 w-4" />
+                        Share book
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={() => {
@@ -1373,6 +1407,14 @@ function BookDetailPageContent() {
                     >
                       <MessageSquareWarning className="h-4 w-4" />
                       Troubleshoot
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={inProgress}
+                      onSelect={() => setDeleteOpen(true)}
+                      className="text-[#df1b41] focus:text-[#df1b41]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {inProgress ? "Stop writing to delete" : "Delete book"}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
