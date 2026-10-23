@@ -169,9 +169,12 @@ export function LiveGenerationDock({
 
   return (
     <>
+      {/* Phones: a dimmed backdrop that tucks the panel away when tapped. On wide
+          screens there's no backdrop, so the page behind (Stop, menus) stays usable. */}
       <div
-        className="fixed inset-0 z-30 bg-[#0a2540]/10 lg:bg-transparent"
+        className="fixed inset-0 z-30 bg-[#0a2540]/10 lg:hidden"
         aria-hidden
+        onClick={onMinimize}
       />
       <aside
         className={cn(

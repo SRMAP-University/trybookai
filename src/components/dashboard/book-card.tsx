@@ -139,6 +139,14 @@ export function DashboardBookCard({ book }: DashboardBookCardProps) {
             <p className="text-[11px] font-medium text-[#0e6245]">
               Ready to read or export
             </p>
+          ) : book.status === "FAILED" || book.status === "PAUSED" ? (
+            <p className="text-[11px] font-medium text-[#b54708]">
+              Stopped part-way · open to resume
+            </p>
+          ) : book.status === "DRAFT" ? (
+            <p className="text-[11px] font-medium text-[#635bff]">
+              Not started yet · open to start writing
+            </p>
           ) : null}
         </div>
       </Link>

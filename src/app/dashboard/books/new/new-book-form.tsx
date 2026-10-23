@@ -259,7 +259,11 @@ export function NewBookForm({
       tense: template.tense,
       includeDialogue: template.includeDialogue,
       includeExamples: template.includeExamples,
-      description: prev.description || template.description,
+      // Swap in the new template's premise unless the author wrote their own.
+      description:
+        !prev.description || BOOK_TEMPLATES.some((t) => t.description === prev.description)
+          ? template.description
+          : prev.description,
     }));
     const isPreset = PAGE_PRESETS.some((p) => p.pages === targetPages);
     setCustomLength(!isPreset);
