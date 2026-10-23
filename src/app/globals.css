@@ -430,20 +430,20 @@
 .bkr-cover .veil { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 28%, transparent 50%, rgba(0, 0, 0, 0.78)); }
 .bkr-cover.front::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to right, rgba(255, 255, 255, 0.16), transparent 2.5%, rgba(0, 0, 0, 0.28) 3.5%, transparent 9%); }
 .bkr-cover .ct { position: absolute; left: 9%; right: 9%; bottom: 9%; }
-.bkr-cover .ct h1 { margin: 0; color: #fff; font-family: var(--font-serif-display), Georgia, serif; font-weight: 400; font-size: calc(var(--bkr-pw) * 0.105); line-height: 1; letter-spacing: -0.01em; text-wrap: balance; }
-.bkr-cover .ct p { margin: 0.9em 0 0; font: 600 calc(var(--bkr-pw) * 0.026) / 1.3 var(--bkr-ui); letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.85; }
+.bkr-cover .ct h1 { margin: 0; color: #fff; font-family: var(--font-serif-display), Georgia, serif; font-weight: 400; font-size: calc(var(--bkr-u) * 0.105); line-height: 1; letter-spacing: -0.01em; text-wrap: balance; }
+.bkr-cover .ct p { margin: 0.9em 0 0; font: 600 calc(var(--bkr-u) * 0.026) / 1.3 var(--bkr-ui); letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.85; }
 .bkr-cover.plain .ct { top: 30%; bottom: auto; text-align: center; }
-.bkr-cover.plain .ct h1 { font-size: calc(var(--bkr-pw) * 0.115); }
+.bkr-cover.plain .ct h1 { font-size: calc(var(--bkr-u) * 0.115); }
 .bkr-cover.plain .frame { position: absolute; inset: 5.5%; border: 1px solid rgba(255, 255, 255, 0.28); outline: 1px solid rgba(255, 255, 255, 0.14); outline-offset: 5px; pointer-events: none; }
-.bkr-cover.plain .orn { position: absolute; left: 0; right: 0; bottom: 14%; text-align: center; font-size: calc(var(--bkr-pw) * 0.04); color: #c9a86a; }
-.bkr-cover .blurb { position: absolute; inset: 12% 11% auto; font-size: calc(var(--bkr-pw) * 0.034); line-height: 1.6; opacity: 0.88; }
-.bkr-cover .mark { position: absolute; left: 11%; right: 11%; bottom: 9%; display: flex; justify-content: space-between; font: 600 calc(var(--bkr-pw) * 0.024) / 1 var(--bkr-ui); letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.7; }
+.bkr-cover.plain .orn { position: absolute; left: 0; right: 0; bottom: 14%; text-align: center; font-size: calc(var(--bkr-u) * 0.04); color: #c9a86a; }
+.bkr-cover .blurb { position: absolute; inset: 12% 11% auto; font-size: calc(var(--bkr-u) * 0.034); line-height: 1.6; opacity: 0.88; }
+.bkr-cover .mark { position: absolute; left: 11%; right: 11%; bottom: 9%; display: flex; justify-content: space-between; font: 600 calc(var(--bkr-u) * 0.024) / 1 var(--bkr-ui); letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.7; }
 .bkr-own { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12%; text-align: center; }
-.bkr-own .t { margin: 0; color: var(--bkr-ink); font-family: var(--font-serif-display), Georgia, serif; font-weight: 400; font-size: calc(var(--bkr-pw) * 0.085); line-height: 1.05; text-wrap: balance; }
-.bkr-own .a { margin: 1.2em 0 0; font: 600 calc(var(--bkr-pw) * 0.025) / 1.3 var(--bkr-ui); letter-spacing: 0.22em; text-transform: uppercase; color: var(--bkr-muted); }
+.bkr-own .t { margin: 0; color: var(--bkr-ink); font-family: var(--font-serif-display), Georgia, serif; font-weight: 400; font-size: calc(var(--bkr-u) * 0.085); line-height: 1.05; text-wrap: balance; }
+.bkr-own .a { margin: 1.2em 0 0; font: 600 calc(var(--bkr-u) * 0.025) / 1.3 var(--bkr-ui); letter-spacing: 0.22em; text-transform: uppercase; color: var(--bkr-muted); }
 .bkr-own .o { margin: 1.6em 0; color: var(--bkr-accent); }
-.bkr-own .s { margin: 0; font-style: italic; font-size: calc(var(--bkr-pw) * 0.032); color: var(--bkr-muted); }
-.bkr-own .imprint { position: absolute; bottom: 8%; font: 600 calc(var(--bkr-pw) * 0.022) / 1 var(--bkr-ui); letter-spacing: 0.2em; text-transform: uppercase; color: var(--bkr-muted); }
+.bkr-own .s { margin: 0; font-style: italic; font-size: calc(var(--bkr-u) * 0.032); color: var(--bkr-muted); }
+.bkr-own .imprint { position: absolute; bottom: 8%; font: 600 calc(var(--bkr-u) * 0.022) / 1 var(--bkr-ui); letter-spacing: 0.2em; text-transform: uppercase; color: var(--bkr-muted); }
 
 @keyframes bkr-rise { from { opacity: 0; transform: translateX(-25%) translateY(24px) scale(0.96); } to { opacity: 1; transform: translateX(-25%); } }
 @keyframes bkr-rise-single { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: none; } }

@@ -66,9 +66,13 @@ function subscribeMotion(cb: () => void) {
 function layoutFor(w: number, h: number, size: number) {
   if (!w || !h) return null;
   const phone = w < 640;
-  const availH = h - 52 - 60 - (phone ? 8 : 36);
+  // Short screens (landscape phones, small windows): the bars float over the page instead of taking room.
+  const compact = h < 600;
+  const top = compact ? 0 : 52;
+  const bottom = compact ? 0 : 60;
+  const availH = h - top - bottom - (phone || compact ? 12 : 36);
   const availW = w - (phone ? 16 : 64);
-  const spread = w >= 900 && availH >= 420;
+  const spread = w >= 900 && availH >= 400;
   let pw: number;
   let ph: number;
   if (spread) {
@@ -90,8 +94,12 @@ function layoutFor(w: number, h: number, size: number) {
   const pb = Math.max(46, Math.round(ph * 0.085));
   return {
     spread,
+    top,
+    bottom,
     pw,
     ph,
+    /** Base unit for cover and title type, so short pages don't overflow */
+    unit: Math.round(Math.min(pw, ph * 0.68)),
     fs,
     inner,
     outer,
@@ -421,6 +429,7 @@ export function BookReader({
 
   const style = {
     "--bkr-pw": `${layout.pw}px`,
+    "--bkr-u": `${layout.unit}px`,
     "--bkr-ph": `${layout.ph}px`,
     "--bkr-fs": `${layout.fs}px`,
     "--bkr-cw": `${layout.cw}px`,
@@ -620,6 +629,7 @@ export function BookReader({
       {/* The book */}
       <div
         className="bkr-stage"
+        style={{ top: layout.top, bottom: layout.bottom }}
         onClick={onStageClick}
         onTouchStart={(e) => {
           touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
