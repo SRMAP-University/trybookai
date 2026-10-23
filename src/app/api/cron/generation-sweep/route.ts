@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cleanEnv } from "@/lib/env";
 import { recoverStaleGenerationJobs } from "@/lib/book-generator/background";
+import { resumeStaleAudioJobs } from "@/lib/audio-generator/background";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,12 @@ export async function GET(request: Request) {
 
   try {
     const result = await recoverStaleGenerationJobs({ forceRestart: true });
-    return NextResponse.json({ ok: true, ...result });
+    // Audio jobs whose runner died (shown as "generating" forever) carry on.
+    const audioResumed = await resumeStaleAudioJobs().catch((error) => {
+      console.error("[cron/generation-sweep] audio resume failed:", error);
+      return 0;
+    });
+    return NextResponse.json({ ok: true, ...result, audioResumed });
   } catch (error) {
     console.error("[cron/generation-sweep]", error);
     return NextResponse.json(

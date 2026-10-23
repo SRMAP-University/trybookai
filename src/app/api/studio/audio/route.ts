@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -276,6 +276,9 @@ export async function POST(request: Request) {
         ? normalizeVoiceSettings(voiceSettings)
         : undefined,
     });
+    // Keep this function alive while the job narrates (up to maxDuration).
+    const task = "task" in result ? result.task : undefined;
+    if (task) after(() => task);
 
     return NextResponse.json(
       {

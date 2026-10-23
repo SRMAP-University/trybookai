@@ -23,7 +23,12 @@ import {
   scoreScenes,
   type Scene,
 } from "@/lib/audio-generator/score";
-import type { MusicScore, ScoreMood, ScoreSpan } from "@/lib/audio-generator/score-types";
+import {
+  parseMusicScore,
+  type MusicScore,
+  type ScoreMood,
+  type ScoreSpan,
+} from "@/lib/audio-generator/score-types";
 import {
   normalizeVoiceSettings,
   parseStoredVoiceSettings,
@@ -128,9 +133,11 @@ class ScoreBuilder {
   constructor(
     private readonly ids: { bookId: string; audioId: string },
     private readonly settings: VoiceSettingsConfig,
-    level: MusicScore["level"]
+    level: MusicScore["level"],
+    /** Score saved by an earlier run of this job, to carry on from */
+    saved?: MusicScore | null
   ) {
-    this.score = emptyScore(level);
+    this.score = saved && saved.level === level ? saved : emptyScore(level);
   }
 
   setTrack(number: number, spans: ScoreSpan[]) {
@@ -156,9 +163,16 @@ class ScoreBuilder {
     return this.queue;
   }
 
+  /** Compose cues for moods the tracks use but that a cut-short run never finished. */
+  composeMissingCues(genre: string | null) {
+    return this.composeCues(moodsWithoutCues(this.score), genre);
+  }
+
   /** Compose and upload one cue per mood; a failed cue just leaves that mood silent. */
   async composeCues(moods: ScoreMood[], genre: string | null) {
-    await mapLimit(moods, 2, async (mood) => {
+    // A resumed job already has some cues; compose only the rest.
+    const missing = moods.filter((mood) => !this.score.cues[mood]);
+    await mapLimit(missing, 2, async (mood) => {
       try {
         const bytes = await composeCue(mood, genre);
         this.score.cues[mood] = await uploadMusicCueToR2(
@@ -176,6 +190,15 @@ class ScoreBuilder {
       }
     });
   }
+}
+
+/** Moods heard in the score's tracks that have no cue yet. */
+function moodsWithoutCues(score: MusicScore): ScoreMood[] {
+  const used = new Set<ScoreMood>();
+  for (const spans of Object.values(score.tracks)) {
+    for (const [, , mood] of spans) used.add(mood);
+  }
+  return [...used].filter((mood) => !score.cues[mood]);
 }
 
 /** Score scenes for every track and start composing their cues. */
@@ -304,14 +327,54 @@ function ttsOptionsFromSettings(
   };
 }
 
+/** Tracks already saved for this job (from earlier runs), by number. */
+async function savedTracks(audioId: string): Promise<Map<number, string>> {
+  const rows = await db.bookAudioTrack.findMany({
+    where: { audioId },
+    select: { number: true, audioUrl: true },
+  });
+  return new Map(rows.map((r) => [r.number, r.audioUrl]));
+}
+
+/** Bytes of a track saved by an earlier run, for joining the full file. */
+async function fetchTrackBytes(url: string): Promise<Buffer> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+  if (!res.ok) throw new Error(`Couldn't load a saved track (${res.status})`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/** Join every track in order (new ones from memory, earlier ones from storage) into one file. */
+async function joinTracks(
+  numbers: number[],
+  fresh: Map<number, Buffer>,
+  saved: Map<number, string>
+): Promise<Buffer[]> {
+  const buffers: Buffer[] = [];
+  for (const number of numbers) {
+    const bytes = fresh.get(number) ?? (saved.has(number) ? await fetchTrackBytes(saved.get(number)!) : null);
+    if (bytes) buffers.push(bytes);
+  }
+  return buffers;
+}
+
+function fileTitle(title: string, fallback: string) {
+  return `${title.replace(/[^\w\s.-]+/g, "").trim() || fallback}.mp3`;
+}
+
+/**
+ * Narrate a book chapter by chapter. Resumable: chapters saved by an earlier
+ * run are skipped (and not charged again), and once `deadline` passes no new
+ * chapter starts; the job then returns "continue" to carry on in a new run.
+ */
 async function runAudiobook(
   bookId: string,
   audioId: string,
   voiceId: string,
   userId: string,
   emit: AudioStreamEmitter,
-  voiceSettings: VoiceSettingsConfig
-) {
+  voiceSettings: VoiceSettingsConfig,
+  job: { deadline: number; storedSettings: unknown }
+): Promise<RunOutcome> {
   const book = await db.book.findUniqueOrThrow({
     where: { id: bookId },
     include: {
@@ -337,36 +400,60 @@ async function runAudiobook(
       opening: i === 0 ? `${book.title}.` : undefined,
     })
   );
-  await assertAudioQuota(userId, estimateAudioMinutesFromText(texts.join("\n\n")));
+  const saved = await savedTracks(audioId);
+  const todo = chapters
+    .map((chapter, i) => ({ chapter, i }))
+    .filter(({ chapter, i }) => texts[i].trim() && !saved.has(chapter.number));
+  if (todo.length) {
+    await assertAudioQuota(
+      userId,
+      estimateAudioMinutesFromText(todo.map(({ i }) => texts[i]).join("\n\n"))
+    );
+  }
 
   const builder =
     voiceSettings.backgroundMusic === "off"
       ? null
-      : new ScoreBuilder({ bookId, audioId }, voiceSettings, voiceSettings.backgroundMusic);
+      : new ScoreBuilder(
+          { bookId, audioId },
+          voiceSettings,
+          voiceSettings.backgroundMusic,
+          parseMusicScore(job.storedSettings)
+        );
   let score: Awaited<ReturnType<typeof prepareScore>> | null = null;
-  if (builder) {
+  if (builder && todo.length) {
     emit({
       type: "phase",
       message: "Scoring scenes for background music…",
       audioType: "AUDIOBOOK",
     });
-    score = await prepareScore(builder, texts, {
-      genre: book.genre,
-      title: book.title,
-      kind: "audiobook",
+    score = await prepareScore(
+      builder,
+      todo.map(({ i }) => texts[i]),
+      { genre: book.genre, title: book.title, kind: "audiobook" }
+    );
+  }
+
+  if (todo.length) {
+    emit({
+      type: "phase",
+      message: saved.size
+        ? `Narrating the remaining ${todo.length} of ${chapters.length} chapters…`
+        : `Narrating ${chapters.length} chapters…`,
+      audioType: "AUDIOBOOK",
     });
   }
 
-  emit({
-    type: "phase",
-    message: `Narrating ${chapters.length} chapters…`,
-    audioType: "AUDIOBOOK",
-  });
-
-  let finished = 0;
-  const narrated = await mapLimit(chapters, NARRATION_CONCURRENCY, async (chapter, i) => {
+  const fresh = new Map<number, Buffer>();
+  let finished = saved.size;
+  let deferred = false;
+  await mapLimit(todo, NARRATION_CONCURRENCY, async ({ chapter, i }, k) => {
+    // Out of time for this run: leave the rest for the next one.
+    if (Date.now() > job.deadline) {
+      deferred = true;
+      return null;
+    }
     const text = texts[i];
-    if (!text.trim()) return null;
 
     emit({
       type: "phase",
@@ -376,7 +463,7 @@ async function runAudiobook(
 
     const tts = ttsOptionsFromSettings(voiceId, voiceSettings);
     const narrated = score
-      ? await narrateScenes(score.scenes[i], tts)
+      ? await narrateScenes(score.scenes[k], tts)
       : { audio: await textToSpeechLong(text, tts), spans: null };
     const audioBytes = narrated.audio;
     await creditAudioMinutes(userId, estimateAudioMinutesFromText(text));
@@ -389,6 +476,7 @@ async function runAudiobook(
       chapterId: chapter.id,
       audioBytes,
     });
+    fresh.set(chapter.number, audioBytes);
     if (builder && narrated.spans) await builder.setTrack(chapter.number, narrated.spans);
 
     finished++;
@@ -413,10 +501,8 @@ async function runAudiobook(
       trackNumber: chapter.number,
       trackTitle: chapter.title,
     });
-    return audioBytes;
+    return null;
   });
-  // Full audiobook in chapter order, whatever order chapters finished in.
-  const chapterBuffers = narrated.filter((b): b is Buffer => Boolean(b));
 
   if (score) {
     emit({
@@ -425,9 +511,20 @@ async function runAudiobook(
       audioType: "AUDIOBOOK",
     });
     await score.cuesReady;
-    await builder?.save();
+  }
+  if (builder) {
+    await builder.composeMissingCues(book.genre);
+    await builder.save();
   }
 
+  if (deferred) return "continue";
+
+  // Full audiobook in chapter order, whatever order or run the chapters finished in.
+  const chapterBuffers = await joinTracks(
+    chapters.map((c) => c.number),
+    fresh,
+    saved
+  );
   if (chapterBuffers.length > 0) {
     emit({
       type: "phase",
@@ -435,12 +532,11 @@ async function runAudiobook(
       audioType: "AUDIOBOOK",
     });
 
-    const fullBytes = Buffer.concat(chapterBuffers);
     const { publicUrl: fullUrl } = await uploadFullAudioToR2(
       bookId,
       audioId,
-      fullBytes,
-      `${book.title.replace(/[^\w\s.-]+/g, "").trim() || "audiobook"}.mp3`
+      Buffer.concat(chapterBuffers),
+      fileTitle(book.title, "audiobook")
     );
 
     await db.bookAudio.update({
@@ -448,6 +544,7 @@ async function runAudiobook(
       data: { audioUrl: fullUrl, progress: 100 },
     });
   }
+  return "done";
 }
 
 type PodcastEpisode = {
@@ -534,14 +631,27 @@ Return JSON:
   return episodes;
 }
 
+/** Episode scripts saved on the job by an earlier run, so a resumed podcast stays the same series. */
+function storedEpisodes(storedSettings: unknown): PodcastEpisode[] | null {
+  const list = (storedSettings as { podcast?: unknown } | null)?.podcast;
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const episodes = list.filter(
+    (e): e is PodcastEpisode =>
+      Boolean(e) && typeof e.number === "number" && typeof e.title === "string" && typeof e.script === "string"
+  );
+  return episodes.length ? episodes : null;
+}
+
+/** Record a podcast episode by episode; resumable like runAudiobook. */
 async function runPodcast(
   bookId: string,
   audioId: string,
   voiceId: string,
   userId: string,
   emit: AudioStreamEmitter,
-  voiceSettings: VoiceSettingsConfig
-) {
+  voiceSettings: VoiceSettingsConfig,
+  job: { deadline: number; storedSettings: unknown }
+): Promise<RunOutcome> {
   const book = await db.book.findUniqueOrThrow({
     where: { id: bookId },
     include: {
@@ -552,34 +662,65 @@ async function runPodcast(
     },
   });
 
-  emit({
-    type: "phase",
-    message: "Writing podcast episode scripts…",
-    audioType: "PODCAST",
+  let episodes = storedEpisodes(job.storedSettings);
+  if (!episodes) {
+    emit({
+      type: "phase",
+      message: "Writing podcast episode scripts…",
+      audioType: "PODCAST",
+    });
+    episodes = await buildPodcastEpisodes(book);
+  }
+  // Keep the scripts on the job (the score builder writes the same object).
+  const settingsWithScripts = { ...voiceSettings, podcast: episodes } as VoiceSettingsConfig;
+  await db.bookAudio.update({
+    where: { id: audioId },
+    data: {
+      voiceSettings: {
+        ...settingsWithScripts,
+        ...(parseMusicScore(job.storedSettings) ? { music: parseMusicScore(job.storedSettings) } : {}),
+      } as object,
+    },
   });
 
-  const episodes = await buildPodcastEpisodes(book);
-  const episodeBuffers: Buffer[] = [];
-  const estimated = episodes.reduce(
-    (sum, ep) => sum + estimateAudioMinutesFromText(ep.script),
-    0
-  );
-  await assertAudioQuota(userId, estimated);
+  const saved = await savedTracks(audioId);
+  const todo = episodes
+    .map((ep, i) => ({ ep, i }))
+    .filter(({ ep }) => !saved.has(ep.number));
+  if (todo.length) {
+    await assertAudioQuota(
+      userId,
+      todo.reduce((sum, { ep }) => sum + estimateAudioMinutesFromText(ep.script), 0)
+    );
+  }
 
   const builder =
     voiceSettings.backgroundMusic === "off"
       ? null
-      : new ScoreBuilder({ bookId, audioId }, voiceSettings, voiceSettings.backgroundMusic);
-  const score = builder
-    ? await prepareScore(
-        builder,
-        episodes.map((ep) => ep.script),
-        { genre: book.genre, title: book.title, kind: "podcast" }
-      )
-    : null;
+      : new ScoreBuilder(
+          { bookId, audioId },
+          settingsWithScripts,
+          voiceSettings.backgroundMusic,
+          parseMusicScore(job.storedSettings)
+        );
+  const score =
+    builder && todo.length
+      ? await prepareScore(
+          builder,
+          todo.map(({ ep }) => ep.script),
+          { genre: book.genre, title: book.title, kind: "podcast" }
+        )
+      : null;
 
-  for (let i = 0; i < episodes.length; i++) {
-    const ep = episodes[i];
+  const fresh = new Map<number, Buffer>();
+  let finished = saved.size;
+  let deferred = false;
+  for (let k = 0; k < todo.length; k++) {
+    if (Date.now() > job.deadline) {
+      deferred = true;
+      break;
+    }
+    const { ep } = todo[k];
     emit({
       type: "phase",
       message: `Recording episode ${ep.number}: ${ep.title}`,
@@ -588,10 +729,9 @@ async function runPodcast(
 
     const tts = ttsOptionsFromSettings(voiceId, voiceSettings);
     const narrated = score
-      ? await narrateScenes(score.scenes[i], tts)
+      ? await narrateScenes(score.scenes[k], tts)
       : { audio: await textToSpeechLong(ep.script, tts), spans: null };
     const audioBytes = narrated.audio;
-    episodeBuffers.push(audioBytes);
     if (builder && narrated.spans) await builder.setTrack(ep.number, narrated.spans);
     await creditAudioMinutes(userId, estimateAudioMinutesFromText(ep.script));
 
@@ -602,8 +742,10 @@ async function runPodcast(
       title: ep.title,
       audioBytes,
     });
+    fresh.set(ep.number, audioBytes);
 
-    const progress = ((i + 1) / episodes.length) * 95;
+    finished++;
+    const progress = (finished / episodes.length) * 95;
     await db.bookAudio.update({
       where: { id: audioId },
       data: { progress, status: "GENERATING" },
@@ -626,11 +768,19 @@ async function runPodcast(
     });
   }
 
-  if (score) {
-    await score.cuesReady;
-    await builder?.save();
+  if (score) await score.cuesReady;
+  if (builder) {
+    await builder.composeMissingCues(book.genre);
+    await builder.save();
   }
 
+  if (deferred) return "continue";
+
+  const episodeBuffers = await joinTracks(
+    episodes.map((ep) => ep.number),
+    fresh,
+    saved
+  );
   if (episodeBuffers.length > 0) {
     emit({
       type: "phase",
@@ -641,13 +791,14 @@ async function runPodcast(
       bookId,
       audioId,
       Buffer.concat(episodeBuffers),
-      `${book.title.replace(/[^\w\s.-]+/g, "").trim() || "podcast"}.mp3`
+      fileTitle(book.title, "podcast")
     );
     await db.bookAudio.update({
       where: { id: audioId },
       data: { audioUrl: fullUrl, progress: 100 },
     });
   }
+  return "done";
 }
 
 async function runMusic(
@@ -891,11 +1042,29 @@ async function runSong(
   });
 }
 
+/** A run either finishes the job or stops early to carry on in a fresh run. */
+export type RunOutcome = "done" | "continue";
+
+/** Heartbeat interval; well under AUDIO_STALE_MS (background.ts). */
+const HEARTBEAT_MS = 20_000;
+
+/**
+ * Stop starting new chapters after this, leaving room for chapters already in
+ * flight and the final upload before Vercel's 5-minute function limit.
+ */
+const RUN_BUDGET_MS = process.env.VERCEL ? 150_000 : Number.POSITIVE_INFINITY;
+
+/**
+ * Run (or resume) one audio job. The caller must own the job (status
+ * GENERATING, claimed in background.ts). Returns "continue" when the run
+ * stopped early with work left; the job is then PENDING and resumes in a new
+ * run, keeping every chapter already narrated.
+ */
 export async function runAudioGeneration(
   audioId: string,
   userId: string,
   emit?: AudioStreamEmitter
-) {
+): Promise<RunOutcome> {
   if (!isElevenLabsConfigured()) {
     throw new Error("ELEVENLABS_API_KEY is not configured.");
   }
@@ -912,18 +1081,26 @@ export async function runAudioGeneration(
   const emitter = emit ?? createAudioEventEmitter(audioId);
   const { voiceId, voiceName } = resolveVoice(audio.voiceId, audio.voiceName);
   const voiceSettings = parseStoredVoiceSettings(audio.voiceSettings);
+  const deadline = Date.now() + RUN_BUDGET_MS;
 
+  // Keep progress and saved tracks: a resumed job carries on where it stopped.
+  // (Raw voiceSettings also holds the music score and podcast scripts so far.)
   await db.bookAudio.update({
     where: { id: audioId },
     data: {
       status: "GENERATING",
-      progress: 0,
       errorMessage: null,
       voiceId,
       voiceName,
-      voiceSettings,
     },
   });
+
+  // Prove this job is alive, so nobody else takes it over.
+  const heartbeat = setInterval(() => {
+    void db.bookAudio
+      .updateMany({ where: { id: audioId, status: "GENERATING" }, data: { status: "GENERATING" } })
+      .catch(() => undefined);
+  }, HEARTBEAT_MS);
 
   emitter({
     type: "phase",
@@ -932,34 +1109,46 @@ export async function runAudioGeneration(
   });
 
   try {
-    // Only clear tracks when retrying the same failed/pending job — never wipe
-    // a previous completed generation (regenerate creates a new BookAudio).
-    if (audio.status !== "COMPLETED") {
-      await db.bookAudioTrack.deleteMany({ where: { audioId } });
-    }
-
+    let outcome: RunOutcome = "done";
+    const job = { deadline, storedSettings: audio.voiceSettings };
     if (audio.type === "AUDIOBOOK") {
-      await runAudiobook(
+      outcome = await runAudiobook(
         audio.bookId,
         audioId,
         voiceId,
         userId,
         emitter,
-        voiceSettings
+        voiceSettings,
+        job
       );
     } else if (audio.type === "PODCAST") {
-      await runPodcast(
+      outcome = await runPodcast(
         audio.bookId,
         audioId,
         voiceId,
         userId,
         emitter,
-        voiceSettings
+        voiceSettings,
+        job
       );
     } else if (audio.type === "SONG") {
       await runSong(audio.bookId, audioId, userId, emitter);
     } else {
       await runMusic(audio.bookId, audioId, userId, emitter);
+    }
+
+    if (outcome === "continue") {
+      // Hand the job back so the next run can claim it straight away.
+      await db.bookAudio.update({
+        where: { id: audioId },
+        data: { status: "PENDING" },
+      });
+      emitter({
+        type: "phase",
+        message: "Still narrating… (continuing in the background)",
+        audioType: audio.type,
+      });
+      return "continue";
     }
 
     await db.bookAudio.update({
@@ -977,6 +1166,7 @@ export async function runAudioGeneration(
       audioType: audio.type,
       audioId,
     });
+    return "done";
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Audio generation failed";
@@ -989,6 +1179,8 @@ export async function runAudioGeneration(
     });
     emitter({ type: "error", message, audioType: audio.type });
     throw error;
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
@@ -1086,6 +1278,21 @@ export async function ensureAudioRecord(params: {
         params.voiceName ?? failedOrPending.voiceName
       );
       const voiceSettings = normalizeVoiceSettings(params.voiceSettings);
+      // A retry keeps the chapters already narrated (with their music score
+      // and podcast scripts), unless the voice changed: then start clean so one
+      // book doesn't switch narrators halfway.
+      const voiceChanged = Boolean(failedOrPending.voiceId && failedOrPending.voiceId !== voiceId);
+      if (voiceChanged) {
+        await db.bookAudioTrack.deleteMany({ where: { audioId: failedOrPending.id } });
+      }
+      const prior = (failedOrPending.voiceSettings ?? null) as Record<string, unknown> | null;
+      const carried =
+        !voiceChanged && prior
+          ? {
+              ...(prior.music ? { music: prior.music } : {}),
+              ...(prior.podcast ? { podcast: prior.podcast } : {}),
+            }
+          : {};
       return db.bookAudio.update({
         where: { id: failedOrPending.id },
         data: {
@@ -1096,7 +1303,7 @@ export async function ensureAudioRecord(params: {
           audioUrl: null,
           voiceId,
           voiceName,
-          voiceSettings,
+          voiceSettings: { ...voiceSettings, ...carried } as object,
         },
       });
     }

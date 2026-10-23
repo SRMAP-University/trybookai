@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getBaseUrl } from "@/lib/url";
+import { postInternal } from "@/lib/internal-call";
 import {
   ILLUSTRATION_STALE_MS,
   runBookIllustrations,
@@ -15,51 +15,6 @@ export type ScheduleResult = {
   /** The job, so a route can keep its function alive with `after(() => task)`. */
   task?: Promise<void>;
 };
-
-function internalSecret(): string | null {
-  return (
-    process.env.GENERATION_WORKER_SECRET ||
-    process.env.CRON_SECRET ||
-    process.env.INTERNAL_PUSH_SECRET ||
-    null
-  );
-}
-
-/**
- * Continue in a fresh function before this one hits its time limit. Redirects
- * (apex to www) are followed by hand: fetch drops the Authorization header on
- * a cross-host redirect.
- */
-async function continueInNewFunction(bookId: string, chain: number) {
-  const secret = internalSecret();
-  if (!secret) {
-    console.warn("[illustrations] no internal secret set; remaining pictures wait for the next trigger");
-    return;
-  }
-  let url = `${getBaseUrl()}/api/internal/illustrations`;
-  const origin = new URL(url).hostname.replace(/^www\./, "");
-  for (let hop = 0; hop < 3; hop += 1) {
-    const res = await fetch(url, {
-      method: "POST",
-      redirect: "manual",
-      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ bookId, chain }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    const location = res.headers.get("location");
-    if (res.status >= 300 && res.status < 400 && location) {
-      const next = new URL(location, url);
-      if (next.protocol !== "https:" && process.env.NODE_ENV === "production") return;
-      if (!next.hostname.replace(/^www\./, "").endsWith(origin)) return;
-      url = next.toString();
-      continue;
-    }
-    if (!res.ok) {
-      console.warn(`[illustrations] hand-off for ${bookId} failed: ${res.status}`);
-    }
-    return;
-  }
-}
 
 /**
  * Start illustrating a book on this server unless another server is already
@@ -95,7 +50,8 @@ export async function scheduleBookIllustrations(
     .then(async ({ remaining }) => {
       if (!remaining || chain >= MAX_CHAIN) return;
       if (process.env.VERCEL) {
-        await continueInNewFunction(bookId, chain + 1);
+        // Carry on in a fresh function before this one hits its time limit.
+        await postInternal("/api/internal/illustrations", { bookId, chain: chain + 1 });
       } else {
         // Long-lived server: pick up again once this job has let go.
         setTimeout(() => void scheduleBookIllustrations(bookId, { chain: chain + 1 }), 2_000);

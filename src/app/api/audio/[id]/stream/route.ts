@@ -42,16 +42,20 @@ export async function POST(
     });
   }
 
+  // Start or resume the job here (a GENERATING job whose runner died is taken
+  // over, keeping its finished chapters) and keep this function alive for it.
+  let task: Promise<void> | undefined;
   try {
     if (audio.status === "PENDING" || audio.status === "FAILED") {
-      await ensureAudioGenerationRunning({
+      const result = await ensureAudioGenerationRunning({
         bookId: audio.bookId,
         userId: session.user.id,
         type: audio.type,
         regenerate: audio.status === "FAILED",
       });
+      task = "task" in result ? result.task : undefined;
     } else if (audio.status === "GENERATING") {
-      await ensureAudioGenerationById(id, session.user.id);
+      task = (await ensureAudioGenerationById(id, session.user.id)).task;
     }
   } catch (error) {
     const message =
@@ -62,11 +66,7 @@ export async function POST(
     });
   }
 
-  after(() => {
-    ensureAudioGenerationById(id, session.user.id).catch((error) => {
-      console.error("Failed to resume audio generation:", error);
-    });
-  });
+  if (task) after(() => task);
 
   const encoder = new TextEncoder();
 
