@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  BookOpen,
   ChevronDown,
   CircleCheck,
   Clock,
@@ -48,6 +49,7 @@ import {
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { StoryReelPanel } from "@/components/reels/story-reel-panel";
 import { IllustrationsPanel } from "@/components/book/illustrations-panel";
+import { BookReadyDialog } from "@/components/book/book-ready-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
@@ -221,6 +223,8 @@ function BookDetailPageContent() {
   const [dockOpen, setDockOpen] = useState(false);
   const [dockMinimized, setDockMinimized] = useState(false);
   const [derivativesOpen, setDerivativesOpen] = useState(false);
+  // "Your book is ready": shown when writing finishes while the page is open.
+  const [readyOpen, setReadyOpen] = useState(false);
   const [reelCreateOpen, setReelCreateOpen] = useState(false);
   const [coverGenerating, setCoverGenerating] = useState(false);
   const [creatingEdition, setCreatingEdition] = useState(false);
@@ -456,7 +460,7 @@ function BookDetailPageContent() {
           toast.error(message);
         });
       } else {
-        setDerivativesOpen(true);
+        setReadyOpen(true);
       }
       void promptGenerationReview("completed");
     }
@@ -599,7 +603,7 @@ function BookDetailPageContent() {
           // Audiobook kickoff handled on "done" event / server side
           setAudios(latest.audios ?? []);
         } else {
-          setDerivativesOpen(true);
+          setReadyOpen(true);
         }
         void promptGenerationReview("completed");
       } else if (status === "FAILED") {
@@ -1037,6 +1041,16 @@ function BookDetailPageContent() {
 
   return (
     <>
+      <BookReadyDialog
+        open={readyOpen}
+        onOpenChange={setReadyOpen}
+        bookId={book.id}
+        title={book.title}
+        coverImage={book.coverImage}
+        chapters={doneCount}
+        pages={book.currentPages}
+        onCreateAudio={() => setDerivativesOpen(true)}
+      />
       <BookDerivativesDialog
         open={derivativesOpen}
         onOpenChange={setDerivativesOpen}
@@ -1229,9 +1243,17 @@ function BookDetailPageContent() {
                     className="h-10 rounded-full bg-[#635bff] px-5 text-[14px] text-white hover:bg-[#7a73ff]"
                     asChild
                   >
+                    <Link href={`/dashboard/books/${book.id}/read`}>
+                      <BookOpen className="h-3.5 w-3.5" />
+                      Read the book
+                    </Link>
+                  </Button>
+                )}
+                {isComplete && chapterCount > 0 && (
+                  <Button variant="ghost" className={stageButton} asChild>
                     <a href={`/editor/${book.id}`} target="_blank" rel="noopener noreferrer">
                       <PenLine className="h-3.5 w-3.5" />
-                      Open editor
+                      <span className="hidden sm:inline">Open editor</span>
                     </a>
                   </Button>
                 )}

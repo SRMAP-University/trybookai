@@ -180,11 +180,11 @@ export default async function PublicBookPage({ params }: Props) {
     <>
       {firstChapter && (
         <a
-          href={`#chapter-${firstChapter.number}`}
+          href={`/books/${book.slug}/read`}
           className="inline-flex h-10 items-center gap-2 rounded-full bg-[#0a2540] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#1a3a5c]"
         >
           <BookOpen className="h-4 w-4" />
-          Start reading
+          Read the book
         </a>
       )}
       {book.audios.length > 0 && (

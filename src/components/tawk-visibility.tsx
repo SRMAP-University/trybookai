@@ -20,6 +20,8 @@ function shouldHide(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
   // Shared Story Reels and the Reels feed are full-screen players.
   if (pathname.startsWith("/r/") || pathname === "/dashboard/reels") return true;
+  // The book reader turns pages from the bottom corners.
+  if (/^\/(books\/[^/]+|dashboard\/books\/[^/]+)\/read$/.test(pathname)) return true;
   // The new-book page has a sticky create button above the phone nav.
   return (
     pathname === "/dashboard/books/new" &&
