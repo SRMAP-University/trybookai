@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { stripReasoning } from "@/lib/manuscript-clean";
 import epub from "epub-gen-memory";
 import {
   blocksToHtml,
@@ -418,7 +419,7 @@ export function buildMarkdownManuscript(book: ExportBook): string {
 
     for (const section of chapter.sections) {
       lines.push(`### ${section.title}`, "");
-      lines.push(section.content ?? "_Not generated yet._", "");
+      lines.push(section.content ? stripReasoning(section.content) : "_Not generated yet._", "");
     }
   }
 

@@ -1,3 +1,5 @@
+import { stripReasoning } from "@/lib/manuscript-clean";
+
 export type ManuscriptBlock =
   | { type: "heading"; level: 1 | 2 | 3 | 4; text: string }
   | { type: "paragraph"; text: string }
@@ -27,7 +29,7 @@ function parseFigure(line: string): { caption: string; src?: string } | null {
 }
 
 export function parseManuscriptBlocks(content: string): ManuscriptBlock[] {
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const lines = stripReasoning(content).replace(/\r\n/g, "\n").split("\n");
   const blocks: ManuscriptBlock[] = [];
   let i = 0;
 

@@ -1,3 +1,5 @@
+import { stripReasoning } from "@/lib/manuscript-clean";
+
 /**
  * Turn manuscript markdown into text a narrator can read aloud: headings
  * become spoken titles, lists become sentences, tables are read row by row,
@@ -53,7 +55,7 @@ function narrateTable(lines: string[]): string[] {
 }
 
 export function markdownToNarration(markdown: string | null | undefined): string {
-  const lines = (markdown ?? "").replace(/\r\n/g, "\n").split("\n");
+  const lines = stripReasoning(markdown ?? "").replace(/\r\n/g, "\n").split("\n");
   const paragraphs: string[] = [];
   let prose: string[] = [];
   let table: string[] = [];

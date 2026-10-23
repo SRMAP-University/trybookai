@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { stripImageLines, stripReasoning } from "@/lib/manuscript-clean";
 
 export async function GET(
   _request: Request,
@@ -18,6 +19,7 @@ export async function GET(
           summary: true,
           pageCount: true,
           status: true,
+          imageUrl: true,
           sections: {
             orderBy: { number: "asc" },
             select: {
@@ -57,13 +59,21 @@ export async function GET(
       title: chapter.title,
       summary: chapter.summary,
       pageCount: chapter.pageCount,
-      sections: chapter.sections.map((s) => ({
-        number: s.number,
-        title: s.title,
-        content: s.content,
-        pageCount: s.pageCount,
-        wordCount: s.wordCount,
-      })),
+      /** Chapter-opener illustration */
+      imageUrl: chapter.imageUrl,
+      sections: chapter.sections.map((s) => {
+        const markdown = s.content ? stripReasoning(s.content) : s.content;
+        return {
+          number: s.number,
+          title: s.title,
+          // The app shows `content` as plain text, so picture lines would appear as raw URLs.
+          content: markdown ? stripImageLines(markdown) : markdown,
+          /** Full markdown including `![caption](url)` picture lines, for clients that render them */
+          markdown,
+          pageCount: s.pageCount,
+          wordCount: s.wordCount,
+        };
+      }),
     }));
 
   return NextResponse.json({
