@@ -86,6 +86,47 @@ export function parseVisualBible(value: unknown): VisualBible | null {
   };
 }
 
+/**
+ * Capitalized words that never appear in lowercase, by frequency: in a story
+ * these are almost always the names of its people and places.
+ */
+export function frequentNames(text: string, limit = 12): string[] {
+  const lower = new Set(text.match(/\b[a-z]{3,}\b/g) ?? []);
+  const counts = new Map<string, number>();
+  for (const word of text.match(/\b[A-Z][a-z]{2,}\b/g) ?? []) {
+    if (lower.has(word.toLowerCase())) continue;
+    counts.set(word, (counts.get(word) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([word, n]) => `${word} (${n})`);
+}
+
+/** Chapter summaries, the names the text uses most and its opening pages, for books without a character list. */
+function storyExcerpt(book: ReelBook): string {
+  const summaries = book.chapters
+    .map((c) => c.state?.summary?.trim() || c.summary?.trim() || "")
+    .filter(Boolean)
+    .map((s, i) => `${i + 1}. ${s}`)
+    .join("\n");
+  const fullText = book.chapters
+    .flatMap((c) => c.sections.map((s) => s.content ?? ""))
+    .join("\n\n");
+  const names = frequentNames(fullText);
+  const opening = (book.chapters.find((c) => c.sections.some((s) => s.content?.trim()))?.sections ?? [])
+    .map((s) => s.content ?? "")
+    .join("\n\n");
+  return [
+    summaries ? `Chapter summaries:\n${clipText(summaries, 1500)}` : "",
+    names.length ? `Names used most often in the text (with counts): ${names.join(", ")}` : "",
+    opening ? `Story text (opening):\n${clipText(opening, 2000)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 /** A look from the book's tone when the art director call is skipped or fails. */
 function fallbackLook(book: ReelBook): string {
   const tone = book.tone?.trim().toLowerCase();
@@ -121,6 +162,9 @@ export async function buildVisualBible(
     places.length
       ? `Places:\n${places.map((p) => `- ${p.name}: ${clipText(p.note, 300)}`).join("\n")}`
       : "",
+    // Without a character list, the cast has to come from the story itself, or
+    // invented names won't match the people the shots and pictures mention.
+    narrative && !characters.length ? storyExcerpt(book) : "",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -145,7 +189,13 @@ Rules:
 - Characters: 25 words or fewer each. Appearance and clothing only: apparent age, build, face shape, hair, skin tone if the book states it, outfit, and one signature physical or clothing detail. No props or objects held, no actions, no expressions or moods; those change from shot to shot.
 - Where the book is silent, invent plausible details that fit the genre and era, and keep them simple.
 - Places: 20 words or fewer each. Architecture or landscape, materials, light, one signature detail.
-- At most 6 characters and 5 places; pick the most important. Use empty lists when none are given.
+- At most 6 characters and 5 places; pick the most important. ${
+            !narrative
+              ? "Use empty lists when none are given."
+              : characters.length
+                ? "Use the names exactly as given."
+                : "No character list is given: take the main characters and places from the synopsis and story text, with their names spelled exactly as in the text. Never invent characters who aren't in it."
+          }
 - If a character is a real, identifiable person, describe only their period clothing and role, never their face.
 
 Return only JSON: {"look": string, "cast": [{"name": string, "look": string}], "places": [{"name": string, "look": string}]}`,
@@ -159,17 +209,20 @@ Return only JSON: {"look": string, "cast": [{"name": string, "look": string}], "
       cast?: Array<{ name?: unknown; look?: unknown }>;
       places?: Array<{ name?: unknown; look?: unknown }>;
     };
+    const placeList = (parsed.places ?? [])
+      .map((p) => ({ name: clean(p.name, 60), look: clean(p.look, 200) }))
+      .filter((p) => p.name && p.look)
+      .slice(0, 5);
+    // A city listed as a "character" would put a person into every picture that mentions it.
+    const placeNames = new Set(placeList.map((p) => p.name.toLowerCase()));
     return {
       style,
       look: clean(parsed.look, 240) || empty.look,
       cast: (parsed.cast ?? [])
         .map((c) => ({ name: clean(c.name, 60), look: appearanceOnly(clean(c.look, 220)) }))
-        .filter((c) => c.name && c.look)
+        .filter((c) => c.name && c.look && !placeNames.has(c.name.toLowerCase()))
         .slice(0, 6),
-      places: (parsed.places ?? [])
-        .map((p) => ({ name: clean(p.name, 60), look: clean(p.look, 200) }))
-        .filter((p) => p.name && p.look)
-        .slice(0, 5),
+      places: placeList,
     };
   } catch (error) {
     console.warn(
