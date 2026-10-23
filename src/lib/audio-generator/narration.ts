@@ -83,7 +83,11 @@ export function markdownToNarration(markdown: string | null | undefined): string
       continue;
     }
     // Figures are for the page, scene breaks and rules are pauses.
-    if (/^\[FIGURE:.*\]$/i.test(line) || /^([-*_])(\s*\1){2,}$/.test(line)) {
+    if (
+      /^\[FIGURE:.*\]$/i.test(line) ||
+      /^!\[[^\]]*\]\([^)]*\)$/.test(line) ||
+      /^([-*_])(\s*\1){2,}$/.test(line)
+    ) {
       flushProse();
       continue;
     }

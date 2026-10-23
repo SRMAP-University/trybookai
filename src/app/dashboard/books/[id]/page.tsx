@@ -47,6 +47,7 @@ import {
 } from "@/components/dashboard/book-audio-panel";
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { StoryReelPanel } from "@/components/reels/story-reel-panel";
+import { IllustrationsPanel } from "@/components/book/illustrations-panel";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ExpandableDescription } from "@/components/ui/expandable-description";
@@ -83,6 +84,7 @@ interface Chapter {
   summary: string | null;
   pageCount: number;
   status: string;
+  imageUrl?: string | null;
   sections: Section[];
 }
 
@@ -115,6 +117,7 @@ interface Book {
   templateId?: string | null;
   edition: number;
   generateAudiobookOnComplete?: boolean;
+  includeIllustrations?: boolean;
   chapters: Chapter[];
   audios?: BookAudioItem[];
 }
@@ -1437,6 +1440,16 @@ function BookDetailPageContent() {
               />
             )}
 
+            {(isComplete || inProgress || doneCount > 0) && (
+              <IllustrationsPanel
+                bookId={book.id}
+                enabled={Boolean(book.includeIllustrations)}
+                canIllustrate={isComplete || doneCount > 0}
+                generating={inProgress}
+                onPicturesAdded={fetchBook}
+              />
+            )}
+
             {isComplete && (
               <StoryReelPanel
                 bookId={book.id}
@@ -1530,6 +1543,15 @@ function BookDetailPageContent() {
 
                         {open && (
                           <div className="space-y-4 border-t border-[#eef1f5] bg-[#f8fafc] px-4 py-4 sm:px-12">
+                            {chapter.imageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={chapter.imageUrl}
+                                alt={`Chapter ${chapter.number} illustration`}
+                                loading="lazy"
+                                className="aspect-[3/2] w-full rounded-lg bg-[#eef2f7] object-cover"
+                              />
+                            )}
                             {chapter.sections.map((section) => (
                               <div key={section.id}>
                                 <p className="text-[12px] font-medium text-[#697386]">

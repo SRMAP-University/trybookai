@@ -173,7 +173,11 @@ export function blocksToHtml(content: string): string {
         }
         if (block.type === "figure") {
           if (block.src) {
-            return `<figure><img src="${escapeHtml(block.src)}" alt="${escapeHtml(block.caption)}" /><figcaption>${inlineHtml(block.caption)}</figcaption></figure>`;
+            const caption =
+              block.caption && block.caption !== "Illustration"
+                ? `<p class="caption"><em>${inlineHtml(block.caption)}</em></p>`
+                : "";
+            return `<div class="figure"><img src="${escapeHtml(block.src)}" alt="${escapeHtml(block.caption)}" />${caption}</div>`;
           }
           return `<figure><p><em>Illustration:</em> ${inlineHtml(block.caption)}</p></figure>`;
         }

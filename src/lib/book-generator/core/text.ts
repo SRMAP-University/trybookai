@@ -197,7 +197,7 @@ export function cleanSectionOutput(
 // Sentence terminators, including Devanagari (। ॥) and Arabic-script (۔ ؟) marks.
 const TERMINAL = /[.!?…。！？।॥۔؟」』"”’')\]*_]$/;
 const SENTENCE_END = /[.!?…。！？।॥۔؟]["”’')\]*_]*(?=\s|$)/g;
-const BLOCK_LINE = /^([-*+]\s|\d+[.)]\s|\||#{1,6}\s|\[FIGURE:)/i;
+const BLOCK_LINE = /^([-*+]\s|\d+[.)]\s|\||#{1,6}\s|\[FIGURE:|!\[)/i;
 
 /** True when text ends at a sentence or block boundary (list item, table, heading, figure). */
 export function endsCleanly(text: string): boolean {
@@ -238,7 +238,11 @@ export function clipText(text: string | null | undefined, maxChars: number): str
 
 /** Last `maxChars` of text, starting at a paragraph or sentence boundary. */
 export function tailText(text: string | null | undefined, maxChars: number): string {
-  const value = (text ?? "").trim();
+  // Illustration lines are for readers; writers continuing the prose shouldn't see or copy them.
+  const value = (text ?? "")
+    .replace(/^[ \t]*!\[[^\]]*\]\([^)]*\)[ \t]*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   if (value.length <= maxChars) return value;
   let slice = value.slice(value.length - maxChars);
   const paragraph = slice.indexOf("\n\n");

@@ -231,6 +231,12 @@ model Book {
   coverPrompt         String? @db.Text
   /// When true, start audiobook narration after the manuscript completes
   generateAudiobookOnComplete Boolean @default(false)
+  /// Draw chapter-opener and scene pictures as chapters finish
+  includeIllustrations Boolean  @default(false)
+  /// Style line plus cast and place descriptors shared by every illustration prompt
+  visualBible          Json?
+  /// Refreshed by the running illustration job; stale means it can be resumed
+  illustrationHeartbeatAt DateTime?
 
   /// Edition lineage — first book has edition 1; forks share parentBookId
   edition             Int     @default(1)
@@ -254,6 +260,7 @@ model Book {
   storyState      StoryState?
   canonFacts      CanonFact[]
   reels           StoryReel[]
+  illustrations   BookIllustration[]
 
   @@index([userId])
   @@index([status])
@@ -565,12 +572,17 @@ model Chapter {
   content     String?       @db.Text
   pageCount   Int           @default(0)
   status      ChapterStatus @default(PENDING)
+  /// Picture shown above the chapter title
+  imageUrl    String?       @db.Text
+  /// Set once the chapter's pictures are planned, drawn and placed
+  illustratedAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  book        Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  sections    Section[]
-  state       ChapterState?
+  book          Book               @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  sections      Section[]
+  state         ChapterState?
+  illustrations BookIllustration[]
 
   @@unique([bookId, number])
   @@index([bookId])
@@ -621,6 +633,44 @@ model SectionState {
   updatedAt         DateTime @updatedAt
 
   section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+}
+
+/// A picture in a book: a chapter opener, or a scene placed after a paragraph.
+model BookIllustration {
+  id             String    @id @default(cuid())
+  bookId         String
+  chapterId      String
+  /// OPENER | SCENE
+  kind           String
+  /// Order within the chapter; the opener is 0
+  position       Int
+  /// Section and prose paragraph (0-based) a scene goes after
+  sectionId      String?
+  paragraphIndex Int?
+  /// What the picture shows, from the planner (no style or cast lines)
+  description    String    @db.Text
+  caption        String?   @db.Text
+  /// Cast names in the picture
+  characters     Json?
+  mood           String    @default("neutral")
+  /// Full prompt last sent to the image model
+  prompt         String?   @db.Text
+  imageUrl       String?   @db.Text
+  /// PENDING | DRAWING | READY | FAILED
+  status         String    @default("PENDING")
+  attempts       Int       @default(0)
+  claimedAt      DateTime?
+  error          String?   @db.Text
+  /// Set when the picture is in the chapter (opener on the chapter, scene in the section text)
+  placedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  book    Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([chapterId, kind, position])
+  @@index([bookId, status])
 }
 
 model GenerationJob {

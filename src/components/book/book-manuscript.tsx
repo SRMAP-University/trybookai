@@ -16,6 +16,8 @@ type BookManuscriptProps = {
   compact?: boolean;
   /** Larger, darker text for reading pages; serif layouts inherit the page's reading font. */
   variant?: "default" | "reader";
+  /** Large first letter on the first paragraph, as at the start of a chapter */
+  dropCap?: boolean;
   className?: string;
 };
 
@@ -96,11 +98,13 @@ export function BookManuscript({
   templateId,
   compact = false,
   variant = "default",
+  dropCap = false,
   className,
 }: BookManuscriptProps) {
   const layout = resolveManuscriptLayout({ genre, templateId } satisfies ContentFormatInput);
   const blocks = parseManuscriptBlocks(content || "");
   const reader = variant === "reader";
+  const dropCapIndex = dropCap ? blocks.findIndex((b) => b.type === "paragraph") : -1;
   // On reading pages, serif layouts use the page's reading font instead of the system serif.
   const fontClass =
     reader && (layout === "literary" || layout === "academic") ? "" : layoutClassName(layout);
@@ -229,20 +233,35 @@ export function BookManuscript({
 
         if (block.type === "figure") {
           if (block.src) {
+            // Book illustrations: shown whole, never cropped, with the caption beneath.
+            const caption = block.caption && block.caption !== "Illustration" ? block.caption : null;
             return (
               <figure
                 key={index}
-                className="overflow-hidden rounded-xl border border-[#e6ebf1] bg-[#f6f9fc]"
+                className={reader ? "-mx-5 my-10 sm:-mx-6 lg:-mx-12" : compact ? "my-4" : "my-6"}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={block.src}
-                  alt={block.caption}
-                  className="max-h-72 w-full object-cover"
+                  alt={caption ?? "Illustration"}
+                  loading="lazy"
+                  className={cn(
+                    "h-auto w-full bg-[#eef2f7]",
+                    reader ? "sm:rounded-2xl" : "rounded-lg"
+                  )}
                 />
-                <figcaption className="px-3 py-2 text-[12px] text-[#697386]">
-                  {block.caption}
-                </figcaption>
+                {caption && (
+                  <figcaption
+                    className={cn(
+                      "italic text-[#697386]",
+                      reader
+                        ? "mx-auto mt-3 max-w-[560px] px-5 text-center font-sans text-[14px] leading-relaxed"
+                        : "mt-1.5 text-[12px]"
+                    )}
+                  >
+                    {caption}
+                  </figcaption>
+                )}
               </figure>
             );
           }
@@ -274,7 +293,11 @@ export function BookManuscript({
           );
         }
 
-        return <p key={index}>{inlineMarkdown(block.text)}</p>;
+        return (
+          <p key={index} className={index === dropCapIndex ? "drop-cap" : undefined}>
+            {inlineMarkdown(block.text)}
+          </p>
+        );
       })}
     </div>
   );

@@ -70,6 +70,7 @@ type FormState = {
   templateId: string;
   startGeneration: boolean;
   generateAudiobook: boolean;
+  includeIllustrations: boolean;
 };
 
 const PAGE_PRESETS = [
@@ -113,6 +114,7 @@ const initialForm: FormState = {
   templateId: "",
   startGeneration: true,
   generateAudiobook: false,
+  includeIllustrations: true,
 };
 
 export function NewBookForm({
@@ -309,6 +311,7 @@ export function NewBookForm({
         startGeneration: form.startGeneration,
         generateAudiobookOnComplete:
           canGenerateAudio && form.generateAudiobook,
+        includeIllustrations: form.includeIllustrations,
       }),
     });
 
@@ -839,6 +842,12 @@ export function NewBookForm({
                       : false,
                   }))
                 }
+              />
+              <SwitchRow
+                label="Illustrate the book"
+                description="A picture for every chapter and its key scenes"
+                checked={form.includeIllustrations}
+                onChange={(includeIllustrations) => set("includeIllustrations", includeIllustrations)}
               />
               <SwitchRow
                 label="Narrate when finished"

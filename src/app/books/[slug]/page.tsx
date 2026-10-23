@@ -35,6 +35,7 @@ const getPublicBook = cache(async function getPublicBook(slug: string) {
           summary: true,
           pageCount: true,
           status: true,
+          imageUrl: true,
           sections: {
             orderBy: { number: "asc" },
             select: {
@@ -370,7 +371,10 @@ export default async function PublicBookPage({ params }: Props) {
           )}
 
           {completedChapters.length > 0 ? (
-            <div id="book-text" className={cn(readingSerif.className, "mt-16")}>
+            <div
+              id="book-text"
+              className={cn(readingSerif.className, serifDisplay.variable, "mt-16")}
+            >
               {completedChapters.map((chapter, index) => {
                 const next = completedChapters[index + 1];
                 return (
@@ -379,6 +383,17 @@ export default async function PublicBookPage({ params }: Props) {
                     id={`chapter-${chapter.number}`}
                     className="scroll-mt-24 border-t border-[#e6ebf1] pb-4 pt-16 first:border-t-0 first:pt-0"
                   >
+                    {chapter.imageUrl && (
+                      <figure className="-mx-5 mb-10 sm:-mx-6 lg:-mx-12">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={chapter.imageUrl}
+                          alt={`Chapter ${chapter.number} illustration`}
+                          loading={index === 0 ? "eager" : "lazy"}
+                          className="aspect-[3/2] w-full bg-[#eef2f7] object-cover sm:rounded-2xl"
+                        />
+                      </figure>
+                    )}
                     <header className="mb-10 text-center">
                       <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.18em] text-[#635bff]">
                         Chapter {chapter.number}
@@ -415,6 +430,7 @@ export default async function PublicBookPage({ params }: Props) {
                         )}
                         <BookManuscript
                           variant="reader"
+                          dropCap={narrative && sectionIndex === 0}
                           genre={book.genre}
                           templateId={book.templateId}
                           content={section.content || ""}

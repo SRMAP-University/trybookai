@@ -22,6 +22,10 @@ const MOOD_LIGHTING: Record<ScoreMood, string> = {
 const FRAME_RULES =
   "vertical 9:16 composition, main subject in the upper two-thirds, uncluttered lower third, no text, no letters, no captions, no signs with writing, no watermark, no border";
 
+/** Framing for pictures printed in a book: landscape, one clear subject. */
+export const BOOK_FRAME_RULES =
+  "horizontal 3:2 book illustration, balanced composition with one clear focal subject, no text, no letters, no captions, no signs with writing, no watermark, no border";
+
 export const REEL_NEGATIVE_PROMPT = [
   "text",
   "words",
@@ -75,7 +79,8 @@ export function withoutLettering(description: string): string {
 
 export function buildShotPrompt(
   bible: VisualBible,
-  shot: { description: string; characters: string[]; mood: ScoreMood }
+  shot: { description: string; characters: string[]; mood: ScoreMood },
+  frame: string = FRAME_RULES
 ): string {
   // Style and look lead every prompt and never change within a reel, so the
   // pictures read as one film; the shot description carries the variety.
@@ -86,15 +91,16 @@ export function buildShotPrompt(
     ...castLines(bible, shot.characters, shot.description),
     placeLine(bible, shot.description),
     MOOD_LIGHTING[shot.mood],
-    FRAME_RULES,
+    frame,
   ].filter(Boolean);
-  return sanitizeImagePrompt(parts.join(". "), `${bible.style}. ${FRAME_RULES}`);
+  return sanitizeImagePrompt(parts.join(". "), `${bible.style}. ${frame}`);
 }
 
 /** A gentler prompt for a shot the model refused: the setting and mood, no action. */
 export function buildSafeShotPrompt(
   bible: VisualBible,
-  shot: { description: string; mood: ScoreMood }
+  shot: { description: string; mood: ScoreMood },
+  frame: string = FRAME_RULES
 ): string {
   const place = placeLine(bible, shot.description);
   return sanitizeImagePrompt(
@@ -103,11 +109,11 @@ export function buildSafeShotPrompt(
       bible.look,
       `atmospheric establishing shot${place ? ` of ${place}` : " of the story's setting"}, no people in focus`,
       MOOD_LIGHTING[shot.mood],
-      FRAME_RULES,
+      frame,
     ]
       .filter(Boolean)
       .join(". "),
-    `${bible.style}. ${FRAME_RULES}`
+    `${bible.style}. ${frame}`
   );
 }
 

@@ -94,9 +94,16 @@ function fallbackLook(book: ReelBook): string {
 
 export async function buildVisualBible(
   book: ReelBook,
-  styleId: string
+  styleId: string,
+  options: {
+    /** A style line to use instead of a reel style preset. */
+    stylePrompt?: string;
+    /** What the pictures are for, so the art director writes for it. */
+    medium?: "video" | "book";
+  } = {}
 ): Promise<VisualBible> {
-  const style = reelStyle(styleId).prompt;
+  const style = options.stylePrompt || reelStyle(styleId).prompt;
+  const medium = options.medium ?? "video";
   const narrative = isNarrativeBook(book);
   const characters = narrative ? bookCharacters(book) : [];
   const places = narrative ? bookPlaces(book) : [];
@@ -127,10 +134,14 @@ export async function buildVisualBible(
       messages: [
         {
           role: "system",
-          content: `You are the art director for an illustrated video of a book. Everything you write is pasted into every image prompt, so the whole video looks like one film and each character looks the same in every picture.
+          content: `${
+            medium === "book"
+              ? "You are the art director for an illustrated edition of a book. Everything you write is pasted into every image prompt, so the whole book looks like one illustrator drew it and each character looks the same in every picture."
+              : "You are the art director for an illustrated video of a book. Everything you write is pasted into every image prompt, so the whole video looks like one film and each character looks the same in every picture."
+          }
 
 Rules:
-- "look": the visual identity of the whole video in 25 words or fewer: a specific color palette, light quality, lens or camera feel, and texture, fitting the book's genre, era and tone.
+- "look": the visual identity of the whole ${medium} in 25 words or fewer: a specific color palette, light quality, lens or camera feel, and texture, fitting the book's genre, era and tone.
 - Characters: 25 words or fewer each. Appearance and clothing only: apparent age, build, face shape, hair, skin tone if the book states it, outfit, and one signature physical or clothing detail. No props or objects held, no actions, no expressions or moods; those change from shot to shot.
 - Where the book is silent, invent plausible details that fit the genre and era, and keep them simple.
 - Places: 20 words or fewer each. Architecture or landscape, materials, light, one signature detail.

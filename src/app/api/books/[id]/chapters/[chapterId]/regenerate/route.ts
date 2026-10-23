@@ -1,7 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { regenerateChapter } from "@/lib/book-generator";
+import {
+  resetChapterScenes,
+  scheduleBookIllustrations,
+} from "@/lib/book-illustrations/schedule";
+
+// Re-illustrating the rewritten chapter runs in after().
+export const maxDuration = 300;
 
 export async function POST(
   _request: Request,
@@ -24,6 +31,12 @@ export async function POST(
 
   try {
     const chapter = await regenerateChapter(chapterId, session.user.id);
+    if (book.includeIllustrations) {
+      // Scene pictures pointed at the old paragraphs; plan new ones.
+      await resetChapterScenes(chapterId);
+      const { task } = await scheduleBookIllustrations(id);
+      if (task) after(() => task);
+    }
     return NextResponse.json(chapter);
   } catch (error) {
     const message =

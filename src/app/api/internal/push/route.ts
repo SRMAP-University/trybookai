@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
+import { scheduleBookIllustrations } from "@/lib/book-illustrations/schedule";
 import {
   notifyBookProgress,
   nextPushMilestone,
@@ -8,6 +9,8 @@ import {
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
+// Illustrating finished chapters runs in after(), so allow the full window.
+export const maxDuration = 300;
 
 const schema = z.object({
   userId: z.string().min(1),
@@ -89,6 +92,20 @@ export async function POST(request: Request) {
 
   const progress = body.progress ?? book.progress ?? 0;
   const title = body.title ?? book.title;
+
+  // The generation worker calls here as chapters finish (25/50/75%) and at the
+  // end: draw pictures for the chapters written so far. A no-op for books
+  // without illustrations or with a job already running.
+  if (body.phase === "progress" || body.phase === "completed") {
+    after(async () => {
+      try {
+        const { task } = await scheduleBookIllustrations(body.bookId);
+        await task;
+      } catch (error) {
+        console.warn(`[illustrations] could not start for ${body.bookId}:`, error);
+      }
+    });
+  }
 
   if (body.phase === "progress") {
     const milestone = nextPushMilestone(body.lastMilestone, progress);

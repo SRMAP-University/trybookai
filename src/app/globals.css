@@ -242,3 +242,13 @@
   75% { transform: translate(-3%, -2%); }
   100% { transform: translate(0, 0); }
 }
+
+/* Book pages: a large first letter at the start of a chapter. */
+.drop-cap::first-letter {
+  float: left;
+  margin: 0.06em 0.1em 0 0;
+  font-family: var(--font-serif-display), Georgia, "Times New Roman", serif;
+  font-size: 3.7em;
+  line-height: 0.78;
+  color: #0a2540;
+}

@@ -430,6 +430,9 @@ export async function runBookGeneration(
             );
             if (milestone != null) {
               lastPushMilestone = milestone;
+              void import("@/lib/book-illustrations/schedule").then(
+                ({ kickBookIllustrations }) => kickBookIllustrations(bookId)
+              );
               void notifyBookProgress({
                 userId,
                 bookId,
@@ -510,6 +513,10 @@ export async function runBookGeneration(
         phase: "completed",
       });
     }
+
+    void import("@/lib/book-illustrations/schedule").then(({ kickBookIllustrations }) =>
+      kickBookIllustrations(bookId)
+    );
 
     if (finished?.generateAudiobookOnComplete) {
       void import("@/lib/audio-generator/background")

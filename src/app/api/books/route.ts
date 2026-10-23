@@ -34,6 +34,8 @@ const createBookSchema = z.object({
   templateId: z.string().optional(),
   startGeneration: z.boolean().optional(),
   generateAudiobookOnComplete: z.boolean().optional(),
+  /** Draw chapter and scene pictures; on unless turned off */
+  includeIllustrations: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -113,6 +115,7 @@ export async function POST(request: Request) {
           ...bookData,
           createdVia: client,
           generateAudiobookOnComplete: Boolean(generateAudiobookOnComplete),
+          includeIllustrations: bookData.includeIllustrations ?? true,
           characters: characters ?? undefined,
           themes: themes ?? undefined,
           pov: bookData.pov ?? user.defaultPov,

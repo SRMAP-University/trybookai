@@ -341,6 +341,26 @@ export function audioPublicPrefix(): string | null {
 }
 
 const REEL_PREFIX = "reels";
+const ILLUSTRATION_PREFIX = "illustrations";
+
+/**
+ * Upload a book illustration to illustrations/{bookId}/{name}. Names must be
+ * unique per version because objects are cached as immutable.
+ */
+export async function uploadIllustrationToR2(
+  bookId: string,
+  name: string,
+  bytes: Buffer,
+  contentType: string
+): Promise<string> {
+  const safeName = name.replace(/[^a-z0-9._-]/gi, "");
+  const key = `${ILLUSTRATION_PREFIX}/${bookId}/${safeName}`;
+  const result = await uploadPublicBytes(key, bytes, contentType);
+  if (!result.publicUrl) {
+    throw new Error("R2_PUBLIC_BASE_URL must be set so illustrations can be shown.");
+  }
+  return result.publicUrl;
+}
 
 /**
  * Upload a Story Reel file (shot image, narration) to

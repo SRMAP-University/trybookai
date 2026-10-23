@@ -9,7 +9,8 @@ import {
 } from "@/lib/book-export";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Illustrated books download their pictures into the PDF or EPUB.
+export const maxDuration = 120;
 
 export async function GET(
   request: Request,

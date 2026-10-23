@@ -32,6 +32,8 @@ export type ExportChapter = {
   number: number;
   title: string;
   summary: string | null;
+  /** Chapter-opener illustration */
+  imageUrl?: string | null;
   sections: ExportSection[];
 };
 
@@ -79,6 +81,81 @@ function copyrightLine(user: ExportBrandUser): string {
 const PDF_CONTENT_WIDTH = 468;
 const PDF_LEFT = 72;
 const PDF_BOTTOM = 72;
+
+/** Pictures in the PDF, keyed by URL; only JPEG and PNG, which pdfkit can embed. */
+type PdfImages = Map<string, { bytes: Buffer; width: number; height: number }>;
+
+const PDF_IMAGE_MAX_HEIGHT = 330;
+
+function imageSize(bytes: Buffer): { width: number; height: number } | null {
+  if (bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50) {
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  }
+  if (bytes.length > 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    let offset = 2;
+    while (offset + 9 < bytes.length && bytes[offset] === 0xff) {
+      const marker = bytes[offset + 1];
+      const isFrame = marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
+      if (isFrame) {
+        return { height: bytes.readUInt16BE(offset + 5), width: bytes.readUInt16BE(offset + 7) };
+      }
+      offset += 2 + bytes.readUInt16BE(offset + 2);
+    }
+  }
+  return null;
+}
+
+function bookImageUrls(book: ExportBook): string[] {
+  const urls = new Set<string>();
+  for (const chapter of book.chapters) {
+    if (chapter.imageUrl) urls.add(chapter.imageUrl);
+    for (const section of chapter.sections) {
+      for (const block of parseManuscriptBlocks(section.content ?? "")) {
+        if (block.type === "figure" && block.src) urls.add(block.src);
+      }
+    }
+  }
+  return [...urls].filter((url) => /^https?:\/\//i.test(url)).slice(0, 150);
+}
+
+async function loadPdfImages(book: ExportBook): Promise<PdfImages> {
+  const urls = bookImageUrls(book);
+  const images: PdfImages = new Map();
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(8, urls.length) }, async () => {
+      while (next < urls.length) {
+        const url = urls[next++];
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+          if (!res.ok) continue;
+          const bytes = Buffer.from(await res.arrayBuffer());
+          const size = imageSize(bytes);
+          if (size && size.width > 0 && size.height > 0) images.set(url, { bytes, ...size });
+        } catch {
+          /* leave the picture out rather than fail the export */
+        }
+      }
+    })
+  );
+  return images;
+}
+
+/** Draw a picture across the text column, scaled to fit, centered. */
+function writePdfImage(
+  doc: PDFKit.PDFDocument,
+  image: { bytes: Buffer; width: number; height: number },
+  maxHeight = PDF_IMAGE_MAX_HEIGHT
+) {
+  const scale = Math.min(PDF_CONTENT_WIDTH / image.width, maxHeight / image.height);
+  const width = image.width * scale;
+  const height = image.height * scale;
+  ensureSpace(doc, height + 8);
+  const y = doc.y;
+  doc.image(image.bytes, PDF_LEFT + (PDF_CONTENT_WIDTH - width) / 2, y, { width, height });
+  doc.x = PDF_LEFT;
+  doc.y = y + height + 6;
+}
 
 function ensureSpace(doc: PDFKit.PDFDocument, needed: number) {
   if (doc.y + needed > doc.page.height - PDF_BOTTOM) {
@@ -175,7 +252,7 @@ function writePdfTable(
   }
 }
 
-function writePdfBlocks(doc: PDFKit.PDFDocument, content: string) {
+function writePdfBlocks(doc: PDFKit.PDFDocument, content: string, images?: PdfImages) {
   const blocks = parseManuscriptBlocks(content.trim() || "Not generated yet.");
   if (!blocks.length) {
     writeRichText(doc, "Not generated yet.", {
@@ -186,11 +263,11 @@ function writePdfBlocks(doc: PDFKit.PDFDocument, content: string) {
   }
 
   for (const block of blocks) {
-    writePdfBlock(doc, block);
+    writePdfBlock(doc, block, images);
   }
 }
 
-function writePdfBlock(doc: PDFKit.PDFDocument, block: ManuscriptBlock) {
+function writePdfBlock(doc: PDFKit.PDFDocument, block: ManuscriptBlock, images?: PdfImages) {
   if (block.type === "heading") {
     const size = block.level <= 2 ? 14 : block.level === 3 ? 12 : 11;
     ensureSpace(doc, 28);
@@ -230,6 +307,22 @@ function writePdfBlock(doc: PDFKit.PDFDocument, block: ManuscriptBlock) {
     doc.moveDown(0.2);
     writePdfTable(doc, block.headers, block.rows);
     doc.moveDown(0.45);
+    return;
+  }
+
+  const picture = block.type === "figure" && block.src ? images?.get(block.src) : undefined;
+  if (block.type === "figure" && picture) {
+    doc.moveDown(0.4);
+    writePdfImage(doc, picture);
+    if (block.caption && block.caption !== "Illustration") {
+      doc
+        .font("Times-Italic")
+        .fontSize(10)
+        .fillColor("#555555")
+        .text(block.caption, PDF_LEFT, doc.y, { width: PDF_CONTENT_WIDTH, align: "center" });
+      doc.font("Times-Roman").fillColor("#111111");
+    }
+    doc.moveDown(0.6);
     return;
   }
 
@@ -341,6 +434,7 @@ export function buildMarkdownManuscript(book: ExportBook): string {
 
 export async function buildPdfBuffer(book: ExportBook): Promise<Buffer> {
   const { user } = book;
+  const images = await loadPdfImages(book);
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -414,6 +508,11 @@ export async function buildPdfBuffer(book: ExportBook): Promise<Buffer> {
 
     for (const chapter of book.chapters) {
       doc.addPage();
+      const opener = chapter.imageUrl ? images.get(chapter.imageUrl) : undefined;
+      if (opener) {
+        writePdfImage(doc, opener, 300);
+        doc.moveDown(1);
+      }
       doc
         .font("Times-Bold")
         .fontSize(16)
@@ -438,7 +537,7 @@ export async function buildPdfBuffer(book: ExportBook): Promise<Buffer> {
           color: "#222222",
         });
         doc.moveDown(0.35);
-        writePdfBlocks(doc, section.content?.trim() || "Not generated yet.");
+        writePdfBlocks(doc, section.content?.trim() || "Not generated yet.", images);
         doc.moveDown(0.35);
       }
     }
@@ -506,6 +605,9 @@ export async function buildEpubBuffer(book: ExportBook): Promise<Buffer> {
 
   for (const chapter of book.chapters) {
     const parts: string[] = [
+      ...(chapter.imageUrl
+        ? [`<div class="figure"><img src="${escapeHtml(chapter.imageUrl)}" alt="Chapter ${chapter.number} illustration" /></div>`]
+        : []),
       `<h1>Chapter ${chapter.number}: ${escapeHtml(chapter.title)}</h1>`,
     ];
     if (chapter.summary) {
@@ -545,7 +647,11 @@ export async function buildEpubBuffer(book: ExportBook): Promise<Buffer> {
         (user.includeBrandInExport &&
           (user.imprintName || user.brandName || undefined)) ||
         undefined,
-      css: `body { font-family: Georgia, serif; line-height: 1.5; } h1, h2 { font-family: Georgia, serif; } p { margin: 0 0 1em; }`,
+      css: `body { font-family: Georgia, serif; line-height: 1.5; } h1, h2 { font-family: Georgia, serif; } p { margin: 0 0 1em; } .figure { margin: 1.5em 0; text-align: center; } .figure img { max-width: 100%; height: auto; } .caption { font-size: 0.9em; color: #555; }`,
+      // Pictures are downloaded into the file; a missing one is left out, not fatal.
+      fetchTimeout: 15_000,
+      retryTimes: 2,
+      ignoreFailedDownloads: true,
     },
     content
   );
