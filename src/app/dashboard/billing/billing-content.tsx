@@ -15,6 +15,12 @@ import {
   pricingHeaderStyle,
 } from "@/lib/pricing-plans";
 import { LEGAL } from "@/lib/legal";
+import {
+  formatRegionalPrice,
+  hasYearlyPricing,
+  regionalPrice,
+  type RegionalPricing,
+} from "@/lib/regional-pricing";
 import { useUpgradePlan } from "@/components/dashboard/upgrade-button";
 import { LegalClickAgreement } from "@/components/legal/legal-consent";
 import { useDashboardUser } from "@/components/dashboard/user-context";
@@ -78,8 +84,11 @@ function AddonStepper({
 
 export function BillingContent({
   instantUpgrade = true,
+  pricing,
 }: {
   instantUpgrade?: boolean;
+  /** Prices for the visitor's country — ₹ in India, $ elsewhere. */
+  pricing: RegionalPricing;
 }) {
   const searchParams = useSearchParams();
   const { upgrade, loading } = useUpgradePlan();
@@ -88,6 +97,11 @@ export function BillingContent({
     null
   );
   const [interval, setInterval] = useState<BillingInterval>("month");
+  const showYearly = hasYearlyPricing(pricing);
+  // Plans not sold in this country (e.g. Unlimited in India) are hidden.
+  const visiblePlans = PRICING_PLANS.filter(
+    (planMeta) => regionalPrice(pricing, planMeta.key, interval) !== null
+  );
   const [pagesQty, setPagesQty] = useState(0);
   const [audioQty, setAudioQty] = useState(0);
   const [pagesBonus, setPagesBonus] = useState(0);
@@ -346,35 +360,37 @@ export function BillingContent({
             )}
         </div>
 
-        <div className="inline-flex rounded-full border border-[#e8e8e8] bg-[#f7f7f7] p-1">
-          <button
-            type="button"
-            onClick={() => setInterval("month")}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
-              interval === "month"
-                ? "bg-white text-[#0a2540] shadow-sm"
-                : "text-[#697386] hover:text-[#0a2540]"
-            )}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setInterval("year")}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
-              interval === "year"
-                ? "bg-white text-[#0a2540] shadow-sm"
-                : "text-[#697386] hover:text-[#0a2540]"
-            )}
-          >
-            Yearly
-            <span className="ml-1.5 text-[11px] font-semibold text-[#0e6245]">
-              2 mo free
-            </span>
-          </button>
-        </div>
+        {showYearly && (
+          <div className="inline-flex rounded-full border border-[#e8e8e8] bg-[#f7f7f7] p-1">
+            <button
+              type="button"
+              onClick={() => setInterval("month")}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
+                interval === "month"
+                  ? "bg-white text-[#0a2540] shadow-sm"
+                  : "text-[#697386] hover:text-[#0a2540]"
+              )}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setInterval("year")}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
+                interval === "year"
+                  ? "bg-white text-[#0a2540] shadow-sm"
+                  : "text-[#697386] hover:text-[#0a2540]"
+              )}
+            >
+              Yearly
+              <span className="ml-1.5 text-[11px] font-semibold text-[#0e6245]">
+                2 mo free
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {onTrial && user && (
@@ -396,13 +412,17 @@ export function BillingContent({
         />
       )}
 
-      <div className="grid items-stretch gap-5 pt-3 lg:grid-cols-3">
-        {PRICING_PLANS.map((planMeta) => {
+      <div
+        className={cn(
+          "grid items-stretch gap-5 pt-3",
+          visiblePlans.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2"
+        )}
+      >
+        {visiblePlans.map((planMeta) => {
           const key = planMeta.key;
           const plan = PLANS[key];
           const items = PRICING_FEATURES[key];
-          const displayPrice =
-            interval === "year" ? plan.yearlyPrice : plan.price;
+          const displayPrice = regionalPrice(pricing, key, interval) ?? 0;
           const periodLabel = interval === "year" ? "per year" : "per month";
           const isCurrent =
             currentPlan === key ||
@@ -458,7 +478,7 @@ export function BillingContent({
                 </p>
                 <div className="mt-1 flex items-end gap-2">
                   <span className="text-[48px] font-bold leading-none tracking-[-0.04em] text-[#0a2540]">
-                    ${displayPrice}
+                    {formatRegionalPrice(pricing, displayPrice)}
                   </span>
                   <span className="mb-1.5 text-[14px] text-[#697386]">
                     {periodLabel}

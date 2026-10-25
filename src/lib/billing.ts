@@ -1,7 +1,18 @@
 import { db } from "@/lib/db";
 import { knownAddonPriceIds } from "@/lib/addons";
-import { PLANS, PREMIUM_TRIAL, type BillingInterval } from "@/lib/constants";
+import {
+  PLANS,
+  PREMIUM_TRIAL,
+  planPriceId,
+  type BillingInterval,
+} from "@/lib/constants";
 import { cleanEnv } from "@/lib/env";
+import { countryCodeFromIncomingRequest, countryCodeFromRequest } from "@/lib/geo";
+import {
+  REGIONAL_PRICING,
+  pricingRegionForCountry,
+  type RegionalPricing,
+} from "@/lib/regional-pricing";
 
 export type PaidPlan = "PRO" | "ENTERPRISE" | "UNLIMITED";
 
@@ -26,6 +37,8 @@ export function knownPaidPriceIds(): Set<string> {
       envPrice("STRIPE_ENTERPRISE_YEARLY_PRICE_ID"),
       envPrice("STRIPE_UNLIMITED_PRICE_ID"),
       envPrice("STRIPE_UNLIMITED_YEARLY_PRICE_ID"),
+      envPrice("STRIPE_PRO_INR_PRICE_ID"),
+      envPrice("STRIPE_ENTERPRISE_INR_PRICE_ID"),
       cleanEnv(PLANS.PRO.priceId),
       cleanEnv(PLANS.PRO.yearlyPriceId),
       cleanEnv(PLANS.ENTERPRISE.priceId),
@@ -53,6 +66,7 @@ export function planFromPriceId(priceId: string | undefined): PaidPlan {
     [
       envPrice("STRIPE_ENTERPRISE_PRICE_ID"),
       envPrice("STRIPE_ENTERPRISE_YEARLY_PRICE_ID"),
+      envPrice("STRIPE_ENTERPRISE_INR_PRICE_ID"),
       cleanEnv(PLANS.ENTERPRISE.priceId),
       cleanEnv(PLANS.ENTERPRISE.yearlyPriceId),
     ].filter(Boolean)
@@ -87,6 +101,37 @@ export function isStripeBillingEnabled() {
     (envPrice("STRIPE_ENTERPRISE_PRICE_ID") ||
       envPrice("STRIPE_ENTERPRISE_YEARLY_PRICE_ID"))
   );
+}
+
+/**
+ * Subscription prices for the visitor: live geo first, then the country saved
+ * on the account. India shows USD until its INR Stripe prices are configured,
+ * so the price shown always matches what Checkout charges.
+ */
+export async function pricingForRequest(
+  request: Request | null,
+  userId?: string | null
+): Promise<RegionalPricing> {
+  let country = request
+    ? countryCodeFromRequest(request)
+    : await countryCodeFromIncomingRequest();
+  if (!country && userId) {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { countryCode: true },
+    });
+    country = user?.countryCode ?? null;
+  }
+
+  const region = pricingRegionForCountry(country);
+  if (
+    region === "IN" &&
+    isStripeBillingEnabled() &&
+    !(planPriceId("PRO", "month", "IN") && planPriceId("ENTERPRISE", "month", "IN"))
+  ) {
+    return REGIONAL_PRICING.DEFAULT;
+  }
+  return REGIONAL_PRICING[region];
 }
 
 export function isTrialActive(user: {

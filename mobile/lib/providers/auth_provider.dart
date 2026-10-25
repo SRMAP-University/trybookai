@@ -36,6 +36,9 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isAuthenticated => user != null;
 
+  /// Store billing, when wired up — source of store-localized prices.
+  RevenueCatService? get revenueCat => _revenueCat;
+
   /// Shell / router: allow app while `/me` is still in flight if a token exists.
   bool get canEnterApp => user != null || hasStoredSession;
 

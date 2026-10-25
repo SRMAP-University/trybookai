@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { PREMIUM_TRIAL, PLANS } from "@/lib/constants";
+import { PREMIUM_TRIAL } from "@/lib/constants";
 import { addonPriceId } from "@/lib/addons";
 import { cleanEnv } from "@/lib/env";
 import { getAppUrl } from "@/lib/book-public";
@@ -16,7 +16,7 @@ import {
   STRIPE_UNLIMITED_INCLUDED_ADDONS,
   STRIPE_UNLIMITED_MARKETING_FEATURES,
 } from "@/lib/stripe-catalog";
-import type { PaidPlan } from "@/lib/billing";
+import { planFromPriceId, type PaidPlan } from "@/lib/billing";
 
 let stripeInstance: Stripe | null = null;
 
@@ -85,9 +85,10 @@ async function syncProductCatalog(
 async function ensureIncludedFeaturePriceId(
   plan: PaidPlan,
   feature: string,
-  interval: "month" | "year"
+  interval: "month" | "year",
+  currency: string
 ): Promise<string> {
-  const lookupKey = featureLookupKey(plan, feature, interval);
+  const lookupKey = featureLookupKey(plan, feature, interval, currency);
   const cached = includedPriceCache.get(lookupKey);
   if (cached) return cached;
 
@@ -114,7 +115,7 @@ async function ensureIncludedFeaturePriceId(
 
   const price = await stripe.prices.create({
     product: product.id,
-    currency: "usd",
+    currency,
     unit_amount: 0,
     recurring: { interval },
     lookup_key: lookupKey,
@@ -128,9 +129,11 @@ async function ensureIncludedFeaturePriceId(
   return price.id;
 }
 
+/** Checkout needs every line item in the plan price's currency. */
 async function includedFeatureLineItems(
   plan: PaidPlan,
-  interval: "month" | "year"
+  interval: "month" | "year",
+  currency: string
 ): Promise<Stripe.Checkout.SessionCreateParams.LineItem[]> {
   const features =
     plan === "UNLIMITED"
@@ -141,7 +144,7 @@ async function includedFeatureLineItems(
 
   const priceIds = await Promise.all(
     features.map((feature) =>
-      ensureIncludedFeaturePriceId(plan, feature, interval)
+      ensureIncludedFeaturePriceId(plan, feature, interval, currency)
     )
   );
 
@@ -192,16 +195,7 @@ export async function createCheckoutSession({
     ? premiumTrialEndUnix(trialPeriodDays!)
     : undefined;
 
-  const resolvedPlan: PaidPlan =
-    plan ||
-    (cleanEnv(priceId) === cleanEnv(process.env.STRIPE_UNLIMITED_PRICE_ID) ||
-    cleanEnv(priceId) === cleanEnv(process.env.STRIPE_UNLIMITED_YEARLY_PRICE_ID)
-      ? "UNLIMITED"
-      : cleanEnv(priceId) === cleanEnv(process.env.STRIPE_ENTERPRISE_PRICE_ID) ||
-          cleanEnv(priceId) ===
-            cleanEnv(process.env.STRIPE_ENTERPRISE_YEARLY_PRICE_ID)
-        ? "ENTERPRISE"
-        : "PRO");
+  const resolvedPlan: PaidPlan = plan || planFromPriceId(priceId);
 
   try {
     await syncProductCatalog(priceId, resolvedPlan);
@@ -212,10 +206,21 @@ export async function createCheckoutSession({
   const mainPrice = await stripe.prices.retrieve(priceId);
   const interval =
     mainPrice.recurring?.interval === "year" ? "year" : "month";
+  const formatAmount = (minorUnits: number) =>
+    new Intl.NumberFormat(mainPrice.currency === "inr" ? "en-IN" : "en-US", {
+      style: "currency",
+      currency: mainPrice.currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(minorUnits / 100);
 
   let featureItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   try {
-    featureItems = await includedFeatureLineItems(resolvedPlan, interval);
+    featureItems = await includedFeatureLineItems(
+      resolvedPlan,
+      interval,
+      mainPrice.currency
+    );
   } catch (error) {
     console.warn("[stripe] included feature line items failed", error);
   }
@@ -270,10 +275,10 @@ export async function createCheckoutSession({
     custom_text: {
       submit: {
         message: withTrial
-          ? `${PREMIUM_TRIAL.days}-day free trial · $0 due today. After the trial, your card is charged $${PLANS.ENTERPRISE.price}/mo (or the yearly price if selected). Cancel anytime before the trial ends to avoid charges. ${legalNote}`
+          ? `${PREMIUM_TRIAL.days}-day free trial · ${formatAmount(0)} due today. After the trial, your card is charged ${formatAmount(mainPrice.unit_amount ?? 0)}/${interval === "year" ? "yr" : "mo"}. Cancel anytime before the trial ends to avoid charges. ${legalNote}`
           : resolvedPlan === "UNLIMITED"
             ? `Unlimited is subject to fair use and rate limits in our Terms. ${legalNote}`
-            : `${legalNote} “Included ·” rows are plan features at $0. Extra pages/audio are optional paid capacity.`,
+            : `${legalNote} “Included ·” rows are plan features at ${formatAmount(0)}. Extra pages/audio are optional paid capacity.`,
       },
     },
     ...(withTrial ? { payment_method_collection: "always" as const } : {}),

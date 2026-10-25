@@ -5,9 +5,13 @@ import 'package:flutter/foundation.dart';
 /// - `test_…` = Test Store — **debug builds only** (SDK kills release processes)
 /// - `goog_…` / `appl_…` = Play / App Store — use for release & Shorebird builds
 ///
-/// Pass production key: `--dart-define=REVENUECAT_API_KEY=goog_xxx`
+/// Override with `--dart-define=REVENUECAT_API_KEY=...`.
 class RevenueCatConfig {
   static const String testApiKey = 'test_DiHlFWGSHJWFiFlKRPMkckPCuCl';
+
+  /// Google Play app "Book AI" (appcaa134e701) in RevenueCat project
+  /// proj602f353b. Public by design — shipped in every Android build.
+  static const String googleApiKey = 'goog_NHiakdIXWrqvlpsAeaJEiUMcHoG';
 
   static const String _envApiKey = String.fromEnvironment('REVENUECAT_API_KEY');
 
@@ -16,7 +20,9 @@ class RevenueCatConfig {
     if (_envApiKey.isNotEmpty) return _envApiKey;
     // Release / profile: never fall back to Test Store — Purchases.configure
     // intentionally crashes the process when a test_ key is used.
-    if (kReleaseMode) return '';
+    if (kReleaseMode) {
+      return defaultTargetPlatform == TargetPlatform.android ? googleApiKey : '';
+    }
     return testApiKey;
   }
 

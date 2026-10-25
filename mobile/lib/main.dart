@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/providers/new_book_draft_provider.dart';
@@ -10,10 +11,12 @@ import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/routing/app_page.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
+import 'package:bookai_mobile/services/revenuecat_service.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/screens/auth/boot_screen.dart';
 import 'package:bookai_mobile/screens/auth/login_screen.dart';
 import 'package:bookai_mobile/screens/auth/register_screen.dart';
+import 'package:bookai_mobile/screens/billing/billing_screen.dart';
 import 'package:bookai_mobile/screens/shell/main_shell.dart';
 import 'package:bookai_mobile/screens/home/home_screen.dart';
 import 'package:bookai_mobile/screens/books/books_screen.dart';
@@ -32,7 +35,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final api = ApiClient();
   final push = PushNotificationService(api);
-  final auth = AuthProvider(api, push: push);
+  // Linked to the signed-in user by AuthProvider (configure + logIn).
+  final revenueCat = RevenueCatService();
+  final auth = AuthProvider(api, push: push, revenueCat: revenueCat);
   final books = BooksProvider(api);
 
   // One gate before first frame: token read only (fast). Skip BootScreen → shell
@@ -54,6 +59,7 @@ Future<void> main() async {
       auth: auth,
       books: books,
       push: push,
+      revenueCat: revenueCat,
       initialLocation: hasToken ? '/home' : '/login',
     ),
   );
@@ -97,6 +103,7 @@ class BookAiApp extends StatefulWidget {
     required this.auth,
     required this.books,
     required this.push,
+    required this.revenueCat,
     required this.initialLocation,
   });
 
@@ -104,6 +111,7 @@ class BookAiApp extends StatefulWidget {
   final AuthProvider auth;
   final BooksProvider books;
   final PushNotificationService push;
+  final RevenueCatService revenueCat;
   final String initialLocation;
 
   @override
@@ -134,6 +142,7 @@ class _BookAiAppState extends State<BookAiApp> {
         Provider.value(value: widget.api),
         Provider.value(value: widget.push),
         ChangeNotifierProvider.value(value: widget.auth),
+        ChangeNotifierProvider.value(value: widget.revenueCat),
         ChangeNotifierProvider.value(value: widget.books),
         ChangeNotifierProvider.value(value: _public),
         ChangeNotifierProvider.value(value: _newBookDraft),
@@ -178,7 +187,7 @@ GoRouter _buildRouter(
       if (inApp && (isAuthRoute || isBoot)) {
         return auth.pendingOnboarding ? '/books/new' : '/home';
       }
-      if (loc == '/billing') return '/account';
+      if (loc == '/billing' && !AppBilling.iapEnabled) return '/account';
       return null;
     },
     routes: [
@@ -199,7 +208,9 @@ GoRouter _buildRouter(
       ),
       GoRoute(
         path: '/billing',
-        redirect: (context, state) => '/account',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) =>
+            AppPage.slide(state, const BillingScreen()),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
