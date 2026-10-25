@@ -188,10 +188,10 @@ export function DashboardCreatePrompt({
     <div>
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-[#e6ebf1] bg-white shadow-[0_1px_2px_rgba(10,37,64,0.04),0_12px_32px_-20px_rgba(10,37,64,0.25)] transition-[border-color,box-shadow] duration-200 focus-within:border-[#c9c5ff] focus-within:ring-4 focus-within:ring-[#635bff]/10 sm:rounded-[20px]"
+        className="rounded-3xl bg-white shadow-[0_0_0_1px_rgba(10,37,64,0.05),0_2px_6px_rgba(10,37,64,0.04),0_18px_40px_-18px_rgba(10,37,64,0.22)] transition-shadow duration-200 focus-within:shadow-[0_0_0_1px_rgba(99,91,255,0.3),0_0_0_5px_rgba(99,91,255,0.08),0_18px_40px_-18px_rgba(10,37,64,0.22)]"
       >
         {/* Service tabs — compact on phone */}
-        <div className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-[#eef1f5] px-2 pt-2 pb-1.5 [scrollbar-width:none] sm:px-3 sm:pt-3 sm:pb-2 [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-1 overflow-x-auto overscroll-x-contain px-2 pt-2 pb-1.5 [scrollbar-width:none] sm:px-3 sm:pt-3 sm:pb-1 [&::-webkit-scrollbar]:hidden">
           {SERVICES.map((s) => {
             const Icon = s.icon;
             const selected = service === s.id;
@@ -297,7 +297,7 @@ export function DashboardCreatePrompt({
         </div>
 
         {/* Footer — compact on phone */}
-        <div className="flex items-center justify-between gap-3 border-t border-[#eef1f5] px-3 py-2.5 sm:px-5 sm:py-3">
+        <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-1 sm:px-5 sm:pb-4">
           <div className="flex min-w-0 items-center gap-2 text-[12px] text-[#697386]">
             <span className="inline-flex items-center gap-1.5 font-medium text-[#0a2540]">
               <active.icon

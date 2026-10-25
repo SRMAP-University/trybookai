@@ -149,7 +149,7 @@ export function LiveGenerationDock({
       <button
         type="button"
         onClick={onExpand}
-        className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-[#635bff]/30 bg-[#0a2540] px-2.5 py-4 text-white shadow-lg transition-transform hover:px-3"
+        className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-2xl bg-[#0a2540] px-2.5 py-4 text-white shadow-lg transition-transform hover:px-3"
         aria-label="Expand live generation"
       >
         <PenLine className="h-4 w-4 text-[#c4bfff]" />
@@ -160,7 +160,7 @@ export function LiveGenerationDock({
         >
           Writing
         </span>
-        <span className="rounded bg-[#635bff] px-1.5 py-0.5 text-[10px] font-semibold">
+        <span className="rounded-full bg-[#635bff] px-1.5 py-0.5 text-[10px] font-semibold">
           {Math.round(progress)}%
         </span>
       </button>
@@ -178,11 +178,11 @@ export function LiveGenerationDock({
       />
       <aside
         className={cn(
-          "fixed right-0 top-14 z-40 flex w-[min(100vw,420px)] flex-col border-l border-[#e6ebf1] bg-[#f6f9fc] shadow-[-12px_0_40px_rgba(10,37,64,0.12)]",
+          "fixed right-0 top-14 z-40 flex w-[min(100vw,420px)] flex-col bg-[#f6f9fc] shadow-[-12px_0_40px_rgba(10,37,64,0.12)]",
           "bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:top-16 lg:bottom-0"
         )}
       >
-        <div className="flex items-center gap-2 border-b border-[#e6ebf1] bg-white px-4 py-3">
+        <div className="flex items-center gap-2 bg-white px-4 pb-1 pt-3">
           <PenLine className="h-4 w-4 shrink-0 text-[#635bff]" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-medium text-[#0a2540]">
@@ -194,14 +194,14 @@ export function LiveGenerationDock({
           <button
             type="button"
             onClick={onMinimize}
-            className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#0a2540]"
+            className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#0a2540]"
             aria-label="Minimize dock"
           >
             <Minus className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="border-b border-[#e6ebf1] bg-white px-4 py-2.5">
+        <div className="bg-white px-4 pb-3 pt-1.5">
           <p className="text-[11px] font-medium text-[#635bff]">
             {phaseMessage ?? "Writing your book…"}
           </p>
@@ -225,11 +225,11 @@ export function LiveGenerationDock({
           contentRef={contentRef}
         />
 
-        <div className="border-t border-[#e6ebf1] bg-white px-4 py-2">
+        <div className="bg-white px-4 py-2">
           <button
             type="button"
             onClick={onMinimize}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-[12px] font-medium text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#0a2540]"
+            className="flex w-full items-center justify-center gap-1.5 rounded-full py-1.5 text-[12px] font-medium text-[#697386] transition-colors hover:bg-[#f6f9fc] hover:text-[#0a2540]"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             Minimize

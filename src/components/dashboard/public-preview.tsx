@@ -38,7 +38,7 @@ export async function PublicDashboardPreview() {
             Browse all
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
           {recentCovers.map((book, i) => {
             const sample = SAMPLE_BOOKS[i % SAMPLE_BOOKS.length];
             const href = book.slug
@@ -51,15 +51,15 @@ export async function PublicDashboardPreview() {
               <Link
                 key={book.id}
                 href={href}
-                className="group overflow-hidden rounded-lg border border-[#e6ebf1] bg-white transition-colors hover:border-[#635bff]/40"
+                className="group block"
               >
                 <BookCover
                   title={book.title}
                   coverImage={book.coverImage}
                   aspect="card"
-                  className="rounded-none border-0 shadow-none ring-0"
+                  className="rounded-xl shadow-[0_8px_22px_-10px_rgba(10,37,64,0.35)] transition-[transform,box-shadow] duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_16px_32px_-12px_rgba(10,37,64,0.4)]"
                 />
-                <div className="p-3">
+                <div className="px-0.5 pt-2.5">
                   <p className="line-clamp-1 text-[13px] font-medium text-[#0a2540] group-hover:text-[#635bff]">
                     {book.title}
                   </p>
@@ -75,7 +75,7 @@ export async function PublicDashboardPreview() {
       </section>
 
       {/* Anonymous CTA */}
-      <section className="rounded-xl border border-dashed border-[#e6ebf1] bg-[#f8fafc] px-6 py-10 text-center">
+      <section className="rounded-3xl bg-[#f7f8fb] px-6 py-10 text-center">
         <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#f0efff] text-[#635bff]">
           <BookOpen className="h-5 w-5" />
         </div>
@@ -87,7 +87,7 @@ export async function PublicDashboardPreview() {
           manuscripts.
         </p>
         <Button
-          className="mt-6 h-9 rounded-md bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
+          className="mt-6 h-9 rounded-full bg-[#635bff] px-5 text-[13px] hover:bg-[#5851e5]"
           asChild
         >
           <Link href="/register?callbackUrl=/dashboard">

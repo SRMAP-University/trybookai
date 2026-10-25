@@ -44,7 +44,7 @@ export function PremiumUpgradeDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] gap-0 overflow-y-auto p-0 sm:max-w-2xl">
-        <DialogHeader className="space-y-1 border-b border-[#eef1f5] px-5 py-4 text-left">
+        <DialogHeader className="space-y-1 px-5 pb-0 pt-5 text-left">
           <DialogTitle className="text-[17px] font-semibold tracking-tight text-[#0a2540]">
             Upgrade to unlock
           </DialogTitle>
@@ -63,10 +63,10 @@ export function PremiumUpgradeDialog({
               <div
                 key={plan.key}
                 className={cn(
-                  "flex flex-col rounded-xl border bg-white p-4",
+                  "flex flex-col rounded-2xl p-4",
                   plan.highlight
-                    ? "border-[#635bff]/40 shadow-[0_8px_24px_rgba(99,91,255,0.1)]"
-                    : "border-[#e6ebf1]"
+                    ? "bg-white shadow-[0_8px_24px_rgba(99,91,255,0.12)] ring-1 ring-[#635bff]/40"
+                    : "bg-[#f7f8fb]"
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -105,7 +105,7 @@ export function PremiumUpgradeDialog({
                   disabled={Boolean(loading)}
                   onClick={() => void upgrade(plan.key, "month")}
                   className={cn(
-                    "mt-4 h-10 w-full text-[13px]",
+                    "mt-4 h-10 w-full rounded-full text-[13px]",
                     plan.highlight
                       ? "bg-[#635bff] hover:bg-[#5851e5]"
                       : "bg-[#0a2540] hover:bg-[#143352]"
@@ -121,11 +121,11 @@ export function PremiumUpgradeDialog({
           })}
         </div>
 
-        <div className="border-t border-[#eef1f5] px-5 py-3 text-center">
+        <div className="px-5 pb-4 text-center">
           <Button
             type="button"
             variant="ghost"
-            className="h-8 text-[13px] text-[#62748e]"
+            className="h-8 rounded-full px-4 text-[13px] text-[#62748e]"
             onClick={() => onOpenChange(false)}
           >
             Not now

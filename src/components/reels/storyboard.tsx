@@ -89,9 +89,9 @@ export function Storyboard({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton
-        className="flex max-h-[min(92dvh,860px)] flex-col gap-0 overflow-hidden border-[#e6ebf1] bg-white p-0 sm:max-w-[960px]"
+        className="flex max-h-[min(92dvh,860px)] flex-col gap-0 overflow-hidden bg-white p-0 sm:max-w-[960px]"
       >
-        <div className="border-b border-[#e6ebf1] bg-[#f6f9fc] px-5 pb-3 pt-5 sm:px-6">
+        <div className="bg-[#f6f9fc] px-5 pb-3 pt-5 sm:px-6">
           <DialogTitle className="pr-8 text-[17px] font-semibold tracking-[-0.02em] text-[#0a2540]">
             Storyboard
           </DialogTitle>
@@ -101,7 +101,7 @@ export function Storyboard({
           </DialogDescription>
 
           {reel.episodes.length > 1 && (
-            <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 py-1">
               {reel.episodes.map((ep) => (
                 <button
                   key={ep.id}
@@ -111,10 +111,10 @@ export function Storyboard({
                     setEditing(null);
                   }}
                   className={cn(
-                    "shrink-0 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors",
+                    "shrink-0 rounded-full px-3 py-1 text-[12px] font-medium ring-1 transition-colors",
                     ep.number === episode.number
-                      ? "border-[#635bff] bg-[#f0efff] text-[#635bff]"
-                      : "border-[#e6ebf1] bg-white text-[#425466] hover:border-[#c9c5ff]"
+                      ? "bg-[#f0efff] text-[#635bff] ring-[#635bff]/40"
+                      : "bg-white text-[#425466] ring-transparent hover:text-[#0a2540] hover:ring-[#635bff]/20"
                   )}
                 >
                   {reel.format === "TRAILER" ? ep.title : `Ch. ${ep.number}`}
@@ -129,7 +129,7 @@ export function Storyboard({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-b border-[#e6ebf1] px-5 py-2.5 sm:px-6">
+        <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-3.5 sm:px-6">
           <p className="min-w-0 truncate text-[13px] font-medium text-[#0a2540]">
             {episode.title}
             <span className="ml-2 font-normal text-[#697386]">
@@ -138,7 +138,7 @@ export function Storyboard({
           </p>
           <Button
             size="sm"
-            className="h-8 shrink-0 bg-[#635bff] text-[12px] hover:bg-[#5851e5]"
+            className="h-8 shrink-0 rounded-full bg-[#635bff] px-3.5 text-[12px] hover:bg-[#5851e5]"
             disabled={!ready}
             onClick={() => onPlay(episode.number)}
           >
@@ -158,7 +158,7 @@ export function Storyboard({
             const isEditing = editing?.id === shot.id;
             return (
               <div key={shot.id} className="flex min-w-0 flex-col gap-2">
-                <div className="relative aspect-[9/16] overflow-hidden rounded-lg bg-[#0a2540]">
+                <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-[#0a2540]">
                   {shot.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={shot.imageUrl} alt={shot.description} className="h-full w-full object-cover" />
@@ -170,16 +170,16 @@ export function Storyboard({
                       <Loader2 className="h-5 w-5 animate-spin text-white" />
                     </div>
                   )}
-                  <span className="absolute bottom-1.5 left-1.5 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] text-white">
+                  <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 font-mono text-[10px] text-white">
                     {formatTime(shot.startMs)}–{formatTime(shot.endMs)}
                   </span>
                   {shot.status === "REUSED" && (
-                    <span className="absolute right-1.5 top-1.5 rounded bg-[#fcf5e0] px-1.5 py-0.5 text-[10px] font-semibold text-[#9a6700]">
+                    <span className="absolute right-1.5 top-1.5 rounded-full bg-[#fcf5e0] px-2 py-0.5 text-[10px] font-semibold text-[#9a6700]">
                       Reused
                     </span>
                   )}
                   {shot.rerolls > 0 && shot.status !== "REUSED" && (
-                    <span className="absolute right-1.5 top-1.5 rounded bg-[#ebe9ff] px-1.5 py-0.5 text-[10px] font-semibold text-[#635bff]">
+                    <span className="absolute right-1.5 top-1.5 rounded-full bg-[#ebe9ff] px-2 py-0.5 text-[10px] font-semibold text-[#635bff]">
                       Re-rolled
                     </span>
                   )}
@@ -200,7 +200,7 @@ export function Storyboard({
                     <div className="flex gap-1.5">
                       <Button
                         size="sm"
-                        className="h-7 flex-1 bg-[#635bff] text-[11px] hover:bg-[#5851e5]"
+                        className="h-7 flex-1 rounded-full bg-[#635bff] text-[11px] hover:bg-[#5851e5]"
                         disabled={busy[shot.id] || !editing.text.trim() || rerollsLeft === 0}
                         onClick={() => edit(shot, { description: editing.text })}
                       >
@@ -209,7 +209,7 @@ export function Storyboard({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-[11px]"
+                        className="h-7 rounded-full border-transparent bg-[#f6f9fc] text-[11px] hover:bg-[#eef0f5]"
                         onClick={() => setEditing(null)}
                       >
                         Cancel
@@ -278,7 +278,7 @@ function ShotAction({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-6 items-center gap-1 rounded-md border border-[#e6ebf1] bg-white px-2 text-[11px] font-medium text-[#0a2540] transition-colors hover:border-[#c9c5ff] disabled:opacity-50"
+      className="inline-flex h-6 items-center gap-1 rounded-full bg-[#f6f9fc] px-2.5 text-[11px] font-medium text-[#0a2540] transition-colors hover:bg-[#eef0f5] disabled:opacity-50"
     >
       {icon}
       {label}

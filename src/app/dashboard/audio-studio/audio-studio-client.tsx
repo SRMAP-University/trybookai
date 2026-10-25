@@ -467,7 +467,7 @@ export function AudioStudioClient() {
         </div>
 
         {!audioLocked && user && (
-          <div className="min-w-[200px] rounded-lg border border-[#e6ebf1] bg-white px-3.5 py-2.5">
+          <div className="min-w-[200px] rounded-2xl bg-white px-4 py-2.5 shadow-soft">
             <div className="flex items-center justify-between gap-3 text-[12px]">
               <span className="text-[#697386]">Audio left</span>
               <span className="tabular-nums font-medium text-[#0a2540]">
@@ -489,7 +489,7 @@ export function AudioStudioClient() {
       </div>
 
       {audioLocked && (
-        <div className="rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] px-4 py-3 text-[13px] text-[#425466]">
+        <div className="rounded-2xl bg-[#f6f9fc] px-5 py-3.5 text-[13px] text-[#425466]">
           Audio narration is available on Pro, Premium, or during a Premium
           trial.{" "}
           <UpgradeLink
@@ -502,8 +502,8 @@ export function AudioStudioClient() {
       )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="overflow-hidden rounded-xl border border-[#e6ebf1] bg-white">
-          <div className="border-b border-[#e6ebf1] px-5 py-4 sm:px-6">
+        <section className="overflow-hidden rounded-2xl bg-white shadow-soft">
+          <div className="px-5 pt-5 sm:px-6">
             <p className="text-[13px] font-medium text-[#0a2540]">New project</p>
             <p className="mt-0.5 text-[12px] text-[#697386]">
               Source → format → voice → generate
@@ -534,7 +534,7 @@ export function AudioStudioClient() {
                 </span>
               </div>
 
-              <div className="mt-2 inline-flex rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] p-0.5">
+              <div className="mt-2 inline-flex gap-1 rounded-full bg-[#f6f9fc] p-1">
                 {(
                   [
                     { id: "text" as const, label: "Paste text" },
@@ -546,9 +546,9 @@ export function AudioStudioClient() {
                     type="button"
                     onClick={() => setMode(tab.id)}
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors",
+                      "rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors",
                       sourceMode === tab.id
-                        ? "bg-white text-[#0a2540] shadow-sm"
+                        ? "bg-white text-[#0a2540] shadow-[0_1px_3px_rgba(10,37,64,0.12)]"
                         : "text-[#697386] hover:text-[#0a2540]"
                     )}
                   >
@@ -574,9 +574,9 @@ export function AudioStudioClient() {
                     onChange={(e) => onPdfPicked(e.target.files?.[0] ?? null)}
                   />
                   {pdfFile ? (
-                    <div className="flex items-center justify-between gap-3 rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] px-3.5 py-3">
+                    <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#f7f8fb] px-3.5 py-3">
                       <div className="flex min-w-0 items-center gap-2.5">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-[#635bff]">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#635bff]">
                           <FileText className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
@@ -594,7 +594,7 @@ export function AudioStudioClient() {
                           setPdfFile(null);
                           if (fileInputRef.current) fileInputRef.current.value = "";
                         }}
-                        className="rounded-md p-1.5 text-[#697386] hover:bg-white hover:text-[#0a2540]"
+                        className="rounded-full p-1.5 text-[#697386] hover:bg-white hover:text-[#0a2540]"
                         aria-label="Remove PDF"
                       >
                         <X className="h-4 w-4" />
@@ -604,7 +604,7 @@ export function AudioStudioClient() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#d8dee8] bg-[#fafbfc] px-4 py-12 text-center transition-colors hover:border-[#635bff]/40 hover:bg-[#f8f7ff]"
+                      className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#dfe4ec] bg-[#fafbfc] px-4 py-12 text-center transition-colors hover:border-[#635bff]/40 hover:bg-[#f8f7ff]"
                     >
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ebe9ff] text-[#635bff]">
                         <Upload className="h-4 w-4" />
@@ -650,10 +650,10 @@ export function AudioStudioClient() {
                       type="button"
                       onClick={() => onTypeChange(option.id)}
                       className={cn(
-                        "flex items-start gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors",
+                        "flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors",
                         active
-                          ? "border-[#635bff] bg-[#f8f7ff]"
-                          : "border-[#e6ebf1] hover:border-[#c9c5ff]"
+                          ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+                          : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7]"
                       )}
                     >
                       <Icon
@@ -685,10 +685,10 @@ export function AudioStudioClient() {
                     <div
                       key={voice.id}
                       className={cn(
-                        "relative rounded-lg border transition-colors",
+                        "relative rounded-xl transition-colors",
                         active
-                          ? "border-[#635bff] bg-[#f8f7ff]"
-                          : "border-[#e6ebf1] hover:border-[#c9c5ff]"
+                          ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+                          : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7]"
                       )}
                     >
                       <button
@@ -724,10 +724,10 @@ export function AudioStudioClient() {
                       onClick={() => setVoiceId(voice.id)}
                       title={[voiceSummary(voice), voice.description].filter(Boolean).join(" — ")}
                       className={cn(
-                        "rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        "rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 transition-colors",
                         voiceId === voice.id
-                          ? "border-[#635bff] bg-[#f8f7ff] text-[#635bff]"
-                          : "border-[#e6ebf1] text-[#425466] hover:border-[#c9c5ff]"
+                          ? "bg-[#f0efff] text-[#635bff] ring-[#635bff]/40"
+                          : "bg-[#f7f8fb] text-[#425466] ring-transparent hover:bg-[#f0f2f7]"
                       )}
                     >
                       {voice.name}
@@ -755,10 +755,10 @@ export function AudioStudioClient() {
                     type="button"
                     onClick={() => applyPreset(preset.id)}
                     className={cn(
-                      "rounded-md border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                      "rounded-full px-3 py-1.5 text-[12px] font-medium ring-1 transition-colors",
                       activePreset === preset.id
-                        ? "border-[#635bff] bg-[#f8f7ff] text-[#635bff]"
-                        : "border-[#e6ebf1] text-[#425466] hover:border-[#c9c5ff]"
+                        ? "bg-[#f0efff] text-[#635bff] ring-[#635bff]/40"
+                        : "bg-[#f7f8fb] text-[#425466] ring-transparent hover:bg-[#f0f2f7]"
                     )}
                   >
                     {preset.name}
@@ -768,7 +768,7 @@ export function AudioStudioClient() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6ebf1] bg-[#fafbfc] px-5 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f7f8fb] px-5 py-4 sm:px-6">
             <p className="text-[12px] text-[#697386]">
               {user && !audioLocked
                 ? `${audioRemaining} min remaining this month`
@@ -777,7 +777,7 @@ export function AudioStudioClient() {
             <Button
               onClick={handleGenerate}
               disabled={busy || audioLocked}
-              className="h-9 bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+              className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
             >
               {busy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -792,8 +792,8 @@ export function AudioStudioClient() {
         </section>
 
         <aside className="space-y-4">
-          <div className="rounded-xl border border-[#e6ebf1] bg-white">
-            <div className="flex items-center justify-between border-b border-[#e6ebf1] px-4 py-3">
+          <div className="rounded-2xl bg-white shadow-soft">
+            <div className="flex items-center justify-between px-4 pb-1 pt-4">
               <div>
                 <p className="text-[13px] font-medium text-[#0a2540]">Library</p>
                 <p className="text-[11px] text-[#697386]">
@@ -835,10 +835,10 @@ export function AudioStudioClient() {
                         type="button"
                         onClick={() => void openProject(project)}
                         className={cn(
-                          "flex w-full flex-col rounded-lg px-3 py-2.5 text-left transition-colors",
+                          "flex w-full flex-col rounded-xl px-3 py-2.5 text-left transition-colors",
                           active
-                            ? "bg-[#f8f7ff] ring-1 ring-[#c9c5ff]"
-                            : "hover:bg-[#f6f9fc]"
+                            ? "bg-[#f0efff] ring-1 ring-[#635bff]/40"
+                            : "hover:bg-[#f7f8fb]"
                         )}
                       >
                         <span className="truncate text-[13px] font-medium text-[#0a2540]">
@@ -847,7 +847,7 @@ export function AudioStudioClient() {
                         <span className="mt-1.5 flex items-center gap-2">
                           <span
                             className={cn(
-                              "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                              "rounded-full px-2 py-0.5 text-[10px] font-medium",
                               statusTone(status)
                             )}
                           >
@@ -866,7 +866,7 @@ export function AudioStudioClient() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#e6ebf1] px-4 py-3.5 text-[12px] leading-relaxed text-[#697386]">
+          <div className="rounded-2xl bg-[#f7f8fb] px-4 py-3.5 text-[12px] leading-relaxed text-[#697386]">
             <p className="font-medium text-[#0a2540]">Quick tips</p>
             <ul className="mt-2 space-y-1.5">
               <li>Use text-based PDFs — scans extract poorly.</li>

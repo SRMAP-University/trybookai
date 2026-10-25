@@ -57,11 +57,16 @@ export function DeleteBookDialog({ open, onOpenChange, bookId, title, isPublic }
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" disabled={deleting} onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            className="rounded-full px-4"
+            disabled={deleting}
+            onClick={() => onOpenChange(false)}
+          >
             Keep it
           </Button>
           <Button
-            className="bg-[#df1b41] text-white hover:bg-[#c0123a]"
+            className="rounded-full bg-[#df1b41] px-4 text-white hover:bg-[#c0123a]"
             disabled={deleting}
             onClick={() => void remove()}
           >

@@ -295,11 +295,11 @@ export function BookDerivativesDialog({
     <Dialog open={open} onOpenChange={resetAndClose}>
       <DialogContent
         showCloseButton
-        className="max-h-[min(92dvh,760px)] gap-0 overflow-y-auto border-[#e6ebf1] bg-white p-0 sm:max-w-[640px]"
+        className="max-h-[min(92dvh,760px)] gap-0 overflow-y-auto bg-white p-0 sm:max-w-[640px]"
       >
         {step === "pick" ? (
           <>
-            <div className="relative overflow-hidden border-b border-[#e6ebf1] bg-[#f6f9fc] px-5 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-7">
+            <div className="relative overflow-hidden bg-[#f6f9fc] px-5 pb-4 pt-6 sm:px-6 sm:pb-5 sm:pt-7">
               <div
                 className="pointer-events-none absolute inset-0 opacity-[0.4]"
                 style={{
@@ -338,11 +338,11 @@ export function BookDerivativesDialog({
                     type="button"
                     disabled={busy}
                     onClick={() => handleSelect(option)}
-                    className="group flex flex-col rounded-xl border border-[#e6ebf1] bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#635bff]/35 hover:shadow-[0_10px_28px_rgba(10,37,64,0.08)] disabled:opacity-60"
+                    className="group flex flex-col rounded-2xl bg-[#f7f8fb] p-4 text-left transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-soft-lg disabled:opacity-60"
                   >
                     <div
                       className={cn(
-                        "mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-linear-to-br text-white",
+                        "mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br text-white",
                         option.tone
                       )}
                     >
@@ -460,10 +460,10 @@ export function BookDerivativesDialog({
                         });
                       }}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                        "rounded-full px-3 py-1.5 text-[12px] font-medium ring-1 transition-colors",
                         activePreset === preset.id
-                          ? "border-[#635bff] bg-[#f0efff] text-[#635bff]"
-                          : "border-[#e6ebf1] text-[#425466] hover:border-[#c9c5ff]"
+                          ? "bg-[#f0efff] text-[#635bff] ring-[#635bff]/50"
+                          : "bg-[#f7f8fb] text-[#425466] ring-transparent hover:bg-[#f0f2f7]"
                       )}
                     >
                       {preset.name}
@@ -472,7 +472,7 @@ export function BookDerivativesDialog({
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-xl border border-[#e6ebf1] bg-[#fafbfc] p-4">
+              <div className="space-y-4 rounded-2xl bg-[#f7f8fb] p-4">
                 <SliderField
                   label="Stability"
                   hint="Lower = more expressive. Higher = steadier narration."
@@ -536,7 +536,7 @@ export function BookDerivativesDialog({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6ebf1] bg-[#fafbfc] px-5 py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fafbfc] px-5 py-3.5">
               <button
                 type="button"
                 onClick={() => setStep("pick")}
@@ -546,7 +546,7 @@ export function BookDerivativesDialog({
                 Back
               </button>
               <Button
-                className="h-9 bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+                className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
                 onClick={handleGenerate}
                 disabled={busy}
               >
@@ -562,7 +562,7 @@ export function BookDerivativesDialog({
         )}
 
         {step === "pick" && (
-          <div className="border-t border-[#e6ebf1] bg-[#fafbfc] px-5 py-3.5">
+          <div className="bg-[#fafbfc] px-5 py-3.5">
             <Button
               variant="ghost"
               className="h-8 w-full text-[13px] text-[#697386] hover:bg-transparent hover:text-[#0a2540]"

@@ -36,7 +36,7 @@ export function AnonymousRouteFallback({
           <p className="mt-1 text-[14px] text-[#697386]">{description}</p>
         </div>
 
-        <div className="rounded-xl border border-dashed border-[#e6ebf1] bg-[#f8fafc] px-6 py-14 text-center">
+        <div className="rounded-3xl bg-[#f7f8fb] px-6 py-14 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f0efff] text-[#635bff]">
             <Lock className="h-5 w-5" />
           </div>
@@ -50,13 +50,13 @@ export function AnonymousRouteFallback({
           <div className="mt-6 flex items-center justify-center gap-3">
             <Button
               variant="outline"
-              className="h-9 rounded-md border-[#e6ebf1] px-4 text-[13px] text-[#0a2540] hover:bg-white"
+              className="h-9 rounded-full border-transparent bg-white px-4 text-[13px] text-[#0a2540] shadow-soft hover:bg-white"
               asChild
             >
               <Link href="/login">Sign in</Link>
             </Button>
             <Button
-              className="h-9 rounded-md bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
+              className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
               asChild
             >
               <Link href="/register">Create free account</Link>

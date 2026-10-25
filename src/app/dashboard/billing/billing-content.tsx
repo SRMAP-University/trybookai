@@ -41,7 +41,7 @@ function AddonStepper({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#eef1f5] bg-[#fafbfc] px-4 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#f7f8fb] px-4 py-4">
       <div className="min-w-0">
         <p className="text-[15px] font-semibold text-[#0a2540]">{label}</p>
         <p className="mt-0.5 text-[13px] text-[#697386]">{description}</p>
@@ -346,14 +346,14 @@ export function BillingContent({
             )}
         </div>
 
-        <div className="inline-flex rounded-full border border-[#e8e8e8] bg-[#f7f7f7] p-1">
+        <div className="inline-flex gap-1 rounded-full bg-[#f6f9fc] p-1">
           <button
             type="button"
             onClick={() => setInterval("month")}
             className={cn(
               "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
               interval === "month"
-                ? "bg-white text-[#0a2540] shadow-sm"
+                ? "bg-white text-[#0a2540] shadow-[0_1px_3px_rgba(10,37,64,0.12)]"
                 : "text-[#697386] hover:text-[#0a2540]"
             )}
           >
@@ -365,7 +365,7 @@ export function BillingContent({
             className={cn(
               "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
               interval === "year"
-                ? "bg-white text-[#0a2540] shadow-sm"
+                ? "bg-white text-[#0a2540] shadow-[0_1px_3px_rgba(10,37,64,0.12)]"
                 : "text-[#697386] hover:text-[#0a2540]"
             )}
           >
@@ -415,9 +415,9 @@ export function BillingContent({
             <div
               key={key}
               className={cn(
-                "relative flex flex-col overflow-visible rounded-2xl border border-[#e8e8e8] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)]",
+                "relative flex flex-col overflow-visible rounded-3xl bg-white shadow-[0_0_0_1px_rgba(10,37,64,0.04),0_8px_30px_rgba(10,37,64,0.07)]",
                 planMeta.highlight &&
-                  "border-[#c9c5ff] shadow-[0_12px_40px_rgba(99,91,255,0.12)]",
+                  "shadow-[0_12px_40px_rgba(99,91,255,0.14)] ring-1 ring-[#c9c5ff]",
                 isCurrent && "ring-2 ring-[#635bff]/30"
               )}
             >
@@ -439,7 +439,7 @@ export function BillingContent({
               )}
 
               <div
-                className="overflow-hidden rounded-t-2xl px-7 pb-2 pt-10"
+                className="overflow-hidden rounded-t-3xl px-7 pb-2 pt-10"
                 style={pricingHeaderStyle(planMeta.headerFrom)}
               >
                 <div className="flex flex-wrap items-center gap-2">
@@ -493,7 +493,7 @@ export function BillingContent({
               <div className="flex flex-1 flex-col px-7 pb-7 pt-3">
                 {key === "PRO" && (
                   <Button
-                    className="mt-1 h-11 w-full bg-[#635bff] text-[14px] font-semibold hover:bg-[#5851e5]"
+                    className="mt-1 h-11 w-full rounded-full bg-[#635bff] text-[14px] font-semibold hover:bg-[#5851e5]"
                     onClick={() => handleCheckout("PRO")}
                     disabled={
                       !!loading ||
@@ -520,7 +520,7 @@ export function BillingContent({
                   <div className="mt-1 space-y-2">
                     {canStartTrial && (
                       <Button
-                        className="h-11 w-full border-0 bg-[#0a2540] text-[14px] font-semibold text-white hover:bg-[#071a2e]"
+                        className="h-11 w-full rounded-full border-0 bg-[#0a2540] text-[14px] font-semibold text-white hover:bg-[#071a2e]"
                         onClick={() => handleTrial("start")}
                         disabled={!!loading || !!trialLoading}
                       >
@@ -532,7 +532,7 @@ export function BillingContent({
                     )}
                     {onTrial && (
                       <Button
-                        className="h-11 w-full bg-[#0e6245] text-[14px] font-semibold hover:bg-[#0a4d37]"
+                        className="h-11 w-full rounded-full bg-[#0e6245] text-[14px] font-semibold hover:bg-[#0a4d37]"
                         onClick={() => handleTrial("end")}
                         disabled={!!loading || !!trialLoading}
                       >
@@ -544,7 +544,7 @@ export function BillingContent({
                     )}
                     {!onTrial && !canStartTrial && (
                       <Button
-                        className="h-11 w-full bg-[#635bff] text-[14px] font-semibold text-white hover:bg-[#5851e5]"
+                        className="h-11 w-full rounded-full bg-[#635bff] text-[14px] font-semibold text-white hover:bg-[#5851e5]"
                         onClick={() => handleCheckout("ENTERPRISE")}
                         disabled={
                           !!loading ||
@@ -579,7 +579,7 @@ export function BillingContent({
                 {key === "UNLIMITED" && (
                   <div className="mt-1 space-y-2">
                     <Button
-                      className="h-11 w-full bg-[#635bff] text-[14px] font-semibold text-white hover:bg-[#5851e5]"
+                      className="h-11 w-full rounded-full bg-[#635bff] text-[14px] font-semibold text-white hover:bg-[#5851e5]"
                       onClick={() => handleCheckout("UNLIMITED")}
                       disabled={
                         !!loading ||
@@ -610,9 +610,7 @@ export function BillingContent({
                   </div>
                 )}
 
-                <div className="my-6 h-px bg-[#eef1f5]" />
-
-                <p className="text-[13px] font-medium text-[#0a2540]">
+                <p className="mt-7 text-[13px] font-medium text-[#0a2540]">
                   {planMeta.featuresLabel}
                 </p>
                 <ul className="mt-4 space-y-3">
@@ -634,7 +632,7 @@ export function BillingContent({
 
       <div
         className={cn(
-          "flex flex-col gap-4 rounded-2xl border border-[#e8e8e8] bg-[#fafbfc] px-6 py-5 sm:flex-row sm:items-center sm:justify-between",
+          "flex flex-col gap-4 rounded-3xl bg-[#f7f8fb] px-6 py-5 sm:flex-row sm:items-center sm:justify-between",
           currentPlan === "FREE" && "ring-2 ring-[#635bff]/30"
         )}
       >
@@ -669,14 +667,14 @@ export function BillingContent({
         </div>
         <Button
           variant="outline"
-          className="h-10 shrink-0 border-[#e6ebf1] text-[13px] font-semibold text-[#0a2540]"
+          className="h-10 shrink-0 rounded-full border-transparent bg-white px-4 text-[13px] font-semibold text-[#0a2540]"
           disabled
         >
           {currentPlan === "FREE" ? "Your current plan" : "Free plan"}
         </Button>
       </div>
 
-      <section className="rounded-2xl border border-[#e8e8e8] bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] sm:p-8">
+      <section className="rounded-3xl bg-white p-6 shadow-soft sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[#0a2540]">
@@ -745,7 +743,7 @@ export function BillingContent({
                     </span>
                   </p>
                   <Button
-                    className="h-10 bg-[#635bff] px-5 text-[14px] font-semibold hover:bg-[#5851e5]"
+                    className="h-10 rounded-full bg-[#635bff] px-5 text-[14px] font-semibold hover:bg-[#5851e5]"
                     disabled={
                       addonsSaving || (pagesQty <= 0 && audioQty <= 0)
                     }

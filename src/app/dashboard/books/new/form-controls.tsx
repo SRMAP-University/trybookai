@@ -68,10 +68,10 @@ export function Chip({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "rounded-full border px-3 py-1.5 text-[13px] transition-[background-color,border-color,color,transform] duration-150 active:scale-95",
+        "rounded-full px-3 py-1.5 text-[13px] transition-[background-color,box-shadow,color,transform] duration-150 active:scale-95",
         selected
-          ? "border-[#c9c5ff] bg-[#f0efff] font-medium text-[#635bff]"
-          : "border-[#e6ebf1] bg-white text-[#425466] hover:border-[#c9c5ff] hover:text-[#0a2540]"
+          ? "bg-[#f0efff] font-medium text-[#635bff] ring-1 ring-[#635bff]/40"
+          : "bg-[#f7f8fb] text-[#425466] ring-1 ring-transparent hover:bg-[#f0f2f7] hover:text-[#0a2540]"
       )}
     >
       {children}
@@ -95,7 +95,7 @@ export function Segmented<T extends string | number>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="grid auto-cols-fr grid-flow-col gap-1 rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] p-1"
+      className="grid auto-cols-fr grid-flow-col gap-1 rounded-full bg-[#f6f9fc] p-1"
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -107,7 +107,7 @@ export function Segmented<T extends string | number>({
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "rounded-md px-2 py-1.5 text-[13px] transition-[background-color,color,box-shadow] duration-150",
+              "rounded-full px-2 py-1.5 text-[13px] transition-[background-color,color,box-shadow] duration-150",
               selected
                 ? "bg-white font-medium text-[#0a2540] shadow-[0_1px_3px_rgba(10,37,64,0.12)]"
                 : "text-[#697386] hover:text-[#0a2540]"
@@ -164,7 +164,7 @@ export function SwitchRow({
       <span
         className={cn(
           "flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors duration-200",
-          checked ? "bg-[#635bff]" : "bg-[#e6ebf1]"
+          checked ? "bg-[#635bff]" : "bg-[#dfe4ec]"
         )}
       >
         <span
@@ -192,7 +192,7 @@ export function EnhanceButton({
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-[#635bff] transition-colors hover:bg-[#f0efff] disabled:opacity-50"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium text-[#635bff] transition-colors hover:bg-[#f0efff] disabled:opacity-50"
     >
       {loading ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />

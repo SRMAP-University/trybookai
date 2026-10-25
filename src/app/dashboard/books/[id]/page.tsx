@@ -1211,7 +1211,7 @@ function BookDetailPageContent() {
               </h1>
               <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13.5px] text-white/65 sm:justify-start">
                 {(book.edition ?? 1) > 1 && (
-                  <span className="rounded bg-white/10 px-2 py-0.5 text-[11.5px] font-medium text-[#c9c5ff]">
+                  <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11.5px] font-medium text-[#c9c5ff]">
                     Edition {book.edition}
                   </span>
                 )}
@@ -1434,7 +1434,7 @@ function BookDetailPageContent() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-xl bg-[#f6f9fc] px-2 py-2.5 text-center sm:px-4 sm:py-3 sm:text-left"
+                className="rounded-2xl bg-[#f6f9fc] px-2 py-2.5 text-center sm:px-4 sm:py-3 sm:text-left"
               >
                 <p className="text-[11px] text-[#697386] sm:text-[12px]">{stat.label}</p>
                 <p className="mt-0.5 text-[17px] font-semibold tabular-nums tracking-[-0.02em] text-[#0a2540] sm:text-[22px]">
@@ -1444,7 +1444,7 @@ function BookDetailPageContent() {
             ))}
           </section>
         ) : (
-          <section className="rounded-2xl border border-[#e6ebf1] bg-white p-5">
+          <section className="rounded-2xl bg-white p-5 shadow-soft">
             <div className="flex flex-wrap items-baseline justify-between gap-2 text-[13px]">
               <span className="min-w-0 truncate font-medium text-[#0a2540]">
                 {progressLabel}
@@ -1478,7 +1478,7 @@ function BookDetailPageContent() {
         )}
 
         {isComplete && book.errorMessage && (
-          <div className="rounded-xl border border-[#f5c2cc] bg-[#fde8e8]/40 px-4 py-3">
+          <div className="rounded-2xl bg-[#fde8e8]/60 px-4 py-3">
             <p className="text-[13px] text-[#df1b41]">{book.errorMessage}</p>
           </div>
         )}
@@ -1545,18 +1545,18 @@ function BookDetailPageContent() {
               </div>
 
               {chapterCount === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[#e6ebf1] px-6 py-12 text-center text-[14px] text-[#697386]">
+                <div className="rounded-3xl bg-[#f7f8fb] px-6 py-12 text-center text-[14px] text-[#697386]">
                   {inProgress
                     ? "Outlining chapters… they’ll appear here in a moment."
                     : "No chapters yet. Start writing to create the outline."}
                 </div>
               ) : (
-                <ol className="overflow-hidden rounded-2xl border border-[#e6ebf1] bg-white">
+                <ol className="overflow-hidden rounded-2xl bg-white shadow-soft">
                   {book.chapters.map((chapter, index) => {
                     const state = chapterStates[index];
                     const open = expanded === chapter.id;
                     return (
-                      <li key={chapter.id} className="border-b border-[#eef1f5] last:border-0">
+                      <li key={chapter.id} className="border-b border-[#f0f2f6] last:border-0">
                         <div className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[#f8fafc]">
                           <button
                             type="button"
@@ -1609,14 +1609,14 @@ function BookDetailPageContent() {
                         </div>
 
                         {open && (
-                          <div className="space-y-4 border-t border-[#eef1f5] bg-[#f8fafc] px-4 py-4 sm:px-12">
+                          <div className="space-y-4 bg-[#f8fafc] px-4 py-4 sm:px-12">
                             {chapter.imageUrl && (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={chapter.imageUrl}
                                 alt={`Chapter ${chapter.number} illustration`}
                                 loading="lazy"
-                                className="aspect-[3/2] w-full rounded-lg bg-[#eef2f7] object-cover"
+                                className="aspect-[3/2] w-full rounded-xl bg-[#eef2f7] object-cover"
                               />
                             )}
                             {chapter.sections.map((section) => (
@@ -1658,7 +1658,7 @@ function BookDetailPageContent() {
                   Each edition reuses the same premise and settings with a fresh
                   manuscript.
                 </p>
-                <ul className="divide-y divide-[#eef1f5] overflow-hidden rounded-2xl border border-[#e6ebf1] bg-white">
+                <ul className="divide-y divide-[#f0f2f6] overflow-hidden rounded-2xl bg-white shadow-soft">
                   {editions.map((edition) => (
                     <li key={edition.id}>
                       <Link
@@ -1695,7 +1695,7 @@ function BookDetailPageContent() {
             )}
 
             {(book.characters?.length || book.themes?.length || book.customInstructions) && (
-              <section className="space-y-4 rounded-2xl border border-[#e6ebf1] bg-white p-5">
+              <section className="space-y-4 rounded-2xl bg-white p-5 shadow-soft">
                 <h2 className="text-[15px] font-semibold text-[#0a2540]">Story notes</h2>
                 {book.characters && book.characters.length > 0 && (
                   <div>
@@ -1735,7 +1735,7 @@ function BookDetailPageContent() {
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-20">
-            <div className="rounded-2xl border border-[#e6ebf1] bg-white p-4">
+            <div className="rounded-2xl bg-white p-4 shadow-soft">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 text-[14px] font-semibold text-[#0a2540]">
@@ -1801,14 +1801,14 @@ function BookDetailPageContent() {
             </div>
 
             {/* Collapsed on phones, always open from sm up. */}
-            <details className="group rounded-2xl border border-[#e6ebf1] bg-white px-4 py-3 sm:hidden">
+            <details className="group rounded-2xl bg-white px-4 py-3 shadow-soft sm:hidden">
               <summary className="flex cursor-pointer list-none items-center justify-between text-[14px] font-semibold text-[#0a2540] [&::-webkit-details-marker]:hidden">
                 Settings
                 <ChevronDown className="h-4 w-4 text-[#a3acb9] transition-transform duration-200 group-open:rotate-180" />
               </summary>
               <SettingsList rows={settings} />
             </details>
-            <div className="hidden rounded-2xl border border-[#e6ebf1] bg-white px-4 pb-2 pt-4 sm:block">
+            <div className="hidden rounded-2xl bg-white px-4 pb-2 pt-4 shadow-soft sm:block">
               <p className="text-[14px] font-semibold text-[#0a2540]">Settings</p>
               <SettingsList rows={settings} />
             </div>
@@ -1891,7 +1891,7 @@ function ChapterStateIcon({
 
 function SettingsList({ rows }: { rows: { label: string; value: string }[] }) {
   return (
-    <dl className="mt-2 divide-y divide-[#eef1f5]">
+    <dl className="mt-2 divide-y divide-[#f0f2f6]">
       {rows.map((row) => (
         <div
           key={row.label}

@@ -309,7 +309,7 @@ export function ReelPlayer({
 
         {listOpen && (
           <div
-            className="absolute inset-x-0 bottom-0 max-h-[60%] overflow-y-auto rounded-t-2xl bg-[#0b1220]/95 p-3 text-white backdrop-blur-md"
+            className="absolute inset-x-0 bottom-0 max-h-[60%] overflow-y-auto rounded-t-3xl bg-[#0b1220]/95 p-3 text-white backdrop-blur-md"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="px-1 pb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-white/60">
@@ -321,7 +321,7 @@ export function ReelPlayer({
                 type="button"
                 onClick={() => goTo(i, true)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-[13px] hover:bg-white/10",
+                  "flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-[13px] hover:bg-white/10",
                   i === index && "bg-white/10"
                 )}
               >
