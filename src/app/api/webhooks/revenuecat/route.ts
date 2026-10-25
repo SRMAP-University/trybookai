@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cleanEnv } from "@/lib/env";
 import {
   applyPlanFromRevenueCat,
+  fetchVerifiedSubscriber,
   resolveUserIdFromRevenueCat,
 } from "@/lib/revenuecat";
 
@@ -88,6 +89,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Prefer what RevenueCat says the user holds now over this one event:
+    // after a Play plan switch the old product's events still arrive, and
+    // must not undo the new plan.
+    const verified =
+      GRANT_TYPES.has(event.type) || REVOKE_TYPES.has(event.type)
+        ? await fetchVerifiedSubscriber(event.app_user_id ?? userId)
+        : null;
+    if (verified) {
+      await applyPlanFromRevenueCat(userId, verified.entitlements, {
+        // Cancellation keeps access until the period ends; only an expiry
+        // with nothing left active drops the user to Free.
+        allowDowngrade: event.type === "EXPIRATION",
+        productIds: verified.productIds,
+      });
+      return NextResponse.json({ ok: true, matched: true, userId, verified: true });
+    }
+
     const productIds = event.product_id ? [event.product_id] : [];
 
     if (GRANT_TYPES.has(event.type)) {

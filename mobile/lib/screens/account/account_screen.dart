@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
@@ -96,6 +97,12 @@ class AccountScreen extends StatelessWidget {
           ),
           MenuSection(
             children: [
+              if (AppBilling.iapEnabled)
+                MenuTile(
+                  icon: Icons.workspace_premium_outlined,
+                  label: 'Plan & billing',
+                  onTap: () => context.push('/billing'),
+                ),
               MenuTile(
                 icon: Icons.bar_chart_rounded,
                 label: 'Usage',

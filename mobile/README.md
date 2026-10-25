@@ -29,8 +29,25 @@ flutter run --dart-define=API_BASE=http://10.0.2.2:3000
 - Email/password auth via `/api/mobile/auth/*` (JWT)
 - Home, books, generation progress
 - Audio studio
-- Billing (Stripe Checkout / portal in browser)
+- Billing through Google Play / App Store subscriptions (RevenueCat)
 - Account, usage, writing defaults
+
+## Google Play Billing
+
+Subscriptions go through Play Billing via RevenueCat - Play doesn't allow
+website checkout from the app. Android release builds use the RevenueCat
+public Google key baked into `lib/config/revenuecat_config.dart` (public by
+design; override with `--dart-define=REVENUECAT_API_KEY=goog_...`). Debug
+builds use the RevenueCat Test Store key.
+
+- `android/app/src/main/AndroidManifest.xml` must keep
+  `<uses-permission android:name="com.android.vending.BILLING"/>`
+  (a `tools:node="remove"` on it disables billing).
+- Play product ids should contain the plan word: `bookai_pro`,
+  `bookai_premium`, `bookai_unlimited` (base plan `monthly`). The app and
+  server map plans from those words.
+- Purchases only work in builds installed from a Play testing track, not the
+  sideloaded APK.
 
 ## Shorebird (OTA updates)
 

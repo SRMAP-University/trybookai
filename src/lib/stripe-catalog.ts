@@ -67,12 +67,15 @@ export function unlimitedProductDescription() {
 export function featureLookupKey(
   plan: "PRO" | "ENTERPRISE" | "UNLIMITED",
   feature: string,
-  interval: "month" | "year"
+  interval: "month" | "year",
+  currency = "usd"
 ) {
   const slug = feature
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "")
     .slice(0, 40);
-  return `bookai_${plan.toLowerCase()}_${slug}_${interval}`;
+  // USD keys predate regional pricing — keep them unsuffixed.
+  const suffix = currency === "usd" ? "" : `_${currency}`;
+  return `bookai_${plan.toLowerCase()}_${slug}_${interval}${suffix}`;
 }

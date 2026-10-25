@@ -9,10 +9,17 @@ import {
 } from "@/lib/stripe";
 import {
   isStripeBillingEnabled,
+  pricingForRequest,
   upgradeUserPlan,
   type PaidPlan,
 } from "@/lib/billing";
-import { PREMIUM_TRIAL, planPriceId, type BillingInterval } from "@/lib/constants";
+import {
+  PLANS,
+  PREMIUM_TRIAL,
+  planPriceId,
+  type BillingInterval,
+} from "@/lib/constants";
+import { regionalPrice } from "@/lib/regional-pricing";
 import { legalConsentField } from "@/lib/legal";
 import { getBaseUrl } from "@/lib/url";
 import { z } from "zod";
@@ -54,6 +61,16 @@ export async function POST(request: Request) {
 
     const paidPlan = plan as PaidPlan;
 
+    const pricing = await pricingForRequest(request, session.user.id);
+    if (regionalPrice(pricing, paidPlan, interval) === null) {
+      return NextResponse.json(
+        {
+          error: `${PLANS[paidPlan].name}${interval === "year" ? " yearly" : ""} isn't available in your country yet.`,
+        },
+        { status: 400 }
+      );
+    }
+
     if (!isStripeBillingEnabled()) {
       // Instant upgrades are for local development only; in production a
       // missing Stripe setting must not hand out paid plans for free.
@@ -74,7 +91,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const priceId = planPriceId(paidPlan, interval);
+    const priceId = planPriceId(paidPlan, interval, pricing.region);
     if (!priceId) {
       return NextResponse.json(
         {

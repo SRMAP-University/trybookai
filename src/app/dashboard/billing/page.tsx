@@ -1,11 +1,14 @@
 import { Suspense } from "react";
 import { BillingContent } from "./billing-content";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isStripeBillingEnabled } from "@/lib/billing";
+import { auth } from "@/lib/auth";
+import { isStripeBillingEnabled, pricingForRequest } from "@/lib/billing";
 import { AnonymousRouteFallback } from "@/components/dashboard/anonymous-route-fallback";
 
-export default function BillingPage() {
+export default async function BillingPage() {
   const instantUpgrade = !isStripeBillingEnabled();
+  const session = await auth();
+  const pricing = await pricingForRequest(null, session?.user?.id);
 
   return (
     <AnonymousRouteFallback
@@ -20,7 +23,7 @@ export default function BillingPage() {
           </div>
         }
       >
-        <BillingContent instantUpgrade={instantUpgrade} />
+        <BillingContent instantUpgrade={instantUpgrade} pricing={pricing} />
       </Suspense>
     </AnonymousRouteFallback>
   );

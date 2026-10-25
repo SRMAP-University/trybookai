@@ -3,8 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import {
   applyPlanFromRevenueCat,
-  fetchSubscriberEntitlements,
-  fetchSubscriberProductIds,
+  fetchVerifiedSubscriber,
 } from "@/lib/revenuecat";
 
 export const runtime = "nodejs";
@@ -60,17 +59,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    let entitlements = parsed.data.entitlements ?? [];
-    let productIds = parsed.data.productIds ?? [];
-
-    const verifiedEntitlements = await fetchSubscriberEntitlements(appUserId);
-    if (verifiedEntitlements) {
-      entitlements = verifiedEntitlements;
-    }
-    const verifiedProducts = await fetchSubscriberProductIds(appUserId);
-    if (verifiedProducts) {
-      productIds = verifiedProducts;
-    }
+    const verified = await fetchVerifiedSubscriber(appUserId);
+    const entitlements = verified?.entitlements ?? parsed.data.entitlements ?? [];
+    const productIds = verified?.productIds ?? parsed.data.productIds ?? [];
 
     const allowDowngrade =
       parsed.data.allowDowngrade ?? !parsed.data.requestedPlan;
@@ -83,7 +74,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       synced: true,
-      verified: Boolean(verifiedEntitlements || verifiedProducts),
+      verified: Boolean(verified),
       entitlements,
       productIds,
       ...result,
