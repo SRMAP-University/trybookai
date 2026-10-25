@@ -9,9 +9,9 @@ import 'package:flutter/foundation.dart';
 class RevenueCatConfig {
   static const String testApiKey = 'test_DiHlFWGSHJWFiFlKRPMkckPCuCl';
 
-  /// Google Play app "BookAI (Google Play)" in RevenueCat project
+  /// Google Play app "Book AI" (appcaa134e701) in RevenueCat project
   /// proj602f353b. Public by design — shipped in every Android build.
-  static const String googleApiKey = 'goog_gnLIztFcJoYZbLsmoqUdBHhUzUk';
+  static const String googleApiKey = 'goog_NHiakdIXWrqvlpsAeaJEiUMcHoG';
 
   static const String _envApiKey = String.fromEnvironment('REVENUECAT_API_KEY');
 
