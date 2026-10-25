@@ -34,16 +34,11 @@ flutter run --dart-define=API_BASE=http://10.0.2.2:3000
 
 ## Google Play Billing
 
-Subscriptions go through Play Billing via RevenueCat — Play doesn't allow
-website checkout from the app. Release builds need the RevenueCat **public**
-Google key (`goog_…`, never the `sk_…` secret):
-
-```bash
-shorebird release android -- --dart-define=REVENUECAT_API_KEY=goog_xxx
-```
-
-Use the same `--dart-define` for every `shorebird patch android`. Without it,
-release builds skip RevenueCat and the billing screen can't load plans.
+Subscriptions go through Play Billing via RevenueCat - Play doesn't allow
+website checkout from the app. Android release builds use the RevenueCat
+public Google key baked into `lib/config/revenuecat_config.dart` (public by
+design; override with `--dart-define=REVENUECAT_API_KEY=goog_...`). Debug
+builds use the RevenueCat Test Store key.
 
 - `android/app/src/main/AndroidManifest.xml` must keep
   `<uses-permission android:name="com.android.vending.BILLING"/>`

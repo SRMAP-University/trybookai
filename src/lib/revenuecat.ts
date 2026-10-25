@@ -179,27 +179,112 @@ export async function resolveUserIdFromRevenueCat(ids: string[]) {
   return byEmail?.id ?? null;
 }
 
+type VerifiedSubscriber = { entitlements: string[]; productIds: string[] };
+
+function rcGet(secret: string, path: string) {
+  return fetch(`https://api.revenuecat.com${path}`, {
+    headers: { Authorization: `Bearer ${secret}`, Accept: "application/json" },
+    cache: "no-store",
+  });
+}
+
+/** RevenueCat project ids → readable names, cached briefly per process. */
+type V2Catalog = {
+  projectId: string;
+  entitlementKeys: Map<string, string>;
+  productStoreIds: Map<string, string>;
+  loadedAt: number;
+};
+let v2Catalog: V2Catalog | null = null;
+/** Which API the configured secret key belongs to, once known. */
+let secretKeyApi: "v1" | "v2" | null = null;
+
+async function loadV2Catalog(secret: string): Promise<V2Catalog | "incompatible"> {
+  let projectId = cleanEnv(process.env.REVENUECAT_PROJECT_ID);
+  if (!projectId) {
+    const res = await rcGet(secret, "/v2/projects");
+    if (res.status === 401 || res.status === 403) return "incompatible";
+    if (!res.ok) throw new Error(`RevenueCat project lookup failed (${res.status})`);
+    const data = (await res.json()) as { items?: { id: string }[] };
+    projectId = data.items?.[0]?.id ?? "";
+    if (!projectId) throw new Error("RevenueCat key has no project");
+  }
+
+  const [ents, prods] = await Promise.all([
+    rcGet(secret, `/v2/projects/${projectId}/entitlements?limit=200`),
+    rcGet(secret, `/v2/projects/${projectId}/products?limit=200`),
+  ]);
+  if (ents.status === 401 || ents.status === 403) return "incompatible";
+  if (!ents.ok || !prods.ok) {
+    throw new Error(`RevenueCat catalog fetch failed (${ents.status}/${prods.status})`);
+  }
+  const entData = (await ents.json()) as { items?: { id: string; lookup_key: string }[] };
+  const prodData = (await prods.json()) as { items?: { id: string; store_identifier: string }[] };
+  return {
+    projectId,
+    entitlementKeys: new Map((entData.items ?? []).map((e) => [e.id, e.lookup_key])),
+    productStoreIds: new Map((prodData.items ?? []).map((p) => [p.id, p.store_identifier])),
+    loadedAt: Date.now(),
+  };
+}
+
+/** API v2 (current secret keys). Null when the key only works with v1. */
+async function fetchVerifiedSubscriberV2(
+  secret: string,
+  appUserId: string
+): Promise<VerifiedSubscriber | null> {
+  if (!v2Catalog || Date.now() - v2Catalog.loadedAt > 10 * 60_000) {
+    const loaded = await loadV2Catalog(secret);
+    if (loaded === "incompatible") return null;
+    v2Catalog = loaded;
+  }
+  const base = `/v2/projects/${v2Catalog.projectId}/customers/${encodeURIComponent(appUserId)}`;
+  const [entRes, subRes] = await Promise.all([
+    rcGet(secret, `${base}/active_entitlements?limit=100`),
+    rcGet(secret, `${base}/subscriptions?limit=100`),
+  ]);
+  // Never seen by RevenueCat → no purchases.
+  if (entRes.status === 404) return { entitlements: [], productIds: [] };
+  if (!entRes.ok || !subRes.ok) {
+    throw new Error(`RevenueCat customer fetch failed (${entRes.status}/${subRes.status})`);
+  }
+  const ents = (await entRes.json()) as { items?: { entitlement_id: string }[] };
+  const subs = (await subRes.json()) as { items?: { product_id: string; gives_access: boolean }[] };
+
+  const catalog = v2Catalog;
+  const name = (map: Map<string, string>, id: string) => map.get(id) ?? id;
+  const unknown = (ents.items ?? []).some((e) => !catalog.entitlementKeys.has(e.entitlement_id));
+  if (unknown) v2Catalog = null; // New entitlement since caching — refresh next time.
+
+  return {
+    entitlements: (ents.items ?? []).map((e) => name(catalog.entitlementKeys, e.entitlement_id)),
+    productIds: (subs.items ?? [])
+      .filter((s) => s.gives_access)
+      .map((s) => name(catalog.productStoreIds, s.product_id)),
+  };
+}
+
 /**
- * The subscriber's active entitlements and products, straight from the
- * RevenueCat REST API — one request. Null when no secret key is configured.
+ * The subscriber's active entitlements (lookup keys) and products (store ids),
+ * straight from RevenueCat. Works with v2 secret keys and legacy v1 keys.
+ * Null when no secret key is configured.
  */
-export async function fetchVerifiedSubscriber(appUserId: string): Promise<{
-  entitlements: string[];
-  productIds: string[];
-} | null> {
+export async function fetchVerifiedSubscriber(
+  appUserId: string
+): Promise<VerifiedSubscriber | null> {
   const secret = cleanEnv(process.env.REVENUECAT_SECRET_API_KEY);
   if (!secret) return null;
 
-  const res = await fetch(
-    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
+  if (secretKeyApi !== "v1") {
+    const v2 = await fetchVerifiedSubscriberV2(secret, appUserId);
+    if (v2) {
+      secretKeyApi = "v2";
+      return v2;
     }
-  );
+    secretKeyApi = "v1";
+  }
+
+  const res = await rcGet(secret, `/v1/subscribers/${encodeURIComponent(appUserId)}`);
   if (!res.ok) {
     throw new Error(`RevenueCat subscriber fetch failed (${res.status})`);
   }
