@@ -34,20 +34,18 @@ function planRank(plan: PaidPlan | "FREE"): number {
 export function planFromIdentifier(raw: string): PaidPlan | "FREE" {
   const id = raw.trim().toLowerCase();
   if (!id) return "FREE";
+  // Play ids look like "bookai_pro:monthly". `\b` treats "_" as part of a
+  // word, so match the words between separators instead.
+  const words = new Set(id.split(/[^a-z0-9]+/).filter(Boolean));
 
   // Test Store default product ids
   if (id === "lifetime" || id.includes("lifetime") || id.includes("$rc_lifetime")) {
     return "UNLIMITED";
   }
-  if (id.includes("unlimited") || id === RC_ENTITLEMENTS.unlimited) {
+  if (words.has(RC_ENTITLEMENTS.unlimited)) {
     return "UNLIMITED";
   }
-  if (
-    id.includes("premium") ||
-    id.includes("enterprise") ||
-    id === RC_ENTITLEMENTS.premium ||
-    id === RC_ENTITLEMENTS.enterprise
-  ) {
+  if (words.has(RC_ENTITLEMENTS.premium) || words.has(RC_ENTITLEMENTS.enterprise)) {
     return "ENTERPRISE";
   }
   if (
@@ -55,9 +53,7 @@ export function planFromIdentifier(raw: string): PaidPlan | "FREE" {
     id === "yearly" ||
     id.includes("$rc_monthly") ||
     id.includes("$rc_annual") ||
-    /\bpro\b/.test(id) ||
-    id === RC_ENTITLEMENTS.pro ||
-    id === "bookai_pro"
+    words.has(RC_ENTITLEMENTS.pro)
   ) {
     return "PRO";
   }
@@ -184,10 +180,13 @@ export async function resolveUserIdFromRevenueCat(ids: string[]) {
 }
 
 /**
- * Optionally verify entitlements against RevenueCat REST API when a secret key
- * is configured. Returns null if verification is unavailable.
+ * The subscriber's active entitlements and products, straight from the
+ * RevenueCat REST API — one request. Null when no secret key is configured.
  */
-export async function fetchSubscriberEntitlements(appUserId: string) {
+export async function fetchVerifiedSubscriber(appUserId: string): Promise<{
+  entitlements: string[];
+  productIds: string[];
+} | null> {
   const secret = cleanEnv(process.env.REVENUECAT_SECRET_API_KEY);
   if (!secret) return null;
 
@@ -210,44 +209,17 @@ export async function fetchSubscriberEntitlements(appUserId: string) {
       subscriptions?: Record<string, { expires_date?: string | null }>;
     };
   };
-  const entitlements = data.subscriber?.entitlements ?? {};
   const now = Date.now();
-  return Object.entries(entitlements)
-    .filter(([, value]) => {
-      if (!value?.expires_date) return true;
-      return new Date(value.expires_date).getTime() > now;
-    })
-    .map(([id]) => id);
-}
+  const active = (items: Record<string, { expires_date?: string | null }>) =>
+    Object.entries(items)
+      .filter(([, value]) => {
+        if (!value?.expires_date) return true;
+        return new Date(value.expires_date).getTime() > now;
+      })
+      .map(([id]) => id);
 
-export async function fetchSubscriberProductIds(appUserId: string) {
-  const secret = cleanEnv(process.env.REVENUECAT_SECRET_API_KEY);
-  if (!secret) return null;
-
-  const res = await fetch(
-    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    }
-  );
-  if (!res.ok) {
-    throw new Error(`RevenueCat subscriber fetch failed (${res.status})`);
-  }
-  const data = (await res.json()) as {
-    subscriber?: {
-      subscriptions?: Record<string, { expires_date?: string | null }>;
-    };
+  return {
+    entitlements: active(data.subscriber?.entitlements ?? {}),
+    productIds: active(data.subscriber?.subscriptions ?? {}),
   };
-  const subscriptions = data.subscriber?.subscriptions ?? {};
-  const now = Date.now();
-  return Object.entries(subscriptions)
-    .filter(([, value]) => {
-      if (!value?.expires_date) return true;
-      return new Date(value.expires_date).getTime() > now;
-    })
-    .map(([id]) => id);
 }

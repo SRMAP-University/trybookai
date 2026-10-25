@@ -145,20 +145,37 @@ class RevenueCatService extends ChangeNotifier {
       '${p.identifier} ${p.storeProduct.identifier} ${p.storeProduct.title}'
           .toLowerCase();
 
-  /// Which BookAI plan a package belongs to, or null if unknown.
-  String? _planIdForPackage(Package p) {
-    final text = _packageText(p);
+  /// Words in ids like "bookai_pro:monthly" → {bookai, pro, monthly}.
+  /// (`\b` treats `_` as part of a word, so "bookai_pro" never matched it.)
+  static Set<String> _words(String text) => text
+      .toLowerCase()
+      .split(RegExp(r'[^a-z0-9]+'))
+      .where((w) => w.isNotEmpty)
+      .toSet();
 
-    // Duration defaults first — avoids false matches like "pro" inside other words.
-    if (_isLifetime(p)) return 'UNLIMITED';
-
-    if (RegExp(r'\bunlimited\b').hasMatch(text)) return 'UNLIMITED';
-    if (RegExp(r'\b(premium|enterprise)\b').hasMatch(text)) {
+  static String? _planFromWords(Set<String> words) {
+    if (words.contains('unlimited')) return 'UNLIMITED';
+    if (words.contains('premium') || words.contains('enterprise')) {
       return 'ENTERPRISE';
     }
-    if (RegExp(r'\bpro\b').hasMatch(text)) return 'PRO';
+    if (words.contains('pro')) return 'PRO';
+    return null;
+  }
+
+  /// Which BookAI plan a package belongs to, or null if unknown.
+  /// Product ids decide first; the store title is only a fallback.
+  String? _planIdForPackage(Package p) {
+    if (_isLifetime(p)) return 'UNLIMITED';
+
+    final fromIds = _planFromWords(
+      _words('${p.identifier} ${p.storeProduct.identifier}'),
+    );
+    if (fromIds != null) return fromIds;
+    final fromTitle = _planFromWords(_words(p.storeProduct.title));
+    if (fromTitle != null) return fromTitle;
 
     // Default Test Store: monthly + annual → Pro only.
+    final text = _packageText(p);
     if (p.packageType == PackageType.annual ||
         text.contains(r'$rc_annual') ||
         RegExp(r'\byearly\b').hasMatch(text) ||
@@ -173,20 +190,11 @@ class RevenueCatService extends ChangeNotifier {
     return null;
   }
 
-  /// Resolve a package for a BookAI plan.
-  /// Unlimited → lifetime only. Never buy monthly/annual for Unlimited.
+  /// Resolve a package for a BookAI plan. Unlimited is a subscription like
+  /// the others, or a lifetime purchase when that's what the store sells.
   Package? packageForPlan(String plan, {required String interval}) {
     final packages = availablePackages;
     if (packages.isEmpty) return null;
-
-    if (plan == 'UNLIMITED') {
-      for (final p in packages) {
-        if (_isLifetime(p) || _planIdForPackage(p) == 'UNLIMITED') {
-          return p;
-        }
-      }
-      return null;
-    }
 
     final wantAnnual = interval == 'year';
     final intervalPkgs = packages
@@ -195,6 +203,13 @@ class RevenueCatService extends ChangeNotifier {
 
     for (final p in intervalPkgs) {
       if (_planIdForPackage(p) == plan) return p;
+    }
+
+    if (plan == 'UNLIMITED') {
+      for (final p in packages) {
+        if (_isLifetime(p)) return p;
+      }
+      return null;
     }
 
     // Only auto-tier unnamed products when there are 3+ for this interval.
@@ -234,24 +249,49 @@ class RevenueCatService extends ChangeNotifier {
             : 'This plan is not available as an in-app purchase on this device.',
       );
     }
-    if (plan == 'UNLIMITED' && !_isLifetime(package) &&
-        _planIdForPackage(package) != 'UNLIMITED') {
-      throw Exception(
-        'Unlimited is not available as an in-app purchase on this device.',
-      );
-    }
+    final change = await _playPlanChange(package);
     if (kDebugMode) {
       debugPrint(
         'RevenueCat purchase plan=$plan → ${package.identifier} / '
-        '${package.storeProduct.identifier} (${package.packageType})',
+        '${package.storeProduct.identifier} (${package.packageType})'
+        '${change == null ? '' : ' replacing ${change.oldProductIdentifier}'}',
       );
     }
-    return purchasePackage(package);
+    return purchasePackage(package, productChangeInfo: change);
   }
 
-  Future<CustomerInfo?> purchasePackage(Package package) async {
+  /// On Google Play a plan switch must replace the current subscription,
+  /// otherwise the user is billed for both.
+  Future<StoreProductChangeInfo?> _playPlanChange(Package target) async {
+    if (defaultTargetPlatform != TargetPlatform.android ||
+        target.storeProduct.productCategory != ProductCategory.subscription) {
+      return null;
+    }
+    final info = await Purchases.getCustomerInfo();
+    final targetId = target.storeProduct.identifier;
+    for (final e in info.entitlements.active.values) {
+      if (e.store != Store.playStore || e.productIdentifier.isEmpty) continue;
+      final plan = e.productPlanIdentifier;
+      final currentId = plan == null || plan.isEmpty
+          ? e.productIdentifier
+          : '${e.productIdentifier}:$plan';
+      if (currentId == targetId) continue;
+      return StoreProductChangeInfo(
+        e.productIdentifier,
+        replacementMode: StoreReplacementMode.withTimeProration,
+      );
+    }
+    return null;
+  }
+
+  Future<CustomerInfo?> purchasePackage(
+    Package package, {
+    StoreProductChangeInfo? productChangeInfo,
+  }) async {
     try {
-      final result = await Purchases.purchase(PurchaseParams.package(package));
+      final result = await Purchases.purchase(
+        PurchaseParams.package(package, productChangeInfo: productChangeInfo),
+      );
       return result.customerInfo;
     } on PlatformException catch (e) {
       final code = PurchasesErrorHelper.getErrorCode(e);
@@ -264,6 +304,16 @@ class RevenueCatService extends ChangeNotifier {
 
   Future<CustomerInfo> restore() async {
     return Purchases.restorePurchases();
+  }
+
+  Future<CustomerInfo?> customerInfo() async {
+    if (!_configured) return null;
+    try {
+      return await Purchases.getCustomerInfo();
+    } catch (e) {
+      debugPrint('RevenueCat getCustomerInfo failed: $e');
+      return null;
+    }
   }
 
   String? priceLabelForPlan(String plan, {required String interval}) {

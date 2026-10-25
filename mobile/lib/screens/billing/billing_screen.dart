@@ -1,15 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
-import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/config/plan_pricing.dart';
+import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/services/api_client.dart';
+import 'package:bookai_mobile/services/plan_purchase.dart';
 import 'package:bookai_mobile/services/revenuecat_service.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 
+/// Plans are bought through Google Play / the App Store only — store policy
+/// forbids pointing app users at website checkout.
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
 
@@ -18,9 +23,6 @@ class BillingScreen extends StatefulWidget {
 }
 
 class _BillingScreenState extends State<BillingScreen> {
-  static Uri get _webBillingUri =>
-      Uri.parse('${ApiConfig.baseUrl}/dashboard/billing');
-
   static const _plans = [
     (
       key: 'PRO',
@@ -42,28 +44,29 @@ class _BillingScreenState extends State<BillingScreen> {
     ),
   ];
 
+  static String get _storeName =>
+      defaultTargetPlatform == TargetPlatform.iOS ? 'the App Store' : 'Google Play';
+
+  late final PlanPurchase _purchase = PlanPurchase(
+    api: context.read<ApiClient>(),
+    auth: context.read<AuthProvider>(),
+    store: context.read<RevenueCatService>(),
+  );
+
   /// Device-region guess until the server says which prices apply here.
+  /// Only shown while store products are loading or unavailable.
   PlanPricing _pricing = PlanPricing.forDevice();
-  RevenueCatService? _revenueCat;
+  bool _loadingStore = true;
+  CustomerInfo? _customer;
+
+  /// Plan key being bought, or 'RESTORE'.
+  String? _busy;
 
   @override
   void initState() {
     super.initState();
-    if (AppBilling.iapEnabled) {
-      _revenueCat = context.read<AuthProvider>().revenueCat;
-      _revenueCat?.addListener(_onStoreChanged);
-    }
     _loadPricing();
-  }
-
-  @override
-  void dispose() {
-    _revenueCat?.removeListener(_onStoreChanged);
-    super.dispose();
-  }
-
-  void _onStoreChanged() {
-    if (mounted) setState(() {});
+    _loadStore();
   }
 
   Future<void> _loadPricing() async {
@@ -79,36 +82,108 @@ class _BillingScreenState extends State<BillingScreen> {
     }
   }
 
-  /// Store-localized price when store billing is live, else the regional
-  /// table (₹ in India, $ elsewhere). Null hides a plan not sold here.
-  String? _priceLabel(String plan) {
-    final store = _revenueCat?.priceLabelForPlan(plan, interval: 'month');
-    return store ?? _pricing.monthlyLabel(plan);
+  Future<void> _loadStore() async {
+    try {
+      await _purchase.prepare().timeout(const Duration(seconds: 15));
+      _customer = await _purchase.store.customerInfo();
+    } catch (e) {
+      debugPrint('[billing] store load failed: $e');
+    }
+    if (mounted) setState(() => _loadingStore = false);
   }
 
-  Future<void> _openWebsite(BuildContext context) async {
+  Future<void> _retryStore() async {
+    setState(() => _loadingStore = true);
+    await _loadStore();
+  }
+
+  Future<void> _buy(String plan) async {
+    setState(() => _busy = plan);
+    try {
+      final bought = await _purchase.buy(plan);
+      if (!bought || !mounted) return;
+      _customer = await _purchase.store.customerInfo();
+      if (!mounted) return;
+      final label = context.read<AuthProvider>().user?.planLabel;
+      _snack('You’re on ${label ?? 'your new plan'} now.');
+    } catch (e) {
+      final message = _purchase.errorText(e);
+      if (message.isNotEmpty) _snack(message);
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  Future<void> _restore() async {
+    setState(() => _busy = 'RESTORE');
+    try {
+      await _purchase.restore();
+      _customer = await _purchase.store.customerInfo();
+      if (!mounted) return;
+      final label = context.read<AuthProvider>().user?.planLabel ?? 'Free';
+      _snack('Purchases restored · $label');
+    } catch (e) {
+      final message = _purchase.errorText(e);
+      if (message.isNotEmpty) _snack(message);
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  Future<void> _manageSubscription() async {
+    final url = _customer?.managementURL;
+    if (url == null) return;
     final ok = await launchUrl(
-      _webBillingUri,
+      Uri.parse(url),
       mode: LaunchMode.externalApplication,
     );
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the website')),
-      );
-    }
+    if (!ok) _snack('Could not open $_storeName');
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
+    final store = context.watch<RevenueCatService>();
+    final storeReady = store.hasPackages;
+
+    // Once the store answers, show exactly what it sells (store-localized
+    // price, so India sees ₹). Until then, preview the regional prices.
     final plans = [
       for (final plan in _plans)
-        if (_priceLabel(plan.key) case final price?) (plan: plan, price: price),
+        if ((storeReady
+                ? store.priceLabelForPlan(plan.key, interval: 'month')
+                : _pricing.monthlyLabel(plan.key))
+            case final price?)
+          (plan: plan, price: price),
     ];
     final showsUnlimited = plans.any((p) => p.plan.key == 'UNLIMITED');
+    final billedOnWeb = user?.hasStripeSubscription ?? false;
+    final hasStoreSubscription =
+        _customer?.activeSubscriptions.isNotEmpty ?? false;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Billing')),
+      appBar: AppBar(
+        title: const Text('Billing'),
+        actions: [
+          TextButton(
+            onPressed: _busy != null ? null : _restore,
+            child: _busy == 'RESTORE'
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Restore'),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
@@ -132,85 +207,70 @@ class _BillingScreenState extends State<BillingScreen> {
                       fontSize: 13,
                     ),
                   ),
+                  if (hasStoreSubscription && _customer?.managementURL != null) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _manageSubscription,
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: Text('Manage in $_storeName'),
+                    ),
+                  ],
                 ],
               ),
             ),
-          const SizedBox(height: 16),
-          StripeCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: const Text(
-                    'Coming soon',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'In-app purchases coming soon',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 17,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Google Play billing is not available in the app yet. '
-                  'Subscribe on the BookAI website — your plan applies here after you sign in with the same account.',
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => _openWebsite(context),
-                    icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                    label: const Text('Subscribe on website'),
-                  ),
-                ),
-              ],
+          if (billedOnWeb) ...[
+            const SizedBox(height: 16),
+            const StripeCard(
+              child: Text(
+                'Your plan is billed through the BookAI website, so it can’t '
+                'be changed here. Manage or cancel it at trybookai.com.',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          for (final (i, p) in plans.indexed) ...[
-            if (i > 0) const SizedBox(height: 12),
-            _planPreview(
-              name: p.plan.name,
-              price: p.price,
-              period: '/mo',
-              features: p.plan.features,
-              highlight: p.plan.highlight,
-              current: user?.plan == p.plan.key,
+          ],
+          if (!_loadingStore && !storeReady) ...[
+            const SizedBox(height: 16),
+            StripeCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Couldn’t load plans from $_storeName. Check your '
+                    'connection and try again.',
+                    style: const TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: _retryStore,
+                    child: const Text('Try again'),
+                  ),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _openWebsite(context),
-              icon: const Icon(Icons.open_in_new_rounded, size: 18),
-              label: const Text('Subscribe on website'),
+          for (final (i, p) in plans.indexed) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _planCard(
+              name: p.plan.name,
+              price: p.price,
+              features: p.plan.features,
+              highlight: p.plan.highlight,
+              current: _isCurrent(user, p.plan.key),
+              action: _planAction(
+                p.plan.key,
+                name: p.plan.name,
+                current: _isCurrent(user, p.plan.key),
+                enabled: storeReady && !billedOnWeb,
+                switching: hasStoreSubscription,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+          ],
+          const SizedBox(height: 16),
           Text(
-            '${showsUnlimited ? '*Unlimited is subject to fair-use Terms (rate limits). ' : ''}'
-            'Manage or cancel a website subscription from trybookai.com.',
+            'Subscriptions renew monthly at the price shown until you cancel. '
+            'Cancel anytime in $_storeName → Subscriptions.'
+            '${showsUnlimited ? ' *Unlimited is subject to fair-use Terms (rate limits).' : ''}',
             style: const TextStyle(
               fontSize: 11,
               color: AppColors.textMuted,
@@ -222,11 +282,42 @@ class _BillingScreenState extends State<BillingScreen> {
     );
   }
 
-  Widget _planPreview({
+  /// A trial isn't a purchase — trial users can still buy Premium.
+  static bool _isCurrent(UserModel? user, String plan) =>
+      user != null && user.plan == plan && !user.onTrial;
+
+  Widget _planAction(
+    String plan, {
+    required String name,
+    required bool current,
+    required bool enabled,
+    required bool switching,
+  }) {
+    if (current) {
+      return const OutlinedButton(onPressed: null, child: Text('Current plan'));
+    }
+    final busy = _busy == plan;
+    final waiting = _loadingStore && !enabled;
+    return FilledButton(
+      onPressed: enabled && _busy == null ? () => _buy(plan) : null,
+      child: busy || waiting
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : Text(switching ? 'Switch to $name' : 'Subscribe to $name'),
+    );
+  }
+
+  Widget _planCard({
     required String name,
     required String price,
-    required String period,
     required List<String> features,
+    required Widget action,
     bool highlight = false,
     bool current = false,
   }) {
@@ -289,10 +380,10 @@ class _BillingScreenState extends State<BillingScreen> {
                 fontWeight: FontWeight.w800,
                 letterSpacing: -1,
               ),
-              children: [
+              children: const [
                 TextSpan(
-                  text: ' $period',
-                  style: const TextStyle(
+                  text: ' /mo',
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textMuted,
@@ -320,6 +411,8 @@ class _BillingScreenState extends State<BillingScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          SizedBox(width: double.infinity, child: action),
         ],
       ),
     );
