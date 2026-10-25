@@ -2,15 +2,89 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/app_billing.dart';
+import 'package:bookai_mobile/config/plan_pricing.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
+import 'package:bookai_mobile/services/api_client.dart';
+import 'package:bookai_mobile/services/revenuecat_service.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 
-class BillingScreen extends StatelessWidget {
+class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
 
+  @override
+  State<BillingScreen> createState() => _BillingScreenState();
+}
+
+class _BillingScreenState extends State<BillingScreen> {
   static Uri get _webBillingUri =>
       Uri.parse('${ApiConfig.baseUrl}/dashboard/billing');
+
+  static const _plans = [
+    (
+      key: 'PRO',
+      name: 'Pro',
+      highlight: false,
+      features: ['5,000 pages / mo', '1 hour audiobook', 'Private books'],
+    ),
+    (
+      key: 'ENTERPRISE',
+      name: 'Premium',
+      highlight: true,
+      features: ['10,000 pages / mo', '3 hours audiobook', 'Priority support'],
+    ),
+    (
+      key: 'UNLIMITED',
+      name: 'Unlimited',
+      highlight: false,
+      features: ['Unlimited pages*', 'Unlimited audio*', 'Fair use applies'],
+    ),
+  ];
+
+  /// Device-region guess until the server says which prices apply here.
+  PlanPricing _pricing = PlanPricing.forDevice();
+  RevenueCatService? _revenueCat;
+
+  @override
+  void initState() {
+    super.initState();
+    if (AppBilling.iapEnabled) {
+      _revenueCat = context.read<AuthProvider>().revenueCat;
+      _revenueCat?.addListener(_onStoreChanged);
+    }
+    _loadPricing();
+  }
+
+  @override
+  void dispose() {
+    _revenueCat?.removeListener(_onStoreChanged);
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadPricing() async {
+    final api = context.read<ApiClient>();
+    try {
+      final res = await api.dio.get(ApiConfig.billingPricing);
+      final data = res.data;
+      if (data is Map<String, dynamic> && mounted) {
+        setState(() => _pricing = PlanPricing.fromJson(data));
+      }
+    } catch (e) {
+      debugPrint('[billing] pricing fetch failed: $e');
+    }
+  }
+
+  /// Store-localized price when store billing is live, else the regional
+  /// table (₹ in India, $ elsewhere). Null hides a plan not sold here.
+  String? _priceLabel(String plan) {
+    final store = _revenueCat?.priceLabelForPlan(plan, interval: 'month');
+    return store ?? _pricing.monthlyLabel(plan);
+  }
 
   Future<void> _openWebsite(BuildContext context) async {
     final ok = await launchUrl(
@@ -27,6 +101,11 @@ class BillingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
+    final plans = [
+      for (final plan in _plans)
+        if (_priceLabel(plan.key) case final price?) (plan: plan, price: price),
+    ];
+    final showsUnlimited = plans.any((p) => p.plan.key == 'UNLIMITED');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Billing')),
@@ -108,42 +187,17 @@ class BillingScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _planPreview(
-            name: 'Pro',
-            price: r'$20',
-            period: '/mo',
-            features: const [
-              '5,000 pages / mo',
-              '1 hour audiobook',
-              'Private books',
-            ],
-            current: user?.plan == 'PRO',
-          ),
-          const SizedBox(height: 12),
-          _planPreview(
-            name: 'Premium',
-            price: r'$30',
-            period: '/mo',
-            features: const [
-              '10,000 pages / mo',
-              '3 hours audiobook',
-              'Priority support',
-            ],
-            highlight: true,
-            current: user?.plan == 'ENTERPRISE',
-          ),
-          const SizedBox(height: 12),
-          _planPreview(
-            name: 'Unlimited',
-            price: r'$99',
-            period: '/mo',
-            features: const [
-              'Unlimited pages*',
-              'Unlimited audio*',
-              'Fair use applies',
-            ],
-            current: user?.plan == 'UNLIMITED',
-          ),
+          for (final (i, p) in plans.indexed) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _planPreview(
+              name: p.plan.name,
+              price: p.price,
+              period: '/mo',
+              features: p.plan.features,
+              highlight: p.plan.highlight,
+              current: user?.plan == p.plan.key,
+            ),
+          ],
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -154,10 +208,14 @@ class BillingScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            '*Unlimited is subject to fair-use Terms (rate limits). '
+          Text(
+            '${showsUnlimited ? '*Unlimited is subject to fair-use Terms (rate limits). ' : ''}'
             'Manage or cancel a website subscription from trybookai.com.',
-            style: TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.4),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textMuted,
+              height: 1.4,
+            ),
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import { cleanEnv } from "@/lib/env";
+import type { PricingRegion } from "@/lib/regional-pricing";
 
 export const PLANS = {
   FREE: {
@@ -134,10 +135,21 @@ export function planPrice(
 
 export function planPriceId(
   plan: "PRO" | "ENTERPRISE" | "UNLIMITED",
-  interval: BillingInterval = "month"
+  interval: BillingInterval = "month",
+  region: PricingRegion = "DEFAULT"
 ) {
   // Read env at call time so updated Stripe price IDs apply after .env changes
   const clean = (v?: string) => cleanEnv(v) || undefined;
+
+  // India sells Pro and Premium monthly only, in INR (see REGIONAL_PRICING).
+  if (region === "IN") {
+    if (interval !== "month") return undefined;
+    if (plan === "PRO") return clean(process.env.STRIPE_PRO_INR_PRICE_ID);
+    if (plan === "ENTERPRISE") {
+      return clean(process.env.STRIPE_ENTERPRISE_INR_PRICE_ID);
+    }
+    return undefined;
+  }
 
   if (plan === "UNLIMITED") {
     if (interval === "year") {

@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useDashboardUser } from "@/components/dashboard/user-context";
 import { toast } from "sonner";
 import { readJson } from "@/lib/api";
+import {
+  REGIONAL_PRICING,
+  type RegionalPricing,
+} from "@/lib/regional-pricing";
 import { cn } from "@/lib/utils";
 
 type PaidPlan = "PRO" | "ENTERPRISE" | "UNLIMITED";
@@ -15,6 +19,34 @@ type BillingInterval = "month" | "year";
 type UpgradeOptions = {
   acceptedTerms?: boolean;
 };
+
+let pricingCache: RegionalPricing | null = null;
+
+/** Prices for the visitor's country; null until loaded. Fetched once per page load. */
+export function useRegionalPricing(enabled = true) {
+  const [pricing, setPricing] = useState<RegionalPricing | null>(pricingCache);
+
+  useEffect(() => {
+    if (!enabled || pricingCache) return;
+    let cancelled = false;
+    fetch("/api/billing/pricing")
+      .then((res) => readJson<RegionalPricing>(res))
+      .then((result) => {
+        // Checkout's own page shows the real amount, so USD is a safe fallback.
+        const next = result.ok ? result.data : REGIONAL_PRICING.DEFAULT;
+        if (result.ok) pricingCache = next;
+        if (!cancelled) setPricing(next);
+      })
+      .catch(() => {
+        if (!cancelled) setPricing(REGIONAL_PRICING.DEFAULT);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  return pricing;
+}
 
 export function useUpgradePlan() {
   const router = useRouter();

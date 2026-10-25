@@ -9,9 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useUpgradePlan } from "@/components/dashboard/upgrade-button";
+import {
+  useRegionalPricing,
+  useUpgradePlan,
+} from "@/components/dashboard/upgrade-button";
 import { PLANS } from "@/lib/constants";
 import { PRICING_FEATURES } from "@/lib/pricing-plans";
+import { formatRegionalPrice, regionalPrice } from "@/lib/regional-pricing";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -40,6 +44,7 @@ export function PremiumUpgradeDialog({
   featureLabel = "This feature is included on paid plans.",
 }: Props) {
   const { upgrade, loading } = useUpgradePlan();
+  const pricing = useRegionalPricing(open);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -58,6 +63,7 @@ export function PremiumUpgradeDialog({
             const config = PLANS[plan.key];
             const features = PRICING_FEATURES[plan.key] ?? [];
             const busy = loading === plan.key;
+            const price = pricing && regionalPrice(pricing, plan.key, "month");
 
             return (
               <div
@@ -76,7 +82,9 @@ export function PremiumUpgradeDialog({
                     </p>
                     <p className="mt-1 flex items-baseline gap-1">
                       <span className="text-[28px] font-bold tracking-tight text-[#0a2540]">
-                        ${config.price}
+                        {pricing && price !== null
+                          ? formatRegionalPrice(pricing, price)
+                          : "…"}
                       </span>
                       <span className="text-[12px] text-[#697386]">/mo</span>
                     </p>

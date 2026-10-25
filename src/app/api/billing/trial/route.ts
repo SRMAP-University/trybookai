@@ -12,10 +12,12 @@ import {
   endPremiumTrial,
   isStripeBillingEnabled,
   isTrialActive,
+  pricingForRequest,
   startPremiumTrial,
   syncUserTrialState,
 } from "@/lib/billing";
 import { PREMIUM_TRIAL, planPriceId } from "@/lib/constants";
+import { regionalPrice } from "@/lib/regional-pricing";
 import { legalConsentField } from "@/lib/legal";
 import { getBaseUrl } from "@/lib/url";
 import {
@@ -84,7 +86,14 @@ export async function POST(request: Request) {
             { status: 400 }
           );
         }
-        const priceId = planPriceId("ENTERPRISE", interval);
+        const pricing = await pricingForRequest(request, user.id);
+        if (regionalPrice(pricing, "ENTERPRISE", interval) === null) {
+          return NextResponse.json(
+            { error: "Premium yearly isn't available in your country yet." },
+            { status: 400 }
+          );
+        }
+        const priceId = planPriceId("ENTERPRISE", interval, pricing.region);
         if (!priceId) {
           return NextResponse.json(
             { error: "Premium Stripe price is not configured." },
@@ -141,7 +150,7 @@ export async function POST(request: Request) {
           url: checkout.url,
           trialDays: PREMIUM_TRIAL.days,
           amountDueToday: 0,
-          message: `Continue in Stripe — ${PREMIUM_TRIAL.days}-day free trial, $0 due today.`,
+          message: `Continue in Stripe — ${PREMIUM_TRIAL.days}-day free trial, ${pricing.symbol}0 due today.`,
         });
       }
 

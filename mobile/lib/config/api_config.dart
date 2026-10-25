@@ -26,6 +26,7 @@ class ApiConfig {
   static const String jobsActive = '/api/jobs/active';
   static const String analytics = '/api/analytics';
   static const String billingCheckout = '/api/billing/checkout';
+  static const String billingPricing = '/api/billing/pricing';
   static const String billingTrial = '/api/billing/trial';
   static const String billingSync = '/api/billing/sync';
   static const String billingRevenueCatSync = '/api/billing/revenuecat/sync';
