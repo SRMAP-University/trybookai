@@ -55,7 +55,10 @@ export default async function proxy(req: NextRequest) {
   if (path === "/login" && req.nextUrl.searchParams.has("error")) {
     const cookie = req.cookies.getAll().find((c) => CALLBACK_COOKIE.test(c.name));
     const finish = mobileFinishUrl(cookie?.value, req.nextUrl);
-    if (finish) return NextResponse.redirect(finish);
+    if (finish) {
+      finish.searchParams.set("error", "google");
+      return NextResponse.redirect(finish);
+    }
   }
 
   if (bearer?.startsWith("Bearer ") && isApiProtected(path)) {
