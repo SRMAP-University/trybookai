@@ -14,8 +14,7 @@ class BooksProvider extends ChangeNotifier {
   bool loading = false;
   String? error;
 
-  List<BookModel> get generating =>
-      books.where((b) => b.isGenerating).toList();
+  List<BookModel> get generating => books.where((b) => b.isGenerating).toList();
 
   List<BookModel> get completed =>
       books.where((b) => b.status == 'COMPLETED').toList();
@@ -132,6 +131,21 @@ class BooksProvider extends ChangeNotifier {
     }
   }
 
+  /// Just what the reader lays out (titles, pictures, text), as raw JSON so
+  /// it can be cached. Older servers ignore `reader=1` and send the full book.
+  Future<Map<String, dynamic>?> fetchReaderJson(String id) async {
+    try {
+      final res = await _api.dio.get(
+        '${ApiConfig.books}/$id',
+        queryParameters: {'reader': '1'},
+      );
+      return res.data as Map<String, dynamic>;
+    } catch (e) {
+      error = _api.extractError(e);
+      return null;
+    }
+  }
+
   /// Rewrites one chapter; waits for the new text. Throws with a readable
   /// message on failure.
   Future<void> regenerateChapter(String bookId, String chapterId) async {
@@ -195,6 +209,7 @@ class BooksProvider extends ChangeNotifier {
         final v = user[key];
         return v is String && v.trim().isNotEmpty ? v.trim() : null;
       }
+
       return (tone: pick('defaultTone'), audience: pick('defaultAudience'));
     } catch (_) {
       return (tone: null, audience: null);
@@ -261,15 +276,14 @@ class BooksProvider extends ChangeNotifier {
   }
 
   /// Start audiobook conversion for a completed book.
-  Future<String?> startAudiobook(String bookId, {bool regenerate = false}) async {
+  Future<String?> startAudiobook(
+    String bookId, {
+    bool regenerate = false,
+  }) async {
     try {
       final res = await _api.dio.post(
         ApiConfig.audio,
-        data: {
-          'bookId': bookId,
-          'type': 'AUDIOBOOK',
-          'regenerate': regenerate,
-        },
+        data: {'bookId': bookId, 'type': 'AUDIOBOOK', 'regenerate': regenerate},
       );
       await loadActiveJobs();
       final audio = res.data['audio'];

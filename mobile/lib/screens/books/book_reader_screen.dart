@@ -12,6 +12,7 @@ import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/reader/book_pages.dart';
 import 'package:bookai_mobile/reader/reader_blocks.dart';
+import 'package:bookai_mobile/reader/reader_cache.dart';
 import 'package:bookai_mobile/services/reader_memory.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 
@@ -49,15 +50,27 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   bool _loading = true;
   String? _error;
 
+  /// Short fingerprint of the text, so a saved layout is only reused for
+  /// the same words.
+  String _contentSig = '';
+  String? _oldChapterId;
+
   ReaderTheme _theme = ReaderTheme.paper;
   int _step = 2;
 
   List<BookPage>? _pages;
   PageGeometry? _pagesGeometry;
+
+  /// False while later chapters are still being laid out.
+  bool _complete = false;
   String? _layoutKey;
   PaginationJob? _job;
   Anchor? _anchor;
-  bool _placed = false;
+
+  /// Where a new layout should open (null: the cover), and whether it has.
+  Anchor? _placeTarget;
+  bool _awaitingPlace = false;
+  bool _openedOnce = false;
 
   /// Cover 0, title page 1, text pages from 2, then the end and back cover.
   int _slot = 0;
@@ -94,43 +107,68 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     unawaited(_storage.write(key: key, value: value).catchError((_) {}));
   }
 
+  /// Opens the copy saved on the phone straight away, then fetches the
+  /// latest and switches to it only if the text changed.
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     final books = context.read<BooksProvider>();
-    final results = await Future.wait([
-      books.fetchContent(widget.bookId),
+    final prefs = await Future.wait([
       _read(_themeKey),
       _read(_stepKey),
       _read(_anchorKey),
       _read(_oldPosKey),
     ]);
+    final cached = await ReaderCache.book(widget.bookId);
     if (!mounted) return;
-    final book = results[0] as BookContent?;
-    if (book == null) {
-      setState(() {
-        _loading = false;
-        _error = books.error ?? 'Could not open this book.';
-      });
-      return;
-    }
-    final chapters = book.readable;
-    Anchor? anchor;
-    final saved = (results[3] as String?)?.split(',');
+
+    _theme = ReaderTheme.byId(prefs[0]);
+    _step = (int.tryParse(prefs[1] ?? '') ?? 2).clamp(
+      0,
+      PageGeometry.fontSteps.length - 1,
+    );
+    final saved = prefs[2]?.split(',');
     if (saved != null && saved.length == 3) {
       final n = saved.map(int.tryParse).toList();
-      if (!n.contains(null)) anchor = (n[0]!, n[1]!, n[2]!);
+      if (!n.contains(null)) _anchor = (n[0]!, n[1]!, n[2]!);
     }
-    if (anchor == null && results[4] != null) {
-      // Older versions saved the chapter only.
-      final ci = chapters.indexWhere((c) => c.id == results[4]);
-      if (ci >= 0) anchor = (ci, 0, 0);
+    _oldChapterId = prefs[3];
+
+    BookContent? shown;
+    if (cached != null) {
+      try {
+        shown = BookContent.fromJson(cached);
+        _applyBook(shown);
+      } catch (_) {}
     }
+
+    final fresh = await books.fetchReaderJson(widget.bookId);
+    if (!mounted) return;
+    if (fresh == null) {
+      // Offline or failed: keep reading the saved copy if there is one.
+      if (_book == null) {
+        setState(() {
+          _loading = false;
+          _error = books.error ?? 'Could not open this book.';
+        });
+      }
+      return;
+    }
+    unawaited(ReaderCache.saveBook(widget.bookId, fresh));
+    final latest = BookContent.fromJson(fresh);
+    if (shown == null || _signature(latest) != _signature(shown)) {
+      _applyBook(latest);
+    }
+  }
+
+  void _applyBook(BookContent book) {
+    final chapters = book.readable;
     setState(() {
       _book = book;
       _chapters = chapters;
+      _contentSig = _signature(book);
       _narrative = isNarrativeBook(book.genre, book.templateId);
       _illustrated = chapters.any(
         (c) =>
@@ -139,53 +177,140 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               (s) => (s.content ?? '').contains('/illustrations/'),
             ),
       );
-      _theme = ReaderTheme.byId(results[1] as String?);
-      _step = int.tryParse((results[2] as String?) ?? '') ?? 2;
-      _anchor = anchor;
+      if (_anchor == null && _oldChapterId != null) {
+        // Older versions saved the chapter only.
+        final ci = chapters.indexWhere((c) => c.id == _oldChapterId);
+        if (ci >= 0) _anchor = (ci, 0, 0);
+      }
       _loading = false;
     });
   }
 
+  /// FNV-1a over every chapter's title and text, stable across launches.
+  static String _signature(BookContent book) {
+    var h = 0x811c9dc5;
+    void add(String s) {
+      for (final unit in s.codeUnits) {
+        h = ((h ^ unit) * 0x01000193) & 0xffffffff;
+      }
+    }
+
+    add(book.title);
+    for (final c in book.chapters) {
+      add('|${c.id}|${c.number}|${c.title}|${c.imageUrl ?? ''}');
+      for (final s in c.sections) {
+        add('|${s.title}|');
+        add(s.content ?? '');
+      }
+    }
+    return h.toRadixString(16);
+  }
+
   // Layout -------------------------------------------------------------------
 
-  /// Lays the book out again whenever the page or type size changes, keeping
-  /// the reader on the same text.
+  /// Lays the book out again whenever the text, page or type size changes.
+  /// A layout saved for the same key is reused; otherwise pages appear as
+  /// soon as the chapter the reader is going to is laid out.
   void _ensureLayout(PageType type) {
-    if (_book == null || _chapters.isEmpty) return;
-    final key = '${type.g.key}|${type.scaler.scale(10)}';
+    final book = _book;
+    if (book == null || _chapters.isEmpty) return;
+    final key = [
+      'v1',
+      book.id,
+      _contentSig,
+      _narrative,
+      type.g.key,
+      type.scaler.scale(10),
+    ].join('|');
     if (key == _layoutKey) return;
     _layoutKey = key;
     _job?.cancelled = true;
     final job = PaginationJob();
     _job = job;
+
+    var target = _currentAnchor() ?? _anchor;
+    if (!_openedOnce && widget.chapterId != null) {
+      final ci = _chapters.indexWhere((c) => c.id == widget.chapterId);
+      if (ci >= 0) target = (ci, 0, 0);
+    }
+    _placeTarget = target;
+    _awaitingPlace = true;
+    final chapters = _chapters;
+    final narrative = _narrative;
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final saved = await ReaderCache.layout(book.id, key);
+      if (job.cancelled || !mounted) return;
+      final restored = saved == null
+          ? null
+          : decodePages(saved, chapters, narrative, type.g);
+      if (restored != null) {
+        _setPages(restored, type.g, complete: true);
+        return;
+      }
       await type.fontsReady();
       if (job.cancelled || !mounted) return;
-      final pages = await paginateBook(_chapters, _narrative, type, job);
+      final pages = await paginateBook(
+        chapters,
+        narrative,
+        type,
+        job,
+        onChapter: (soFar) {
+          if (!job.cancelled && mounted) {
+            _setPages(soFar, type.g, complete: false);
+          }
+        },
+      );
       if (pages == null || job.cancelled || !mounted) return;
-      final keep = _currentAnchor() ?? _anchor;
-      setState(() {
-        _pages = pages;
-        _pagesGeometry = type.g;
-        _slot = _slotForLayout(pages, keep);
-        _dir = 0;
-        _turn.value = 0;
-      });
-      _placed = true;
-      _afterMove();
+      _setPages(pages, type.g, complete: true);
+      unawaited(ReaderCache.saveLayout(book.id, key, encodePages(pages)));
     });
   }
 
-  int _slotForLayout(List<BookPage> pages, Anchor? keep) {
-    if (!_placed && widget.chapterId != null) {
-      final ci = _chapters.indexWhere((c) => c.id == widget.chapterId);
-      final first = pages.indexWhere((p) => p.chapter == ci);
-      if (first >= 0) return first + 2;
+  /// Shows newly laid-out pages. A new layout waits until the page the
+  /// reader is going to exists, so the old pages (or the cover) stay until
+  /// then and the place never jumps.
+  void _setPages(
+    List<BookPage> pages,
+    PageGeometry g, {
+    required bool complete,
+  }) {
+    if (_awaitingPlace) {
+      final target = _placeTarget;
+      final ready =
+          complete ||
+          target == null ||
+          (pages.isNotEmpty && pages.last.chapter > target.$1);
+      if (!ready) return;
+      setState(() {
+        _pages = pages;
+        _pagesGeometry = g;
+        _complete = complete;
+        _slot = _slotFor(pages, target);
+        _dir = 0;
+        _turn.value = 0;
+      });
+      _awaitingPlace = false;
+      _openedOnce = true;
+      _afterMove();
+      return;
     }
-    if (keep == null) return _placed ? _slot.clamp(0, pages.length + 3) : 0;
+    setState(() {
+      _pages = pages;
+      _pagesGeometry = g;
+      _complete = complete;
+    });
+  }
+
+  int _slotFor(List<BookPage> pages, Anchor? target) {
+    if (target == null) {
+      if (!_openedOnce) return 0;
+      // Cover and title page stay put; the end moves with the page count.
+      return _slot <= 1 ? _slot : pages.length + 2;
+    }
     var index = 0;
     for (var i = 0; i < pages.length; i++) {
-      if (compareAnchors(pages[i].anchor, keep) <= 0) index = i;
+      if (compareAnchors(pages[i].anchor, target) <= 0) index = i;
     }
     return index + 2;
   }
@@ -198,7 +323,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   Anchor? _currentAnchor() => _pageAt(_slot)?.anchor;
 
-  int get _slotCount => _pages == null ? 2 : _pages!.length + 4;
+  /// Until the layout is complete there's one "more pages coming" slot.
+  int get _slotCount =>
+      _pages == null ? 2 : _pages!.length + (_complete ? 4 : 3);
 
   void _afterMove() {
     final page = _pageAt(_slot);
@@ -469,6 +596,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final index = slot - 2;
     if (index < pages.length) {
       return _sheet(g, _textPage(pages[index], index, g, t));
+    }
+    if (!_complete) {
+      return _sheet(
+        g,
+        Center(child: CircularProgressIndicator(color: t.theme.muted)),
+      );
     }
     if (index == pages.length) return _sheet(g, _endPage(g, t));
     return _backCover(g);
@@ -966,12 +1099,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     final page = _pageAt(_slot);
     final label = page != null
-        ? 'Page ${_slot - 1} of ${pages.length}'
+        ? (_complete
+              ? 'Page ${_slot - 1} of ${pages.length}'
+              : 'Page ${_slot - 1}')
         : _slot == 0
         ? 'Tap or swipe to open'
         : _slot == 1
-        ? '${pages.length} pages'
-        : 'The end';
+        ? (_complete ? '${pages.length} pages' : 'Laying out pages…')
+        : _complete
+        ? 'The end'
+        : 'Laying out pages…';
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 10, 24, 12),
       child: Column(

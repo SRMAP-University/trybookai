@@ -15,10 +15,50 @@ export async function GET(
   }
 
   const { id } = await params;
-  const summary =
-    new URL(request.url).searchParams.get("summary") === "1";
+  const searchParams = new URL(request.url).searchParams;
+  const summary = searchParams.get("summary") === "1";
+  // Just what the app's book reader lays out: no jobs, audio or editions.
+  const reader = searchParams.get("reader") === "1";
 
   try {
+    if (reader) {
+      const book = await withDbRetry("book.get.reader", () =>
+        db.book.findFirst({
+          where: { id, userId: session.user.id },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            coverImage: true,
+            slug: true,
+            description: true,
+            genre: true,
+            templateId: true,
+            updatedAt: true,
+            chapters: {
+              orderBy: { number: "asc" },
+              select: {
+                id: true,
+                number: true,
+                title: true,
+                status: true,
+                imageUrl: true,
+                pageCount: true,
+                sections: {
+                  orderBy: { number: "asc" },
+                  select: { id: true, number: true, title: true, content: true },
+                },
+              },
+            },
+          },
+        })
+      );
+      if (!book) {
+        return NextResponse.json({ error: "Book not found" }, { status: 404 });
+      }
+      return NextResponse.json({ ...book, editions: [] });
+    }
+
     if (summary) {
       const book = await withDbRetry("book.get.summary", () =>
         db.book.findFirst({

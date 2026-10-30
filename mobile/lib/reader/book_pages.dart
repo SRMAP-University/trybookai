@@ -341,6 +341,7 @@ class ChapterHeadItem extends PageItem {
 class ParaItem extends PageItem {
   ParaItem(
     this.block,
+    this.bi,
     this.from,
     this.to,
     this.indent,
@@ -349,37 +350,43 @@ class ParaItem extends PageItem {
     super.b,
   );
   final RPara block;
+  final int bi;
   final int from;
   final int to;
   final bool indent;
 }
 
 class HeadItem extends PageItem {
-  HeadItem(this.block, super.h, super.t, super.b);
+  HeadItem(this.block, this.bi, super.h, super.t, super.b);
   final RHead block;
+  final int bi;
   @override
   bool get heading => true;
 }
 
 class ListItemPiece extends PageItem {
-  ListItemPiece(this.block, this.index, super.h, super.t, super.b);
+  ListItemPiece(this.block, this.bi, this.index, super.h, super.t, super.b);
   final RList block;
+  final int bi;
   final int index;
 }
 
 class TableItem extends PageItem {
-  TableItem(this.block, super.h, super.t, super.b);
+  TableItem(this.block, this.bi, super.h, super.t, super.b);
   final RTable block;
+  final int bi;
 }
 
 class FigureItem extends PageItem {
-  FigureItem(this.block, this.imageHeight, super.h, super.t, super.b);
+  FigureItem(this.block, this.bi, this.imageHeight, super.h, super.t, super.b);
   final RFigure block;
+  final int bi;
   final double imageHeight;
 }
 
 class BreakItem extends PageItem {
-  BreakItem(super.h, super.t, super.b);
+  BreakItem(this.bi, super.h, super.t, super.b);
+  final int bi;
 }
 
 /// One printed page of the book's text.
@@ -407,8 +414,9 @@ Future<List<BookPage>?> paginateBook(
   List<ChapterContent> chapters,
   bool narrative,
   PageType t,
-  PaginationJob job,
-) async {
+  PaginationJob job, {
+  void Function(List<BookPage> soFar)? onChapter,
+}) async {
   final g = t.g;
   final limit = g.ch - 1;
   final em = t.em;
@@ -485,6 +493,7 @@ Future<List<BookPage>?> paginateBook(
             );
             final whole = ParaItem(
               block,
+              bi,
               from,
               total,
               indent,
@@ -528,21 +537,11 @@ Future<List<BookPage>?> paginateBook(
               break;
             }
             if (fitWords >= _minSplitWords || (fitWords > 0 && pageEmpty())) {
-              final pieceHeight = t.height(
-                t.words(
-                  block.words,
-                  from,
-                  from + fitWords,
-                  base,
-                  indent: indent,
-                  inItalic: block.quote,
-                ),
-                width,
-                align: TextAlign.justify,
-              );
+              final pieceHeight = lineBottom;
               place(
                 ParaItem(
                   block,
+                  bi,
                   from,
                   from + fitWords,
                   indent,
@@ -566,6 +565,7 @@ Future<List<BookPage>?> paginateBook(
         case RHead():
           final item = HeadItem(
             block,
+            bi,
             t.height(t.inline(block.text, t.heading(block.level)), g.cw),
             em * 1.05,
             em * 0.45,
@@ -577,6 +577,7 @@ Future<List<BookPage>?> paginateBook(
           for (var k = 0; k < block.items.length; k++) {
             final item = ListItemPiece(
               block,
+              bi,
               k,
               t.height(
                 t.words(block.items[k], 0, block.items[k].length, t.body),
@@ -592,6 +593,7 @@ Future<List<BookPage>?> paginateBook(
         case RTable():
           final item = TableItem(
             block,
+            bi,
             _tableHeight(block, t),
             em * 0.6,
             em * 0.6,
@@ -600,7 +602,7 @@ Future<List<BookPage>?> paginateBook(
           place(item);
 
         case RFigure():
-          final imageHeight = math.min(g.cw * 2 / 3, g.ch * 0.6);
+          final imageHeight = figureImageHeight(g);
           final captionHeight = block.caption.isEmpty
               ? 0.0
               : em * 0.8 * 0.45 +
@@ -611,6 +613,7 @@ Future<List<BookPage>?> paginateBook(
                     );
           final item = FigureItem(
             block,
+            bi,
             imageHeight,
             imageHeight + captionHeight,
             em * 0.85,
@@ -623,6 +626,7 @@ Future<List<BookPage>?> paginateBook(
           // A scene break never starts a page.
           if (items.isEmpty) continue;
           final item = BreakItem(
+            bi,
             t.height(TextSpan(text: '⁂', style: t.rule), g.cw),
             em * 0.8,
             em * 0.8,
@@ -632,17 +636,132 @@ Future<List<BookPage>?> paginateBook(
     }
 
     if (items.isNotEmpty) pages.add(BookPage(ci, start, items, anchor));
+    if (!job.cancelled) onChapter?.call(List.unmodifiable(pages));
     // Let a frame through between chapters.
     await Future<void>.delayed(Duration.zero);
   }
   return pages;
 }
 
+double chapterImageHeight(ChapterContent chapter, PageGeometry g) =>
+    (chapter.imageUrl ?? '').isNotEmpty
+    ? math.min(g.cw * 2 / 3, g.ch * 0.44)
+    : 0.0;
+
+double figureImageHeight(PageGeometry g) => math.min(g.cw * 2 / 3, g.ch * 0.6);
+
+/// Page breaks as plain lists, so a layout can be saved and shown again
+/// without measuring.
+List<Object> encodePages(List<BookPage> pages) => [
+  for (final p in pages)
+    [
+      p.chapter,
+      p.start ? 1 : 0,
+      p.anchor.$1,
+      p.anchor.$2,
+      p.anchor.$3,
+      [
+        for (final i in p.items)
+          switch (i) {
+            ChapterHeadItem() => [0, i.gap],
+            ParaItem() => [1, i.gap, i.bi, i.from, i.to, i.indent ? 1 : 0],
+            HeadItem() => [2, i.gap, i.bi],
+            ListItemPiece() => [3, i.gap, i.bi, i.index],
+            TableItem() => [4, i.gap, i.bi],
+            FigureItem() => [5, i.gap, i.bi],
+            BreakItem() => [6, i.gap, i.bi],
+          },
+      ],
+    ],
+];
+
+/// The pages [encodePages] saved, rebuilt against the same chapters. Null if
+/// the saved layout doesn't match them.
+List<BookPage>? decodePages(
+  List<dynamic> raw,
+  List<ChapterContent> chapters,
+  bool narrative,
+  PageGeometry g,
+) {
+  try {
+    final blocks = <int, List<ReaderBlock>>{};
+    List<ReaderBlock> blocksOf(int ci) =>
+        blocks[ci] ??= chapterBlocks(chapters[ci], narrative);
+    final pages = <BookPage>[];
+    for (final p in raw.cast<List<dynamic>>()) {
+      final ci = p[0] as int;
+      final items = <PageItem>[];
+      for (final it in (p[5] as List).cast<List<dynamic>>()) {
+        final gap = (it[1] as num).toDouble();
+        final PageItem item;
+        switch (it[0] as int) {
+          case 0:
+            item = ChapterHeadItem(
+              chapters[ci],
+              chapterImageHeight(chapters[ci], g),
+              0,
+              0,
+              0,
+            );
+          case 1:
+            final b = blocksOf(ci)[it[2] as int] as RPara;
+            final from = it[3] as int;
+            final to = it[4] as int;
+            RangeError.checkValidRange(from, to, b.words.length);
+            item = ParaItem(b, it[2] as int, from, to, it[5] == 1, 0, 0, 0);
+          case 2:
+            item = HeadItem(
+              blocksOf(ci)[it[2] as int] as RHead,
+              it[2] as int,
+              0,
+              0,
+              0,
+            );
+          case 3:
+            final b = blocksOf(ci)[it[2] as int] as RList;
+            final index = it[3] as int;
+            RangeError.checkValidIndex(index, b.items);
+            item = ListItemPiece(b, it[2] as int, index, 0, 0, 0);
+          case 4:
+            item = TableItem(
+              blocksOf(ci)[it[2] as int] as RTable,
+              it[2] as int,
+              0,
+              0,
+              0,
+            );
+          case 5:
+            item = FigureItem(
+              blocksOf(ci)[it[2] as int] as RFigure,
+              it[2] as int,
+              figureImageHeight(g),
+              0,
+              0,
+              0,
+            );
+          case 6:
+            item = BreakItem(it[2] as int, 0, 0, 0);
+          default:
+            return null;
+        }
+        item.gap = gap;
+        items.add(item);
+      }
+      pages.add(
+        BookPage(ci, p[1] == 1, items, (p[2] as int, p[3] as int, p[4] as int)),
+      );
+    }
+    return pages;
+  } catch (_) {
+    return null;
+  }
+}
+
 ChapterHeadItem _chapterHead(ChapterContent chapter, PageType t) {
   final g = t.g;
   final em = t.em;
-  final hasImage = (chapter.imageUrl ?? '').isNotEmpty;
-  final imageHeight = hasImage ? math.min(g.cw * 2 / 3, g.ch * 0.44) : 0.0;
+  final imageHeight = chapterImageHeight(chapter, g);
+  final hasImage = imageHeight > 0;
   final number = t.height(
     TextSpan(text: 'CHAPTER ${chapter.number}', style: t.chapterNumber),
     g.cw,

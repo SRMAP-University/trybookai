@@ -9,6 +9,7 @@ class BookContent {
     this.description,
     this.genre,
     this.templateId,
+    this.updatedAt,
     required this.chapters,
     required this.editions,
   });
@@ -21,6 +22,9 @@ class BookContent {
   final String? description;
   final String? genre;
   final String? templateId;
+
+  /// Changes whenever the book does; part of the saved-layout key.
+  final String? updatedAt;
   final List<ChapterContent> chapters;
   final List<EditionRef> editions;
 
@@ -40,6 +44,7 @@ class BookContent {
       description: json['description'] as String?,
       genre: json['genre'] as String?,
       templateId: json['templateId'] as String?,
+      updatedAt: json['updatedAt'] as String?,
       chapters: list(json['chapters']).map(ChapterContent.fromJson).toList(),
       editions: list(json['editions']).map(EditionRef.fromJson).toList(),
     );
