@@ -21,9 +21,9 @@ class ReaderPalette {
 
   static const paper = ReaderPalette(
     name: 'Paper',
-    background: Color(0xFFFFFCF6),
-    text: Color(0xFF2A2320),
-    muted: Color(0xFF7A6D64),
+    background: Color(0xFFFCFCFB),
+    text: Color(0xFF1A2433),
+    muted: Color(0xFF5E6878),
     rule: Color(0xFFE8DDCF),
   );
   static const sepia = ReaderPalette(
@@ -280,7 +280,7 @@ class ManuscriptView extends StatelessWidget {
       height: 1.65,
       color: palette.text,
     );
-    final heading = GoogleFonts.nunito(
+    final heading = GoogleFonts.inter(
       fontWeight: FontWeight.w800,
       height: 1.3,
       color: palette.text,

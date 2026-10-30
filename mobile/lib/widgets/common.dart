@@ -20,14 +20,22 @@ class StripeCard extends StatelessWidget {
     final content = Container(
       width: double.infinity,
       padding: padding,
+      // The website's `--shadow-soft`: hairline ring, contact shadow, soft drop.
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.navy.withValues(alpha: 0.05)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.navy.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: AppColors.navy.withValues(alpha: 0.04),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: AppColors.navy.withValues(alpha: 0.14),
+            blurRadius: 24,
+            spreadRadius: -12,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -38,7 +46,7 @@ class StripeCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: content,
       ),
     );

@@ -21,16 +21,18 @@ class Reveal extends StatefulWidget {
 }
 
 class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 560),
-  );
-  late final _curve = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+  late final _c = AnimationController(vsync: this, duration: AppMotion.enter);
+  late final _curve = CurvedAnimation(parent: _c, curve: AppMotion.enterCurve);
   Timer? _timer;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_timer != null || _c.isCompleted) return;
+    if (AppMotion.reduced(context)) {
+      _c.value = 1;
+      return;
+    }
     _timer = Timer(widget.delay, () {
       if (mounted) _c.forward();
     });
@@ -47,11 +49,12 @@ class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _curve,
-      child: SlideTransition(
-        position: Tween(
-          begin: const Offset(0, 0.12),
-          end: Offset.zero,
-        ).animate(_curve),
+      child: AnimatedBuilder(
+        animation: _curve,
+        builder: (_, child) => Transform.translate(
+          offset: Offset(0, 16 * (1 - _curve.value)),
+          child: child,
+        ),
         child: widget.child,
       ),
     );
@@ -86,7 +89,7 @@ class _PressableState extends State<Pressable> {
       onTap: widget.onTap,
       child: AnimatedScale(
         scale: _down ? 0.97 : 1,
-        duration: const Duration(milliseconds: 120),
+        duration: AppMotion.quick,
         curve: Curves.easeOut,
         child: widget.child,
       ),
@@ -134,10 +137,10 @@ class HomeHeading extends StatelessWidget {
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
               color: AppColors.navy,
-              letterSpacing: -0.2,
+              letterSpacing: -0.3,
             ),
           ),
         ),
@@ -160,9 +163,9 @@ class HomeLink extends StatelessWidget {
     return TextButton(
       onPressed: onTap,
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.textBody,
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        foregroundColor: AppColors.primaryText,
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -170,7 +173,7 @@ class HomeLink extends StatelessWidget {
           if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 4)],
           Text(
             label,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -200,7 +203,17 @@ class _HomeHeroState extends State<HomeHero>
   late final _float = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 3800),
-  )..repeat(reverse: true);
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (AppMotion.reduced(context)) {
+      _float.value = 0.5;
+    } else if (!_float.isAnimating) {
+      _float.repeat(reverse: true);
+    }
+  }
 
   @override
   void dispose() {
@@ -250,7 +263,7 @@ class _HomeHeroState extends State<HomeHero>
                   style: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -258,21 +271,15 @@ class _HomeHeroState extends State<HomeHero>
                   widget.name ?? 'Writer',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.navy,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                    letterSpacing: -0.5,
-                  ),
+                  style: AppType.display(size: 40),
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'What story will you write today?',
                   style: TextStyle(
                     color: AppColors.textBody,
-                    fontSize: 14,
-                    height: 1.35,
+                    fontSize: 15,
+                    height: 1.4,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -390,7 +397,7 @@ class ContinueReadingRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     height: 1.2,
                     color: AppColors.navy,
                   ),
@@ -399,7 +406,7 @@ class ContinueReadingRow extends StatelessWidget {
                 Text(
                   detail,
                   style: const TextStyle(
-                    fontSize: 12.5,
+                    fontSize: 13,
                     color: AppColors.textMuted,
                   ),
                 ),
@@ -424,52 +431,6 @@ class ContinueReadingRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// One shortcut in the quick actions row.
-typedef QuickAction = ({String label, IconData icon, VoidCallback onTap});
-
-class QuickActions extends StatelessWidget {
-  const QuickActions({super.key, required this.actions});
-
-  final List<QuickAction> actions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final a in actions)
-          Expanded(
-            child: Pressable(
-              onTap: a.onTap,
-              child: Column(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border, width: 1.2),
-                    ),
-                    child: Icon(a.icon, color: AppColors.navy, size: 23),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    a.label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textBody,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
     );
   }
 }
@@ -579,7 +540,7 @@ class WritingNowRow extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.navy,
                           fontSize: 13,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -590,7 +551,7 @@ class WritingNowRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.navy,
                     ),
                   ),
@@ -647,24 +608,14 @@ class PlanLine extends StatelessWidget {
               Text(
                 '${user.displayPlanLabel} plan',
                 style: const TextStyle(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontSize: 14,
                   color: AppColors.navy,
                 ),
               ),
               const Spacer(),
               if (!user.isPaid)
-                GestureDetector(
-                  onTap: onUpgrade,
-                  child: const Text(
-                    'Upgrade',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                    ),
-                  ),
-                )
+                HomeLink('Upgrade', onTap: onUpgrade)
               else
                 const Icon(
                   Icons.chevron_right_rounded,
@@ -832,7 +783,7 @@ class _IdeaListState extends State<IdeaList> {
                     style: const TextStyle(
                       fontSize: 10.5,
                       letterSpacing: 1,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textMuted,
                     ),
                   ),
@@ -841,7 +792,7 @@ class _IdeaListState extends State<IdeaList> {
                     idea.title,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.navy,
                     ),
                   ),
@@ -851,8 +802,8 @@ class _IdeaListState extends State<IdeaList> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12.5,
-                      height: 1.35,
+                      fontSize: 13,
+                      height: 1.4,
                       color: AppColors.textMuted,
                     ),
                   ),

@@ -334,7 +334,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                               ? AppColors.success
                               : failed
                                   ? AppColors.destructive
-                                  : AppColors.primary,
+                                  : AppColors.primaryText,
                         ),
                       ),
                     ),
@@ -458,7 +458,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
-                  color: c.hasText ? AppColors.primary : AppColors.textMuted,
+                  color: c.hasText ? AppColors.primaryText : AppColors.textMuted,
                 ),
               ),
             ),

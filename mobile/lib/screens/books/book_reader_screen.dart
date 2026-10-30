@@ -244,8 +244,8 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   letterSpacing: 2,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  color: p.muted,
                 ),
               ),
               const SizedBox(height: 8),
@@ -282,7 +282,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
                       padding: const EdgeInsets.only(top: 6, bottom: 10),
                       child: Text(
                         s.title,
-                        style: GoogleFonts.nunito(
+                        style: GoogleFonts.inter(
                           fontSize: _fontSize * 1.1,
                           fontWeight: FontWeight.w800,
                           color: p.text,

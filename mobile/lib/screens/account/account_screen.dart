@@ -31,7 +31,7 @@ class AccountScreen extends StatelessWidget {
                         .substring(0, 1)
                         .toUpperCase(),
                     style: const TextStyle(
-                      color: AppColors.primary,
+                      color: AppColors.primaryText,
                       fontWeight: FontWeight.w700,
                       fontSize: 20,
                     ),

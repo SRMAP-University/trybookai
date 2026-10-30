@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/bookai_logo.dart';
 
@@ -99,13 +98,7 @@ class AuthHero extends StatelessWidget {
         const SizedBox(height: 20),
         Text(
           headline,
-          style: GoogleFonts.fraunces(
-            fontSize: 28,
-            height: 1.2,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.6,
-            color: AppColors.navy,
-          ),
+          style: AppType.display(size: 36),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 8),

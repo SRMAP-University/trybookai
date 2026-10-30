@@ -23,13 +23,14 @@ class BookCover3D extends StatelessWidget {
   final bool ribbon;
 
   static const _aspect = 1.45;
+  // Cool tones around the brand indigo, so placeholders sit with the UI.
   static const _palette = [
-    Color(0xFF3F8F6B),
-    Color(0xFFE4574E),
-    Color(0xFF3A7CA5),
-    Color(0xFF8E6BBF),
-    Color(0xFFDD8A3C),
-    Color(0xFF2F6F73),
+    Color(0xFF4B44D6),
+    Color(0xFF0A2540),
+    Color(0xFF2D6CA8),
+    Color(0xFF0E6245),
+    Color(0xFF6E4FD8),
+    Color(0xFF1F6F8B),
   ];
 
   @override

@@ -45,11 +45,11 @@ class BookShelfRow extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFEBDCC6), Color(0xFFD6BE9C)],
+                    colors: [Color(0xFFF0F3F7), Color(0xFFDDE3EB)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF8A6A45).withValues(alpha: 0.22),
+                      color: AppColors.navy.withValues(alpha: 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 6),
                     ),
@@ -92,8 +92,9 @@ class BookShelfRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppColors.navy,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -102,8 +103,7 @@ class BookShelfRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
                     color: AppColors.textMuted,
                   ),
                 ),

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +13,6 @@ import 'package:bookai_mobile/screens/home/home_widgets.dart';
 import 'package:bookai_mobile/services/reader_memory.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/book_shelf.dart';
-import 'package:bookai_mobile/widgets/bookai_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -90,181 +88,145 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const BookAiLogo(height: 28),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: GestureDetector(
-              onTap: () => context.go('/account'),
-              child: _Avatar(user: user),
-            ),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await Future.wait([
-            books.load(),
-            books.loadActiveJobs(),
-            auth.refreshUser(),
-            pub.load(),
-          ]);
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
-          children: [
-            reveal(
-              HomeHero(
-                name: _firstName(user),
-                covers: heroCovers,
-                onWrite: () => context.push('/books/new'),
-              ),
-            ),
-            ValueListenableBuilder<LastRead?>(
-              valueListenable: ReaderMemory.last,
-              builder: (context, last, _) {
-                final row = _continueRow(books, last);
-                if (row == null) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 18),
-                  child: Column(
-                    children: [
-                      const Divider(height: 1, color: AppColors.border),
-                      const SizedBox(height: 16),
-                      row,
-                      const SizedBox(height: 16),
-                      const Divider(height: 1, color: AppColors.border),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            reveal(
-              QuickActions(
-                actions: [
-                  (
-                    label: 'New book',
-                    icon: Icons.edit_note_rounded,
-                    onTap: () => context.push('/books/new'),
-                  ),
-                  (
-                    label: 'Audio Studio',
-                    icon: Icons.headphones_rounded,
-                    onTap: () => context.go('/studio'),
-                  ),
-                  (
-                    label: 'Discover',
-                    icon: Icons.explore_outlined,
-                    onTap: () => context.go('/discover'),
-                  ),
-                  (
-                    label: 'My books',
-                    icon: Icons.auto_stories_outlined,
-                    onTap: () => context.go('/books'),
-                  ),
-                ],
-              ),
-            ),
-            if (writing.isNotEmpty) ...[
-              const SizedBox(height: 32),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await Future.wait([
+              books.load(),
+              books.loadActiveJobs(),
+              auth.refreshUser(),
+              pub.load(),
+            ]);
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+            children: [
               reveal(
-                HomeHeading(
-                  'Writing now',
-                  action: HomeLink(
-                    'All books',
-                    onTap: () => context.go('/books'),
-                  ),
+                HomeHero(
+                  name: _firstName(user),
+                  covers: heroCovers,
+                  onWrite: () => context.push('/books/new'),
                 ),
               ),
-              for (var i = 0; i < writing.length; i++) ...[
-                if (i > 0) const Divider(height: 1, color: AppColors.border),
+              ValueListenableBuilder<LastRead?>(
+                valueListenable: ReaderMemory.last,
+                builder: (context, last, _) {
+                  final row = _continueRow(books, last);
+                  if (row == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 18),
+                    child: Column(
+                      children: [
+                        const Divider(height: 1, color: AppColors.border),
+                        const SizedBox(height: 16),
+                        row,
+                        const SizedBox(height: 16),
+                        const Divider(height: 1, color: AppColors.border),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              if (writing.isNotEmpty) ...[
+                const SizedBox(height: 32),
                 reveal(
-                  WritingNowRow(
-                    book: writing[i],
-                    onTap: () => context.push('/books/${writing[i].id}'),
+                  HomeHeading(
+                    'Writing now',
+                    action: HomeLink(
+                      'All books',
+                      onTap: () => context.go('/books'),
+                    ),
+                  ),
+                ),
+                for (var i = 0; i < writing.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, color: AppColors.border),
+                  reveal(
+                    WritingNowRow(
+                      book: writing[i],
+                      onTap: () => context.push('/books/${writing[i].id}'),
+                    ),
+                  ),
+                ],
+              ],
+              if (books.loading && books.books.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              if (books.completed.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                reveal(
+                  HomeHeading(
+                    'Your bookshelf',
+                    action: HomeLink(
+                      'View all',
+                      onTap: () => context.go('/books'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                reveal(
+                  BookShelfRow(
+                    books: [
+                      for (final b in books.completed.take(8))
+                        (
+                          title: b.title,
+                          subtitle:
+                              '${b.genre ?? 'Book'} · ${b.currentPages} pages',
+                          coverImage: b.coverImage,
+                          slug: b.slug,
+                          onTap: () => context.push('/books/${b.id}'),
+                        ),
+                    ],
                   ),
                 ),
               ],
-            ],
-            if (books.loading && books.books.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 24),
-                child: LinearProgressIndicator(minHeight: 2),
-              ),
-            if (books.completed.isNotEmpty) ...[
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
+              reveal(IdeaList(onPick: _useIdea)),
+              const SizedBox(height: 28),
               reveal(
                 HomeHeading(
-                  'Your bookshelf',
+                  'Popular on BookAI',
                   action: HomeLink(
                     'View all',
-                    onTap: () => context.go('/books'),
+                    onTap: () => context.go('/discover'),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              reveal(
-                BookShelfRow(
-                  books: [
-                    for (final b in books.completed.take(8))
-                      (
-                        title: b.title,
-                        subtitle:
-                            '${b.genre ?? 'Book'} · ${b.currentPages} pages',
-                        coverImage: b.coverImage,
-                        slug: b.slug,
-                        onTap: () => context.push('/books/${b.id}'),
-                      ),
-                  ],
+              if (pub.books.isEmpty && !pub.loading)
+                const Text(
+                  'Browse published manuscripts on Discover.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                )
+              else
+                reveal(
+                  BookShelfRow(
+                    books: [
+                      for (final b in pub.books.take(10))
+                        (
+                          title: b.title,
+                          subtitle: b.author,
+                          coverImage: b.coverImage,
+                          slug: b.slug,
+                          onTap: () => context.push('/discover/${b.slug}'),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+              if (user != null) ...[
+                const SizedBox(height: 32),
+                reveal(
+                  PlanLine(
+                    user: user,
+                    onTap: () => context.push('/usage'),
+                    onUpgrade: () => context.push('/billing'),
+                  ),
+                ),
+              ],
             ],
-            const SizedBox(height: 28),
-            reveal(IdeaList(onPick: _useIdea)),
-            const SizedBox(height: 28),
-            reveal(
-              HomeHeading(
-                'Popular on BookAI',
-                action: HomeLink(
-                  'View all',
-                  onTap: () => context.go('/discover'),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (pub.books.isEmpty && !pub.loading)
-              const Text(
-                'Browse published manuscripts on Discover.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-              )
-            else
-              reveal(
-                BookShelfRow(
-                  books: [
-                    for (final b in pub.books.take(10))
-                      (
-                        title: b.title,
-                        subtitle: b.author,
-                        coverImage: b.coverImage,
-                        slug: b.slug,
-                        onTap: () => context.push('/discover/${b.slug}'),
-                      ),
-                  ],
-                ),
-              ),
-            if (user != null) ...[
-              const SizedBox(height: 32),
-              reveal(
-                PlanLine(
-                  user: user,
-                  onTap: () => context.push('/usage'),
-                  onUpgrade: () => context.push('/billing'),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -300,50 +262,4 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () => context.push('/books/${newest.id}/read'),
     );
   }
-}
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.user});
-
-  final UserModel? user;
-
-  @override
-  Widget build(BuildContext context) {
-    final image = user?.image;
-    final letter =
-        (user?.name?.trim().isNotEmpty == true
-                ? user!.name!.trim()
-                : user?.email ?? '?')
-            .substring(0, 1)
-            .toUpperCase();
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.mutedBg,
-        border: Border.all(color: AppColors.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      alignment: Alignment.center,
-      child: image != null && image.startsWith('http')
-          ? CachedNetworkImage(
-              imageUrl: image,
-              fit: BoxFit.cover,
-              width: 36,
-              height: 36,
-              errorWidget: (_, _, _) => _letter(letter),
-            )
-          : _letter(letter),
-    );
-  }
-
-  Widget _letter(String letter) => Text(
-    letter,
-    style: const TextStyle(
-      color: AppColors.primary,
-      fontWeight: FontWeight.w900,
-      fontSize: 15,
-    ),
-  );
 }
