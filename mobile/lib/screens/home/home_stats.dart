@@ -9,9 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/bookai_logo.dart';
 
-/// How far Home's sheet moves down to show the stats.
-const homeStatsHeight = 300.0;
+/// The strip of the dark layer that always shows above Home's sheet (logo
+/// and plan), and how much further the sheet moves down to show the stats.
+const homePeekHeight = 52.0;
+const homeStatsHeight = 236.0;
 
 const _lavender = Color(0xFFC9C5FF);
 
@@ -115,8 +118,70 @@ class SheetHandle extends StatelessWidget {
   }
 }
 
-/// Plan, what's left this month and what you've written, on the dark layer
-/// behind Home.
+String _planLabel(UserModel? u) {
+  if (u == null) return 'Free';
+  if (u.onTrial && u.trialEndsAt != null) {
+    final ends = DateTime.tryParse(u.trialEndsAt!);
+    if (ends != null) {
+      return 'Free trial · ends ${DateFormat('d MMM').format(ends.toLocal())}';
+    }
+  }
+  return u.onTrial ? u.displayPlanLabel : '${u.displayPlanLabel} plan';
+}
+
+/// The always-visible strip of the dark layer: logo on the left, plan on
+/// the right. Tap it to open or close the stats.
+class HomePeekBar extends StatelessWidget {
+  const HomePeekBar({super.key, required this.user, required this.onTap});
+
+  final UserModel? user;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Show or hide your stats',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          height: homePeekHeight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                const BookAiLogo(height: 24, color: Colors.white),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    _planLabel(user),
+                    style: const TextStyle(
+                      color: _lavender,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What's left this month and what you've written, on the dark layer
+/// behind Home, below the logo strip.
 class HomeStatsPanel extends StatelessWidget {
   const HomeStatsPanel({
     super.key,
@@ -146,61 +211,16 @@ class HomeStatsPanel extends StatelessWidget {
             u.audioMinutesLimit,
           );
 
-    String plan = u?.displayPlanLabel ?? 'Free';
-    if (u != null && u.onTrial && u.trialEndsAt != null) {
-      final ends = DateTime.tryParse(u.trialEndsAt!);
-      if (ends != null) {
-        plan =
-            'Free trial · ends ${DateFormat('d MMM').format(ends.toLocal())}';
-      }
-    } else if (u != null && !u.onTrial) {
-      plan = '${u.displayPlanLabel} plan';
-    }
-
     return ClipRect(
       child: OverflowBox(
         alignment: Alignment.topCenter,
         maxHeight: double.infinity,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Your stats',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Text(
-                      plan,
-                      style: const TextStyle(
-                        color: _lavender,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
               Row(
                 children: [
                   Expanded(

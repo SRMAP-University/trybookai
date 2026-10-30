@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Your stats, behind the sheet; they rise in as it's pulled down.
             Positioned(
-              top: top,
+              top: top + homePeekHeight,
               left: 0,
               right: 0,
               height: homeStatsHeight,
@@ -172,7 +172,9 @@ class _HomeScreenState extends State<HomeScreen> {
               physics: const HomeSheetPhysics(restOffset: homeStatsHeight),
               slivers: [
                 SliverToBoxAdapter(
-                  child: SizedBox(height: top + 8 + homeStatsHeight),
+                  child: SizedBox(
+                    height: top + homePeekHeight + homeStatsHeight,
+                  ),
                 ),
                 DecoratedSliver(
                   decoration: const BoxDecoration(
@@ -323,13 +325,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            // The status bar keeps its dark backing as the sheet scrolls under.
+            // The dark strip with the logo and plan stays on top; the sheet
+            // scrolls under it.
             Positioned(
               top: 0,
               left: 0,
               right: 0,
-              height: top,
-              child: const ColoredBox(color: AppColors.navy),
+              height: top + homePeekHeight,
+              child: ColoredBox(
+                color: AppColors.navy,
+                child: Padding(
+                  padding: EdgeInsets.only(top: top),
+                  child: HomePeekBar(user: user, onTap: _toggleStats),
+                ),
+              ),
             ),
           ],
         ),
