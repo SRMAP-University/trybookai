@@ -408,7 +408,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   child: const Text(
                     'Current',
                     style: TextStyle(
-                      color: AppColors.primary,
+                      color: AppColors.primaryText,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),

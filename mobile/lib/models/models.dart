@@ -114,8 +114,9 @@ class BookModel {
   bool get isGenerating =>
       status == 'GENERATING' || status == 'OUTLINING';
 
+  /// Null for private books — they have no page anyone else can open.
   String? get publicUrl {
-    if (slug == null || slug!.isEmpty) return null;
+    if (!isPublic || slug == null || slug!.isEmpty) return null;
     return '${ApiConfig.baseUrl}/books/$slug';
   }
 
@@ -310,6 +311,7 @@ class PublicSectionModel {
     required this.number,
     required this.title,
     this.content,
+    this.markdown,
     required this.pageCount,
     required this.wordCount,
   });
@@ -317,6 +319,9 @@ class PublicSectionModel {
   final int number;
   final String title;
   final String? content;
+
+  /// Full text with picture lines, for the manuscript renderer.
+  final String? markdown;
   final int pageCount;
   final int wordCount;
 
@@ -325,6 +330,7 @@ class PublicSectionModel {
       number: (json['number'] as num?)?.toInt() ?? 0,
       title: json['title'] as String? ?? '',
       content: json['content'] as String?,
+      markdown: json['markdown'] as String?,
       pageCount: (json['pageCount'] as num?)?.toInt() ?? 0,
       wordCount: (json['wordCount'] as num?)?.toInt() ?? 0,
     );

@@ -6,10 +6,14 @@ class BookAiLogo extends StatelessWidget {
     super.key,
     this.height = 36,
     this.showWordmark = true,
+    this.color,
   });
 
   final double height;
   final bool showWordmark;
+
+  /// Mark and wordmark colour; dark by default, for light backgrounds.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +26,7 @@ class BookAiLogo extends StatelessWidget {
           width: height,
           filterQuality: FilterQuality.high,
           // Force dark mark on light UI (asset is black; tint keeps it crisp).
-          color: Colors.black,
+          color: color ?? Colors.black,
           colorBlendMode: BlendMode.srcIn,
         ),
         if (showWordmark) ...[
@@ -33,7 +37,7 @@ class BookAiLogo extends StatelessWidget {
               fontSize: height * 0.72,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.8,
-              color: AppColors.navy,
+              color: color ?? AppColors.navy,
               height: 1,
             ),
           ),
