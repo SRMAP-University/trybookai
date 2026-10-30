@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/config/book_options.dart';
@@ -69,8 +70,9 @@ class PageSectionTitle extends StatelessWidget {
 
 // Hero -------------------------------------------------------------------------
 
-/// The dark stage at the top: the book's own cover, blurred, lights it; the
-/// cover rises in, catches a sheen and then floats.
+/// The dark stage at the top, lit by the book's own cover, blurred. The
+/// cover and title themselves are drawn by [HeroFlight] above the page so
+/// they can fly into the top bar; the hero keeps their places.
 class BookHero extends StatefulWidget {
   const BookHero({
     super.key,
@@ -82,8 +84,8 @@ class BookHero extends StatefulWidget {
     required this.edition,
     required this.description,
     required this.actions,
-    required this.onBack,
-    this.coverBusy = false,
+    required this.coverKey,
+    required this.titleKey,
   });
 
   final String title;
@@ -94,31 +96,19 @@ class BookHero extends StatefulWidget {
   final int edition;
   final String? description;
   final List<Widget> actions;
-  final VoidCallback onBack;
-  final bool coverBusy;
+  final GlobalKey coverKey;
+  final GlobalKey titleKey;
 
   @override
   State<BookHero> createState() => _BookHeroState();
 }
 
-class _BookHeroState extends State<BookHero> with TickerProviderStateMixin {
-  late final _rise = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
-  late final _sheen = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  );
-  late final _float = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 7),
-  );
+class _BookHeroState extends State<BookHero>
+    with SingleTickerProviderStateMixin {
   late final _drift = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 26),
   );
-  final _timers = <Timer>[];
   bool _started = false;
   bool _synopsis = false;
 
@@ -127,25 +117,11 @@ class _BookHeroState extends State<BookHero> with TickerProviderStateMixin {
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-    if (AppMotion.reduced(context)) {
-      _rise.value = 1;
-      _sheen.value = 1;
-      return;
-    }
-    _rise.forward();
-    _drift.repeat(reverse: true);
-    _timers.add(Timer(const Duration(milliseconds: 600), _sheen.forward));
-    _timers.add(Timer(const Duration(seconds: 1), _float.repeat));
+    if (!AppMotion.reduced(context)) _drift.repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    for (final t in _timers) {
-      t.cancel();
-    }
-    _rise.dispose();
-    _sheen.dispose();
-    _float.dispose();
     _drift.dispose();
     super.dispose();
   }
@@ -162,14 +138,26 @@ class _BookHeroState extends State<BookHero> with TickerProviderStateMixin {
             padding: EdgeInsets.fromLTRB(20, top + 40, 20, 32),
             child: Column(
               children: [
-                _cover(),
+                SizedBox(
+                  key: widget.coverKey,
+                  width: coverBox(heroCoverWidth).width,
+                  height: coverBox(heroCoverWidth).height,
+                ),
                 const SizedBox(height: 24),
                 widget.pill,
                 const SizedBox(height: 12),
-                Text(
-                  widget.title,
-                  textAlign: TextAlign.center,
-                  style: AppType.display(size: 34, color: Colors.white),
+                // Holds the title's place; HeroFlight draws it.
+                Opacity(
+                  opacity: 0,
+                  child: Text(
+                    widget.title,
+                    key: widget.titleKey,
+                    textAlign: TextAlign.center,
+                    textWidthBasis: TextWidthBasis.longestLine,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: heroTitleStyle(),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -265,20 +253,6 @@ class _BookHeroState extends State<BookHero> with TickerProviderStateMixin {
               ],
             ),
           ),
-          Positioned(
-            top: top + 8,
-            left: 12,
-            child: Material(
-              color: Colors.white.withValues(alpha: 0.1),
-              shape: const CircleBorder(),
-              child: IconButton(
-                tooltip: 'Your books',
-                color: Colors.white,
-                icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                onPressed: widget.onBack,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -355,197 +329,351 @@ class _BookHeroState extends State<BookHero> with TickerProviderStateMixin {
       ],
     );
   }
+}
 
-  Widget _cover() {
-    const width = 150.0;
-    const height = width * 1.45;
+/// The hero cover's width, and the box a [BookCover3D] of width [w] takes
+/// (page edges add a little right and below).
+const heroCoverWidth = 150.0;
+Size coverBox(double w) => Size(w * 1.035, w * 1.45 + w * 0.035);
+TextStyle heroTitleStyle() => AppType.display(size: 34, color: Colors.white);
+
+/// Draws the hero's cover and title above the page and flies them into the
+/// top bar as you scroll. Scrolling down, the cover rides up with the page
+/// until it reaches the top, then shrinks and slides left into the bar; the
+/// title follows it up, shrinking, and lands beside the small cover just as
+/// that finishes. A white bar fades in behind them over the last stretch.
+/// Every step follows the scroll position, so it reverses exactly.
+class HeroFlight extends StatefulWidget {
+  const HeroFlight({
+    super.key,
+    required this.scroll,
+    required this.coverKey,
+    required this.titleKey,
+    required this.title,
+    required this.coverImage,
+    required this.slug,
+    required this.coverBusy,
+    required this.onBack,
+  });
+
+  final ScrollController scroll;
+
+  /// Placeholders in the hero that mark where the cover and title rest.
+  final GlobalKey coverKey;
+  final GlobalKey titleKey;
+  final String title;
+  final String? coverImage;
+  final String? slug;
+  final bool coverBusy;
+  final VoidCallback onBack;
+
+  @override
+  State<HeroFlight> createState() => _HeroFlightState();
+}
+
+class _HeroFlightState extends State<HeroFlight> with TickerProviderStateMixin {
+  static const _bar = 56.0;
+  static const _smallCover = 26.0;
+
+  late final _rise = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+  late final _sheen = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+  late final _float = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 7),
+  );
+  final _timers = <Timer>[];
+  bool _started = false;
+
+  /// Where the cover and title sit when the page is at the top, in this
+  /// layer's coordinates. Measured after layout; the current position is
+  /// this minus the scroll offset, so it never lags a frame behind.
+  Rect? _coverRest;
+  Rect? _titleRest;
+  bool _measuring = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (AppMotion.reduced(context)) {
+      _rise.value = 1;
+      _sheen.value = 1;
+      return;
+    }
+    _rise.forward();
+    _timers.add(Timer(const Duration(milliseconds: 600), _sheen.forward));
+    _timers.add(Timer(const Duration(seconds: 1), _float.repeat));
+  }
+
+  @override
+  void dispose() {
+    for (final t in _timers) {
+      t.cancel();
+    }
+    _rise.dispose();
+    _sheen.dispose();
+    _float.dispose();
+    super.dispose();
+  }
+
+  double get _offset => widget.scroll.hasClients ? widget.scroll.offset : 0.0;
+
+  Rect? _rectOf(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject();
+    final me = context.findRenderObject();
+    if (box is! RenderBox || me is! RenderBox) return null;
+    if (!box.attached || !box.hasSize || !me.hasSize) return null;
+    return box.localToGlobal(Offset.zero, ancestor: me) & box.size;
+  }
+
+  void _scheduleMeasure() {
+    if (_measuring) return;
+    _measuring = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measuring = false;
+      if (!mounted) return;
+      final offset = _offset;
+      final cover = _rectOf(widget.coverKey)?.translate(0, offset);
+      final title = _rectOf(widget.titleKey)?.translate(0, offset);
+      bool moved(Rect? a, Rect? b) =>
+          b != null &&
+          (a == null ||
+              (a.topLeft - b.topLeft).distance > 0.5 ||
+              (a.width - b.width).abs() > 0.5 ||
+              (a.height - b.height).abs() > 0.5);
+      if (moved(_coverRest, cover) || moved(_titleRest, title)) {
+        setState(() {
+          _coverRest = cover ?? _coverRest;
+          _titleRest = title ?? _titleRest;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_rise, _float, _sheen]),
-      builder: (_, _) {
+      animation: Listenable.merge([widget.scroll, _rise, _float, _sheen]),
+      builder: (context, _) {
+        _scheduleMeasure();
+        final top = MediaQuery.paddingOf(context).top;
+        final width = MediaQuery.sizeOf(context).width;
+        final coverRest = _coverRest;
+        final titleRest = _titleRest;
+        if (coverRest == null || titleRest == null) {
+          return Stack(children: [_back(top, 0)]);
+        }
+
+        final offset = _offset;
+        final barCenter = top + _bar / 2;
+        // 0 at the top of the page, 1 once the title has reached the bar.
+        final distance = math.max(80.0, titleRest.center.dy - barCenter);
+        final t = (offset / distance).clamp(0.0, 1.0);
+        // The bar's white backing and dark text come in over the last stretch.
+        final solid = ((t - 0.55) / 0.45).clamp(0.0, 1.0);
+
+        // Cover: rides up with the page, holds at the top, shrinks and slides.
+        final coverW = ui.lerpDouble(heroCoverWidth, _smallCover, t)!;
+        final box = coverBox(coverW);
+        final coverNow = coverRest.translate(0, -offset);
         final rise = const Cubic(0.2, 0.75, 0.15, 1).transform(_rise.value);
-        final float = -6 * math.sin(_float.value * math.pi * 2).abs();
-        final sheen = Curves.easeInOutCubic.transform(_sheen.value);
-        return Opacity(
-          opacity: rise,
-          child: Transform.translate(
-            offset: Offset(0, 18 * (1 - rise) + float),
-            child: Transform.scale(
-              scale: 0.94 + 0.06 * rise,
-              child: Stack(
-                children: [
-                  BookCover3D(
-                    title: widget.title,
-                    coverImage: widget.coverImage,
-                    slug: widget.slug,
-                    width: width,
-                    ribbon: false,
-                  ),
-                  // One light sweep across the cover.
-                  if (_sheen.value > 0 && _sheen.value < 1)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      width: width,
-                      height: height,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(4),
-                          bottomLeft: Radius.circular(4),
-                          topRight: Radius.circular(9),
-                          bottomRight: Radius.circular(9),
-                        ),
-                        child: FractionalTranslation(
-                          translation: Offset(-1.2 + 2.6 * sheen, 0),
-                          child: Transform(
-                            transform: Matrix4.skewX(-0.32),
-                            child: FractionallySizedBox(
-                              widthFactor: 0.5,
-                              alignment: Alignment.centerLeft,
-                              child: const DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0x00FFFFFF),
-                                      Color(0x4DFFFFFF),
-                                      Color(0x00FFFFFF),
-                                    ],
-                                  ),
-                                ),
-                              ),
+        final float = -6 * math.sin(_float.value * math.pi * 2).abs() * (1 - t);
+        final coverLeft = ui.lerpDouble(
+          coverNow.center.dx - box.width / 2,
+          8 + 48,
+          t,
+        )!;
+        final coverTop =
+            math.max(barCenter - box.height / 2, coverNow.top) +
+            18 * (1 - rise) +
+            float;
+
+        // Title: follows the page up, shrinking, and lands beside the cover.
+        final titleNow = titleRest.translate(0, -offset);
+        final titleLeftEnd = 8 + 48 + coverBox(_smallCover).width + 10;
+        final scaleEnd = math.min(
+          16 / 34,
+          math.min(
+            (width - titleLeftEnd - 16) / titleRest.width,
+            (_bar - 12) / titleRest.height,
+          ),
+        );
+        final scale = ui.lerpDouble(1, scaleEnd, t)!;
+        final titleTopEnd = barCenter - titleRest.height * scaleEnd / 2;
+        final titleLeft = ui.lerpDouble(titleNow.left, titleLeftEnd, t)!;
+        final titleTop = math.max(titleTopEnd, titleNow.top);
+        final titleColor = Color.lerp(Colors.white, AppColors.navy, solid)!;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // White backing for the bar, with the status bar icons to match.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: top + _bar,
+              child: AnnotatedRegion<SystemUiOverlayStyle>(
+                value: solid > 0.5
+                    ? SystemUiOverlayStyle.dark
+                    : SystemUiOverlayStyle.light,
+                sized: true,
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: solid,
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            border: const Border(
+                              bottom: BorderSide(color: AppColors.border),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  if (widget.coverBusy)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      width: width,
-                      height: height,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                ],
+                  ),
+                ),
               ),
             ),
-          ),
+            Positioned(
+              left: coverLeft,
+              top: coverTop,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: rise,
+                  child: Transform.scale(
+                    scale: 0.94 + 0.06 * rise,
+                    child: _cover(coverW),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              // A pixel of slack each side so rounding never re-wraps it.
+              left: titleLeft - 1,
+              top: titleTop,
+              child: IgnorePointer(
+                child: Transform.scale(
+                  scale: scale,
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: titleRest.width + 2,
+                    child: Text(
+                      widget.title,
+                      textAlign: TextAlign.center,
+                      textWidthBasis: TextWidthBasis.longestLine,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: heroTitleStyle().copyWith(color: titleColor),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            _back(top, solid),
+          ],
         );
       },
     );
   }
-}
 
-/// The slim bar that takes over from the hero as it scrolls away: back,
-/// a small cover and the title. [progress] runs 0 (hidden) to 1 (shown),
-/// so it fades and settles in as you scroll.
-class CollapsedBookBar extends StatelessWidget {
-  const CollapsedBookBar({
-    super.key,
-    required this.progress,
-    required this.title,
-    required this.coverImage,
-    required this.slug,
-    required this.subtitle,
-    required this.onBack,
-  });
+  Widget _back(double top, double solid) {
+    return Positioned(
+      top: top + (_bar - 48) / 2,
+      left: 8,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.1 * (1 - solid)),
+        shape: const CircleBorder(),
+        child: IconButton(
+          tooltip: 'Your books',
+          color: Color.lerp(Colors.white, AppColors.navy, solid),
+          icon: const Icon(Icons.arrow_back_rounded, size: 20),
+          onPressed: widget.onBack,
+        ),
+      ),
+    );
+  }
 
-  final double progress;
-  final String title;
-  final String? coverImage;
-  final String? slug;
-  final String subtitle;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top;
-    final t = progress.clamp(0.0, 1.0);
-    if (t == 0) return const SizedBox.shrink();
-    return IgnorePointer(
-      ignoring: t < 0.5,
-      child: Opacity(
-        opacity: t,
-        child: ClipRect(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              height: top + 56,
-              padding: EdgeInsets.only(top: top),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.88),
-                border: const Border(
-                  bottom: BorderSide(color: AppColors.border),
-                ),
+  Widget _cover(double width) {
+    final height = width * 1.45;
+    final sheen = Curves.easeInOutCubic.transform(_sheen.value);
+    return Stack(
+      children: [
+        BookCover3D(
+          title: widget.title,
+          coverImage: widget.coverImage,
+          slug: widget.slug,
+          width: width,
+          ribbon: false,
+        ),
+        // One light sweep across the cover.
+        if (_sheen.value > 0 && _sheen.value < 1)
+          Positioned(
+            left: 0,
+            top: 0,
+            width: width,
+            height: height,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(4),
+                bottomLeft: Radius.circular(4),
+                topRight: Radius.circular(9),
+                bottomRight: Radius.circular(9),
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Your books',
-                    color: _ink,
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    onPressed: onBack,
-                  ),
-                  Expanded(
-                    child: Transform.translate(
-                      offset: Offset(0, 8 * (1 - t)),
-                      child: Row(
-                        children: [
-                          BookCover3D(
-                            title: title,
-                            coverImage: coverImage,
-                            slug: slug,
-                            width: 26,
-                            ribbon: false,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: -0.2,
-                                    color: _ink,
-                                  ),
-                                ),
-                                if (subtitle.isNotEmpty)
-                                  Text(
-                                    subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
+              child: FractionalTranslation(
+                translation: Offset(-1.2 + 2.6 * sheen, 0),
+                child: Transform(
+                  transform: Matrix4.skewX(-0.32),
+                  child: const FractionallySizedBox(
+                    widthFactor: 0.5,
+                    alignment: Alignment.centerLeft,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color(0x00FFFFFF),
+                            Color(0x4DFFFFFF),
+                            Color(0x00FFFFFF),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        if (widget.coverBusy)
+          Positioned(
+            left: 0,
+            top: 0,
+            width: width,
+            height: height,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: SizedBox(
+                  width: width * 0.25,
+                  height: width * 0.25,
+                  child: const CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

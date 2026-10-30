@@ -69,9 +69,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   final _liveKey = GlobalKey();
   final _audioKey = GlobalKey();
 
-  /// Scroll position, and how far the compact header has come in (0 to 1).
+  /// The page's scroll, and the hero places the cover and title fly from.
   final _scroll = ScrollController();
-  final _barProgress = ValueNotifier<double>(0);
+  final _coverKey = GlobalKey();
+  final _titleKey = GlobalKey();
 
   @override
   void initState() {
@@ -83,20 +84,11 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     });
     _loadContent();
     _poll = Timer.periodic(const Duration(seconds: 12), (_) => _refreshQuiet());
-    _scroll.addListener(_onScroll);
-  }
-
-  /// The header fades in once most of the cover has scrolled away and is
-  /// fully there by the time the title would pass under it.
-  void _onScroll() {
-    final offset = _scroll.hasClients ? _scroll.offset : 0.0;
-    _barProgress.value = ((offset - 190) / 80).clamp(0.0, 1.0);
   }
 
   @override
   void dispose() {
     _scroll.dispose();
-    _barProgress.dispose();
     _poll?.cancel();
     _reconnect?.cancel();
     _uiFlush?.cancel();
@@ -1166,21 +1158,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       ),
     ];
 
-    final barSubtitle = complete
-        ? (chapterCount > 0 ? 'Finished · $chapterCount chapters' : 'Finished')
-        : inProgress
-        ? (_liveChapter != null && chapterCount > 0
-              ? 'Writing chapter $_liveChapter of $chapterCount'
-              : 'Writing…')
-        : meta;
-
-    return ValueListenableBuilder<double>(
-      valueListenable: _barProgress,
-      // Dark status bar icons once the white header is in.
-      builder: (context, t, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: t > 0.5 ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-        child: child!,
-      ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: AppColors.white,
         body: Stack(
@@ -1200,8 +1179,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                     edition: content?.edition ?? 1,
                     meta: meta,
                     description: book.description,
-                    coverBusy: _coverBusy,
-                    onBack: _back,
+                    coverKey: _coverKey,
+                    titleKey: _titleKey,
                     pill: StatusPill(
                       status: book.status,
                       inProgress: inProgress,
@@ -1361,20 +1340,16 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                 ],
               ),
             ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: ValueListenableBuilder<double>(
-                valueListenable: _barProgress,
-                builder: (_, t, _) => CollapsedBookBar(
-                  progress: t,
-                  title: book.title,
-                  coverImage: book.coverImage,
-                  slug: book.slug,
-                  subtitle: barSubtitle,
-                  onBack: _back,
-                ),
+            Positioned.fill(
+              child: HeroFlight(
+                scroll: _scroll,
+                coverKey: _coverKey,
+                titleKey: _titleKey,
+                title: book.title,
+                coverImage: book.coverImage,
+                slug: book.slug,
+                coverBusy: _coverBusy,
+                onBack: _back,
               ),
             ),
           ],
