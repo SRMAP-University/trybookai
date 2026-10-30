@@ -25,6 +25,7 @@ import 'package:bookai_mobile/screens/books/book_detail_screen.dart';
 import 'package:bookai_mobile/screens/books/book_reader_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_books_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_book_detail_screen.dart';
+import 'package:bookai_mobile/screens/reels/reel_player_screen.dart';
 import 'package:bookai_mobile/screens/studio/audio_studio_screen.dart';
 import 'package:bookai_mobile/screens/account/account_screen.dart';
 import 'package:bookai_mobile/screens/account/usage_screen.dart';
@@ -338,6 +339,25 @@ GoRouter _buildRouter(
       GoRoute(
         path: '/usage',
         redirect: (context, state) => '/account/usage',
+      ),
+      GoRoute(
+        path: '/reels',
+        pageBuilder: (context, state) =>
+            AppPage.slide(state, const ReelsFeedScreen()),
+        routes: [
+          GoRoute(
+            path: ':id',
+            pageBuilder: (context, state) => AppPage.slide(
+              state,
+              ReelPlayerScreen(
+                reelId: state.pathParameters['id']!,
+                startEpisode: int.tryParse(
+                  state.uri.queryParameters['episode'] ?? '',
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: '/settings',
