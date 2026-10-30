@@ -4,7 +4,11 @@ import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { verifyMobileToken } from "@/lib/mobile-auth";
 import { countryCodeFromRequest } from "@/lib/geo";
-import { newAccountFinishUrl } from "@/lib/mobile-web-auth";
+import {
+  CALLBACK_COOKIE,
+  mobileFinishUrl,
+  newAccountFinishUrl,
+} from "@/lib/mobile-web-auth";
 
 const { auth } = NextAuth(authConfig);
 
@@ -43,6 +47,14 @@ export default async function proxy(req: NextRequest) {
       req.nextUrl.searchParams.get("callbackUrl"),
       req.nextUrl
     );
+    if (finish) return NextResponse.redirect(finish);
+  }
+
+  // NextAuth turned down a Google sign-in the phone started: finish it, so
+  // the app hears about it instead of the browser sitting on /login.
+  if (path === "/login" && req.nextUrl.searchParams.has("error")) {
+    const cookie = req.cookies.getAll().find((c) => CALLBACK_COOKIE.test(c.name));
+    const finish = mobileFinishUrl(cookie?.value, req.nextUrl);
     if (finish) return NextResponse.redirect(finish);
   }
 

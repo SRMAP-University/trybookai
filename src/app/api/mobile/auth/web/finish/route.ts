@@ -4,7 +4,9 @@ import { db } from "@/lib/db";
 import { signMobileCode } from "@/lib/mobile-auth";
 import { sendWelcomeEmail } from "@/lib/emails/transactional";
 import {
+  CALLBACK_COOKIE,
   appReturnUrl,
+  expiredCookie,
   isAppScheme,
   isPkceValue,
   isStateValue,
@@ -32,8 +34,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const back = (reply: Record<string, string>) =>
-    NextResponse.redirect(appReturnUrl(app, { ...reply, state }));
+  const back = (reply: Record<string, string>) => {
+    const res = NextResponse.redirect(appReturnUrl(app, { ...reply, state }));
+    // The phone's sign-in is over; later website sign-ins start afresh.
+    for (const { name } of request.cookies.getAll()) {
+      if (CALLBACK_COOKIE.test(name)) res.cookies.set(expiredCookie(name));
+    }
+    return res;
+  };
 
   if (!isPkceValue(challenge)) return back({ error: "invalid_request" });
 
