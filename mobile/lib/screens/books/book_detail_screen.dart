@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,14 +14,13 @@ import 'package:bookai_mobile/models/book_content.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
-import 'package:bookai_mobile/screens/books/books_screen.dart';
+import 'package:bookai_mobile/screens/books/book_page_parts.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/file_download.dart';
 import 'package:bookai_mobile/services/generation_stream.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/audiobook_player.dart';
-import 'package:bookai_mobile/widgets/book_cover_3d.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 import 'package:bookai_mobile/widgets/generation_speed_sheet.dart';
 import 'package:bookai_mobile/widgets/premium_upgrade_sheet.dart';
@@ -64,7 +64,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   BookContent? _content;
   String? _rewritingChapter;
   bool _coverBusy = false;
-  bool _showAllChapters = false;
+  int? _liveChapter;
+  String? _liveChapterId;
+  final _liveKey = GlobalKey();
+  final _audioKey = GlobalKey();
 
   @override
   void initState() {
@@ -229,12 +232,21 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
   void _onMenu(String action) {
     switch (action) {
-      case 'cover':
-        unawaited(_newCover());
+      case 'editor':
+        unawaited(_openEditor());
+      case 'refresh':
+        unawaited(_refreshQuiet());
+        unawaited(_loadContent());
       case 'edition':
         unawaited(_newEdition());
-      case 'download':
+      case 'cover':
+        unawaited(_newCover());
+      case 'export':
         if (!_downloadingBook) unawaited(_downloadBook());
+      case 'share':
+        unawaited(_share());
+      case 'copy':
+        unawaited(_copyLink());
       case 'troubleshoot':
         _showReviewSheet(trigger: 'manual');
       case 'web':
@@ -244,271 +256,28 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     }
   }
 
-  Widget _menuRow(IconData icon, String label, {Color? color}) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: color ?? AppColors.textBody),
-        const SizedBox(width: 12),
-        Text(label, style: TextStyle(color: color)),
-      ],
+  Future<void> _openEditor() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/editor/${widget.bookId}');
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  }
+
+  void _scrollTo(GlobalKey key) {
+    final target = key.currentContext;
+    if (target == null) return;
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      alignment: 0.05,
     );
   }
 
-  Widget _header(BookModel book) {
-    final completed = book.status == 'COMPLETED';
-    final chapterCount = _content?.chapters.length ?? 0;
-    final readable = _content?.readable.isNotEmpty == true;
-    final failed = book.status == 'FAILED';
-    return StripeCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  BookCover3D(
-                    title: book.title,
-                    coverImage: book.coverImage,
-                    slug: book.slug,
-                    width: 104,
-                    ribbon: false,
-                  ),
-                  if (_coverBusy)
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      book.title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                        color: AppColors.navy,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      book.genre ?? 'Book',
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: completed
-                            ? AppColors.successSoft
-                            : AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        BookShelfItem.statusLabel(book),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: completed
-                              ? AppColors.success
-                              : failed
-                                  ? AppColors.destructive
-                                  : AppColors.primaryText,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      completed
-                          ? '${book.currentPages} pages${chapterCount > 0 ? ' · $chapterCount chapters' : ''}'
-                          : '${book.currentPages} / ${book.targetPages} pages',
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (book.description != null && book.description!.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            ExpandableText(
-              book.description!,
-              maxLines: 3,
-              style: const TextStyle(color: AppColors.textBody, height: 1.45),
-            ),
-          ],
-          if (!completed) ...[
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: (book.progress / 100).clamp(0, 1),
-                minHeight: 8,
-              ),
-            ),
-          ],
-          if (readable) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _read,
-                icon: const Icon(Icons.auto_stories_rounded),
-                label: Text(completed ? 'Read book' : 'Read what\'s written'),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _chaptersCard(BookModel book, BookContent content) {
-    final canRewrite = book.status == 'COMPLETED' ||
-        book.status == 'DRAFT' ||
-        book.status == 'FAILED';
-    final chapters = content.chapters;
-    final shown = _showAllChapters || chapters.length <= 6
-        ? chapters
-        : chapters.take(5).toList();
-    return StripeCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Chapters',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-              ),
-              const Spacer(),
-              Text(
-                '${content.readable.length} of ${chapters.length} written',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          for (final c in shown) _chapterRow(c, canRewrite),
-          if (shown.length < chapters.length)
-            TextButton(
-              onPressed: () => setState(() => _showAllChapters = true),
-              child: Text('Show all ${chapters.length} chapters'),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _chapterRow(ChapterContent c, bool canRewrite) {
-    final busy = _rewritingChapter == c.id;
-    final subtitle = busy
-        ? 'Rewriting…'
-        : c.hasText
-            ? (c.pageCount > 0 ? '${c.pageCount} pages' : 'Ready to read')
-            : switch (c.status) {
-                'GENERATING' => 'Writing now',
-                'FAILED' => 'Needs rewriting',
-                _ => 'Not written yet',
-              };
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: c.hasText && !busy ? () => _read(c) : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: c.hasText ? AppColors.primarySoft : AppColors.mutedBg,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '${c.number}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: c.hasText ? AppColors.primaryText : AppColors.textMuted,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    c.title.isEmpty ? 'Chapter ${c.number}' : c.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.status == 'FAILED' && !c.hasText
-                          ? AppColors.destructive
-                          : AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (busy)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (canRewrite)
-              IconButton(
-                tooltip: 'Rewrite chapter',
-                icon: const Icon(Icons.refresh_rounded, size: 20),
-                color: AppColors.textMuted,
-                onPressed:
-                    _rewritingChapter == null ? () => _rewriteChapter(c) : null,
-              ),
-          ],
-        ),
-      ),
-    );
+  void _back() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go('/books');
+    }
   }
 
   Future<void> _loadAudios() async {
@@ -852,6 +621,15 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
           case 'section_start':
             final title = event.data['sectionTitle'] as String? ??
                 event.data['title'] as String?;
+            final chapterNumber =
+                (event.data['chapterNumber'] as num?)?.toInt();
+            if (chapterNumber != null) _liveChapter = chapterNumber;
+            final chapterId = event.data['chapterId'] as String?;
+            if (chapterId != null && chapterId != _liveChapterId) {
+              // A new chapter started: the last one is finished.
+              _liveChapterId = chapterId;
+              unawaited(_loadContent());
+            }
             if (title != null) {
               _phase = 'Writing: $title';
               _liveText = '';
@@ -1246,446 +1024,513 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final book = _book;
+    if (book == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: _loading
+              ? const CircularProgressIndicator()
+              : const Text('Book not found'),
+        ),
+      );
+    }
+
+    final content = _content;
+    final chapters = content?.chapters ?? const <ChapterContent>[];
+    final chapterCount = chapters.length;
+    final inProgress = book.isGenerating;
+    final complete = book.status == 'COMPLETED';
+    final canResume = book.status == 'FAILED' || book.status == 'PAUSED';
+    final canStart = (book.status == 'DRAFT' || canResume) && !inProgress;
+    final canRewrite =
+        complete || book.status == 'DRAFT' || book.status == 'FAILED';
+    final states = [
+      for (final c in chapters) chapterStateOf(c, inProgress, _liveChapterId),
+    ];
+    final doneCount = states.where((s) => s == ChapterState.done).length;
+    final words = complete ? (content?.wordCount ?? 0) : 0;
+    final error = content?.errorMessage;
+    final progressLabel = inProgress
+        ? (_phase.isNotEmpty
+              ? _phase
+              : book.status == 'OUTLINING'
+              ? 'Outlining chapters…'
+              : 'Writing…')
+        : book.status == 'PAUSED'
+        ? 'Paused'
+        : book.status == 'FAILED'
+        ? 'Stopped with an error'
+        : 'Not started yet';
+    final meta = [
+      if ((book.genre ?? '').isNotEmpty) book.genre!,
+      if (book.targetPages > 0) '${book.targetPages} pages',
+    ].join(' · ');
+    final hasNotes =
+        content != null &&
+        (content.characters.isNotEmpty ||
+            content.themes.isNotEmpty ||
+            (content.customInstructions ?? '').trim().isNotEmpty);
+
+    final actions = <Widget>[
+      if (canStart)
+        StageButton(
+          tone: StageTone.primary,
+          icon: Icons.play_arrow_rounded,
+          label: canResume ? 'Resume writing' : 'Start writing',
+          onPressed: _start,
+        ),
+      if (inProgress)
+        StageButton(
+          tone: StageTone.primary,
+          icon: Icons.visibility_outlined,
+          label: 'Watch it write',
+          onPressed: () => _scrollTo(_liveKey),
+        ),
+      if (complete && chapterCount > 0)
+        StageButton(
+          tone: StageTone.primary,
+          icon: Icons.auto_stories_outlined,
+          label: 'Read the book',
+          onPressed: _read,
+        ),
+      if (complete)
+        StageButton(
+          icon: Icons.headphones_outlined,
+          label: 'Create audio',
+          onPressed: () => _scrollTo(_audioKey),
+        ),
+      if (inProgress)
+        StageButton(
+          tone: StageTone.danger,
+          icon: Icons.stop_rounded,
+          label: 'Stop',
+          onPressed: _cancel,
+        ),
+      if (!inProgress)
+        StageButton(
+          icon: Icons.download_rounded,
+          label: 'Export',
+          busy: _downloadingBook,
+          onPressed: _downloadBook,
+        ),
+      StageMenu(
+        onSelected: _onMenu,
+        items: [
+          if (chapterCount > 0)
+            stageMenuItem('editor', Icons.edit_outlined, 'Open editor'),
+          if (inProgress)
+            stageMenuItem('refresh', Icons.refresh_rounded, 'Refresh progress'),
+          stageMenuItem('edition', Icons.library_add_outlined, 'New edition'),
+          if (chapterCount > 0 || book.coverImage != null)
+            stageMenuItem(
+              'cover',
+              Icons.image_outlined,
+              book.coverImage != null ? 'New cover' : 'Generate cover',
+              enabled: !_coverBusy,
+            ),
+          if (inProgress)
+            stageMenuItem('export', Icons.download_rounded, 'Export'),
+          if (book.publicUrl != null && chapterCount > 0)
+            stageMenuItem('share', Icons.ios_share_rounded, 'Share book'),
+          if (book.publicUrl != null && chapterCount > 0)
+            stageMenuItem('copy', Icons.link_rounded, 'Copy link'),
+          const PopupMenuDivider(),
+          stageMenuItem(
+            'troubleshoot',
+            Icons.report_gmailerrorred_outlined,
+            'Troubleshoot',
+          ),
+          stageMenuItem('web', Icons.open_in_new_rounded, 'Open on the website'),
+          stageMenuItem(
+            'delete',
+            Icons.delete_outline_rounded,
+            inProgress ? 'Stop writing to delete' : 'Delete book',
+            enabled: !inProgress,
+            danger: true,
+          ),
+        ],
+      ),
+    ];
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.white,
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await Future.wait([_refreshQuiet(), _loadContent(), _loadAudios()]);
+          },
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              BookHero(
+                title: book.title,
+                coverImage: book.coverImage,
+                slug: book.slug,
+                edition: content?.edition ?? 1,
+                meta: meta,
+                description: book.description,
+                coverBusy: _coverBusy,
+                onBack: _back,
+                pill: StatusPill(
+                  status: book.status,
+                  inProgress: inProgress,
+                  chapterCount: chapterCount,
+                  liveChapter: _liveChapter,
+                ),
+                actions: actions,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (complete)
+                      BookStats(
+                        stats: [
+                          (
+                            'Pages',
+                            '${book.currentPages > 0 ? book.currentPages : book.targetPages}',
+                          ),
+                          ('Words', formatWords(words)),
+                          ('Chapters', '$chapterCount'),
+                          ('Read', readingTime(words)),
+                        ],
+                      )
+                    else
+                      WritingProgress(
+                        label: progressLabel,
+                        progress: book.progress,
+                        currentPages: book.currentPages,
+                        targetPages: book.targetPages,
+                        states: states,
+                        error: error,
+                      ),
+                    if (complete && (error ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0x99FDE8E8),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          error!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.destructive,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (inProgress || _liveText.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      KeyedSubtree(key: _liveKey, child: _liveCard(book)),
+                    ],
+                    if (complete) ...[
+                      const SizedBox(height: 32),
+                      KeyedSubtree(key: _audioKey, child: _audioSection(book)),
+                    ],
+                    if (content != null &&
+                        (content.includeIllustrations ||
+                            complete ||
+                            doneCount > 0)) ...[
+                      const SizedBox(height: 32),
+                      IllustrationsPanel(
+                        bookId: book.id,
+                        enabled: content.includeIllustrations,
+                        generating: inProgress,
+                        onPicturesAdded: _loadContent,
+                      ),
+                    ],
+                    const SizedBox(height: 32),
+                    PageSectionTitle(
+                      'Chapters',
+                      trailing: chapterCount > 0
+                          ? '$doneCount of $chapterCount written'
+                          : null,
+                    ),
+                    if (content == null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (chapterCount == 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 48,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F8FB),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Text(
+                          inProgress
+                              ? 'Outlining chapters… they’ll appear here in a moment.'
+                              : 'No chapters yet. Start writing to create the outline.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      )
+                    else
+                      ChapterList(
+                        chapters: chapters,
+                        inProgress: inProgress,
+                        liveChapterId: _liveChapterId,
+                        canRewrite: canRewrite,
+                        rewriting: _rewritingChapter,
+                        onRewrite: _rewriteChapter,
+                        onRead: _read,
+                      ),
+                    if (content != null && content.editions.length > 1) ...[
+                      const SizedBox(height: 32),
+                      EditionsList(
+                        editions: content.editions,
+                        currentId: book.id,
+                        onOpen: (e) => context.push('/books/${e.id}'),
+                      ),
+                    ],
+                    if (hasNotes) ...[
+                      const SizedBox(height: 32),
+                      StoryNotes(
+                        characters: content.characters,
+                        themes: content.themes,
+                        instructions: content.customInstructions,
+                      ),
+                    ],
+                    const SizedBox(height: 32),
+                    VisibilityCard(
+                      isPublic: book.isPublic,
+                      canMakePrivate: book.canMakePrivate,
+                      busy: false,
+                      onChanged: _togglePublic,
+                      onViewPublic: book.publicUrl == null ? null : _openPublic,
+                      showUpgrade: AppBilling.iapEnabled,
+                      onUpgrade: () => showPremiumUpgradeSheet(
+                        context,
+                        featureLabel:
+                            'Private books are included on Pro and Premium.',
+                      ),
+                    ),
+                    if (content != null) ...[
+                      const SizedBox(height: 16),
+                      BookSettingsCard(
+                        rows: BookSettingsCard.rowsFor(content),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The text arriving as it's written.
+  Widget _liveCard(BookModel book) {
+    return StripeCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (_streaming || book.isGenerating) ...[
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  _phase.isEmpty ? 'Live writing' : _phase,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: AppColors.navy,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 100),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _liveText.isEmpty ? 'Waiting for the first words…' : _liveText,
+              style: GoogleFonts.literata(
+                fontSize: 14,
+                height: 1.6,
+                color: _liveText.isEmpty
+                    ? AppColors.textMuted
+                    : AppColors.textBody,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Audiobook: play it, or make it.
+  Widget _audioSection(BookModel book) {
     final audioRunning = _audios.any(
       (a) =>
           '${a['status']}'.toUpperCase() == 'GENERATING' ||
           '${a['status']}'.toUpperCase() == 'PENDING',
     );
-    Map<String, dynamic>? completedAudiobook;
+    Map<String, dynamic>? audiobook;
     for (final a in _audios) {
-      final type = '${a['type'] ?? ''}'.toUpperCase();
-      final status = '${a['status'] ?? ''}'.toUpperCase();
-      if (type == 'AUDIOBOOK' && status == 'COMPLETED') {
-        completedAudiobook = a;
+      if ('${a['type'] ?? ''}'.toUpperCase() == 'AUDIOBOOK' &&
+          '${a['status'] ?? ''}'.toUpperCase() == 'COMPLETED') {
+        audiobook = a;
         break;
       }
     }
-    if (completedAudiobook == null) {
+    if (audiobook == null) {
       for (final a in _audios) {
         if ('${a['status']}'.toUpperCase() == 'COMPLETED' &&
             _audioHasPlayableUrl(a)) {
-          completedAudiobook = a;
+          audiobook = a;
           break;
         }
       }
     }
-    final audioDone = completedAudiobook != null ||
+    final audioDone =
+        audiobook != null ||
         _audios.any((a) => '${a['status']}'.toUpperCase() == 'COMPLETED');
-    final playableTracks = _extractPlayableTracks(completedAudiobook);
+    final tracks = _extractPlayableTracks(audiobook);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(book?.title ?? 'Book'),
-        actions: [
-          if (book?.publicUrl != null)
-            IconButton(
-              onPressed: _share,
-              icon: const Icon(Icons.ios_share_rounded),
-              tooltip: 'Share',
-            ),
-          if (book != null)
-            PopupMenuButton<String>(
-              tooltip: 'More',
-              onSelected: _onMenu,
-              itemBuilder: (_) => [
-                if (book.status == 'COMPLETED' || book.isGenerating)
-                  PopupMenuItem(
-                    value: 'cover',
-                    enabled: !_coverBusy,
-                    child: _menuRow(Icons.auto_awesome_rounded, 'New AI cover'),
-                  ),
-                PopupMenuItem(
-                  value: 'edition',
-                  child: _menuRow(Icons.library_add_rounded, 'New edition'),
-                ),
-                if (book.status == 'COMPLETED')
-                  PopupMenuItem(
-                    value: 'download',
-                    enabled: !_downloadingBook,
-                    child: _menuRow(Icons.download_rounded, 'Download book'),
-                  ),
-                PopupMenuItem(
-                  value: 'troubleshoot',
-                  child: _menuRow(
-                    Icons.report_problem_outlined,
-                    'Troubleshoot',
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'web',
-                  child: _menuRow(Icons.open_in_new_rounded, 'Open in web'),
-                ),
-                if (!book.isGenerating) ...[
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: _menuRow(
-                      Icons.delete_outline_rounded,
-                      'Delete book',
-                      color: AppColors.destructive,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-        ],
-      ),
-      body: _loading && book == null
-          ? const Center(child: CircularProgressIndicator())
-          : book == null
-              ? const Center(child: Text('Book not found'))
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const PageSectionTitle('Audio'),
+        StripeCard(
+          padding: const EdgeInsets.all(20),
+          child: tracks.isNotEmpty
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _header(book),
-                    if (book.isGenerating || _liveText.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      StripeCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                if (_streaming || book.isGenerating)
-                                  const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                if (_streaming || book.isGenerating)
-                                  const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _phase.isEmpty
-                                        ? 'Live generation'
-                                        : _phase,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              width: double.infinity,
-                              constraints: const BoxConstraints(minHeight: 100),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppColors.mutedBg,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Text(
-                                _liveText.isEmpty
-                                    ? 'Waiting for manuscript tokens…'
-                                    : _liveText,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  height: 1.5,
-                                  color: _liveText.isEmpty
-                                      ? AppColors.textMuted
-                                      : AppColors.navy,
-                                  fontFamily: 'serif',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (_content != null && _content!.chapters.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      _chaptersCard(book, _content!),
-                    ],
-                    const SizedBox(height: 16),
-                    StripeCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Sharing',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            book.slug != null
-                                ? 'Public ID · ${book.slug}'
-                                : 'Public page',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textMuted,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              book.isPublic ? 'Public' : 'Private',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              book.isPublic
-                                  ? 'Anyone with the link can read it'
-                                  : book.canMakePrivate
-                                      ? 'Only you can see this book'
-                                      : 'Private books are not available in the free Android app',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textMuted,
-                              ),
-                            ),
-                            value: book.isPublic,
-                            activeThumbColor: AppColors.primary,
-                            onChanged: _togglePublic,
-                          ),
-                          if (AppBilling.iapEnabled &&
-                              book.isPublic &&
-                              !book.canMakePrivate)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton(
-                                onPressed: () => showPremiumUpgradeSheet(
-                                  context,
-                                  featureLabel:
-                                      'Private books are included on Pro and Premium.',
-                                ),
-                                child: const Text('Upgrade to make private'),
-                              ),
-                            ),
-                          if (book.isPublic && book.publicUrl != null)
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: _share,
-                                    icon: const Icon(Icons.ios_share_rounded,
-                                        size: 18),
-                                    label: const Text('Share'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: _copyLink,
-                                    icon: const Icon(Icons.link_rounded,
-                                        size: 18),
-                                    label: const Text('Copy'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          if (book.isPublic && book.publicUrl != null) ...[
-                            const SizedBox(height: 8),
-                            TextButton(
-                              onPressed: _openPublic,
-                              child: const Text('View public page'),
-                            ),
-                          ],
-                        ],
-                      ),
+                    AudiobookPlayer(
+                      tracks: tracks,
+                      downloading: _downloadingAudio,
+                      onDownload: () => _downloadAudiobook(tracks),
                     ),
-                    if (book.status == 'COMPLETED') ...[
-                      const SizedBox(height: 16),
-                      StripeCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Download',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Save the manuscript or audiobook to Files, Drive, or another app.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed:
-                                        _downloadingBook ? null : _downloadBook,
-                                    icon: _downloadingBook
-                                        ? const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Icon(
-                                            Icons.description_outlined,
-                                            size: 18,
-                                          ),
-                                    label: Text(
-                                      _downloadingBook
-                                          ? 'Downloading…'
-                                          : 'Export book',
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: playableTracks.isEmpty ||
-                                            _downloadingAudio
-                                        ? null
-                                        : () =>
-                                            _downloadAudiobook(playableTracks),
-                                    icon: _downloadingAudio
-                                        ? const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Icon(
-                                            Icons.headphones_outlined,
-                                            size: 18,
-                                          ),
-                                    label: Text(
-                                      _downloadingAudio
-                                          ? 'Downloading…'
-                                          : 'Audio (.mp3)',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                    if (AppBilling.iapEnabled)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _audioBusy || audioRunning
+                              ? null
+                              : () => _startAudiobook(regenerate: true),
+                          child: Text(
+                            audioRunning ? 'Regenerating…' : 'Regenerate',
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      StripeCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (playableTracks.isNotEmpty) ...[
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primarySoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.headphones_rounded,
+                            color: AppColors.primaryText,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               const Text(
                                 'Audiobook',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.navy,
+                                ),
                               ),
-                              const SizedBox(height: 12),
-                              AudiobookPlayer(
-                                tracks: playableTracks,
-                                downloading: _downloadingAudio,
-                                onDownload: () =>
-                                    _downloadAudiobook(playableTracks),
-                              ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: AppBilling.iapEnabled
-                                    ? TextButton(
-                                        onPressed: _audioBusy || audioRunning
-                                            ? null
-                                            : () => _startAudiobook(
-                                                  regenerate: true,
-                                                ),
-                                        child: Text(
-                                          audioRunning
-                                              ? 'Regenerating…'
-                                              : 'Regenerate',
-                                          style:
-                                              const TextStyle(fontSize: 12),
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                            ] else ...[
-                              const Text(
-                                'Audiobook',
-                                style: TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                              const SizedBox(height: 6),
                               Text(
                                 audioRunning ||
                                         book.generateAudiobookOnComplete
-                                    ? 'Audiobook converting… pull to refresh in a moment'
+                                    ? 'Converting… pull down to refresh in a moment.'
                                     : audioDone
-                                        ? 'Audio finished, but no playable file URL was returned. Try regenerate, or open the web editor.'
-                                        : AppBilling.iapEnabled
-                                            ? 'Convert the finished manuscript to audio'
-                                            : AppBilling.freeAppMessage,
+                                    ? 'Finished, but no playable file came back. Try again.'
+                                    : AppBilling.iapEnabled
+                                    ? 'Turn the finished book into narrated audio.'
+                                    : AppBilling.freeAppMessage,
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textMuted,
                                 ),
                               ),
-                              if (AppBilling.iapEnabled) ...[
-                                const SizedBox(height: 12),
-                                FilledButton.icon(
-                                onPressed: _audioBusy || audioRunning
-                                    ? null
-                                    : () => _startAudiobook(
-                                          regenerate: audioDone,
-                                        ),
-                                icon: _audioBusy || audioRunning
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Icon(Icons.headphones_rounded),
-                                label: Text(
-                                  audioDone
-                                      ? 'Regenerate audiobook'
-                                      : audioRunning
-                                          ? 'Converting…'
-                                          : 'Convert to audiobook',
-                                ),
-                              ),
-                              ],
-                              const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: _loadAudios,
-                                child: const Text('Refresh audio'),
-                              ),
                             ],
-                          ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (AppBilling.iapEnabled) ...[
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _audioBusy || audioRunning
+                            ? null
+                            : () => _startAudiobook(regenerate: audioDone),
+                        icon: _audioBusy || audioRunning
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.headphones_rounded),
+                        label: Text(
+                          audioRunning
+                              ? 'Converting…'
+                              : audioDone
+                              ? 'Make it again'
+                              : 'Create audiobook',
                         ),
                       ),
                     ],
-                    const SizedBox(height: 16),
-                    if (book.isGenerating)
-                      OutlinedButton.icon(
-                        onPressed: _cancel,
-                        icon: const Icon(Icons.stop_circle_outlined),
-                        label: const Text('Stop generation'),
-                      )
-                    else if (book.status == 'DRAFT' ||
-                        book.status == 'FAILED' ||
-                        book.status == 'PAUSED')
-                      FilledButton.icon(
-                        onPressed: _start,
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: Text(
-                          book.status == 'DRAFT'
-                              ? 'Start generation'
-                              : 'Resume generation',
-                        ),
-                      )
-                    else if (book.status == 'COMPLETED')
-                      OutlinedButton.icon(
-                        onPressed: _openExport,
-                        icon: const Icon(Icons.open_in_browser),
-                        label: const Text('Open full editor (web)'),
-                      ),
                   ],
                 ),
+        ),
+      ],
     );
   }
 }

@@ -12,6 +12,21 @@ class BookContent {
     this.updatedAt,
     required this.chapters,
     required this.editions,
+    this.edition = 1,
+    this.tone,
+    this.audience,
+    this.pov,
+    this.tense,
+    this.language,
+    this.model,
+    this.creativity,
+    this.includeDialogue,
+    this.includeExamples,
+    this.includeIllustrations = false,
+    this.customInstructions,
+    this.characters = const [],
+    this.themes = const [],
+    this.errorMessage,
   });
 
   final String id;
@@ -28,14 +43,61 @@ class BookContent {
   final List<ChapterContent> chapters;
   final List<EditionRef> editions;
 
+  // How it was written (the book page's Settings and Story notes).
+  final int edition;
+  final String? tone;
+  final String? audience;
+  final String? pov;
+  final String? tense;
+  final String? language;
+  final String? model;
+  final double? creativity;
+  final bool? includeDialogue;
+  final bool? includeExamples;
+  final bool includeIllustrations;
+  final String? customInstructions;
+  final List<String> characters;
+  final List<String> themes;
+  final String? errorMessage;
+
   /// Chapters that have text to read.
   List<ChapterContent> get readable =>
       chapters.where((c) => c.hasText).toList();
 
+  /// Every word of the manuscript.
+  int get wordCount => chapters.fold(
+    0,
+    (n, c) =>
+        n +
+        c.sections.fold(
+          0,
+          (m, s) => m + _words.allMatches(s.content ?? '').length,
+        ),
+  );
+
+  static final _words = RegExp(r'\S+');
+
   factory BookContent.fromJson(Map<String, dynamic> json) {
     List<Map<String, dynamic>> list(Object? v) =>
         (v as List?)?.whereType<Map<String, dynamic>>().toList() ?? const [];
+    List<String> strings(Object? v) =>
+        (v as List?)?.whereType<String>().toList() ?? const [];
     return BookContent(
+      edition: (json['edition'] as num?)?.toInt() ?? 1,
+      tone: json['tone'] as String?,
+      audience: json['audience'] as String?,
+      pov: json['pov'] as String?,
+      tense: json['tense'] as String?,
+      language: json['language'] as String?,
+      model: json['model'] as String?,
+      creativity: (json['creativity'] as num?)?.toDouble(),
+      includeDialogue: json['includeDialogue'] as bool?,
+      includeExamples: json['includeExamples'] as bool?,
+      includeIllustrations: json['includeIllustrations'] as bool? ?? false,
+      customInstructions: json['customInstructions'] as String?,
+      characters: strings(json['characters']),
+      themes: strings(json['themes']),
+      errorMessage: json['errorMessage'] as String?,
       id: json['id'] as String,
       title: json['title'] as String? ?? 'Book',
       status: json['status'] as String? ?? 'DRAFT',
@@ -117,17 +179,23 @@ class EditionRef {
     required this.edition,
     required this.status,
     this.title,
+    this.coverImage,
+    this.slug,
   });
 
   final String id;
   final int edition;
   final String status;
   final String? title;
+  final String? coverImage;
+  final String? slug;
 
   factory EditionRef.fromJson(Map<String, dynamic> json) => EditionRef(
     id: json['id'] as String,
     edition: (json['edition'] as num?)?.toInt() ?? 1,
     status: json['status'] as String? ?? 'DRAFT',
     title: json['title'] as String?,
+    coverImage: json['coverImage'] as String?,
+    slug: json['slug'] as String?,
   );
 }
