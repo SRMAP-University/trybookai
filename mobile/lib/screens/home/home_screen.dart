@@ -168,8 +168,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       for (final b in books.completed.take(8))
                         (
                           title: b.title,
-                          subtitle:
-                              '${b.genre ?? 'Book'} · ${b.currentPages} pages',
                           coverImage: b.coverImage,
                           slug: b.slug,
                           onTap: () => context.push('/books/${b.id}'),
@@ -203,7 +201,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       for (final b in pub.books.take(10))
                         (
                           title: b.title,
-                          subtitle: b.author,
                           coverImage: b.coverImage,
                           slug: b.slug,
                           onTap: () => context.push('/discover/${b.slug}'),
