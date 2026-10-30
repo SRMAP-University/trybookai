@@ -443,6 +443,113 @@ class _BookHeroState extends State<BookHero> with TickerProviderStateMixin {
   }
 }
 
+/// The slim bar that takes over from the hero as it scrolls away: back,
+/// a small cover and the title. [progress] runs 0 (hidden) to 1 (shown),
+/// so it fades and settles in as you scroll.
+class CollapsedBookBar extends StatelessWidget {
+  const CollapsedBookBar({
+    super.key,
+    required this.progress,
+    required this.title,
+    required this.coverImage,
+    required this.slug,
+    required this.subtitle,
+    required this.onBack,
+  });
+
+  final double progress;
+  final String title;
+  final String? coverImage;
+  final String? slug;
+  final String subtitle;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    final t = progress.clamp(0.0, 1.0);
+    if (t == 0) return const SizedBox.shrink();
+    return IgnorePointer(
+      ignoring: t < 0.5,
+      child: Opacity(
+        opacity: t,
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              height: top + 56,
+              padding: EdgeInsets.only(top: top),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.88),
+                border: const Border(
+                  bottom: BorderSide(color: AppColors.border),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Your books',
+                    color: _ink,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: onBack,
+                  ),
+                  Expanded(
+                    child: Transform.translate(
+                      offset: Offset(0, 8 * (1 - t)),
+                      child: Row(
+                        children: [
+                          BookCover3D(
+                            title: title,
+                            coverImage: coverImage,
+                            slug: slug,
+                            width: 26,
+                            ribbon: false,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.2,
+                                    color: _ink,
+                                  ),
+                                ),
+                                if (subtitle.isNotEmpty)
+                                  Text(
+                                    subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Book status on the hero: writing, finished, failed, paused or draft.
 class StatusPill extends StatelessWidget {
   const StatusPill({

@@ -69,6 +69,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   final _liveKey = GlobalKey();
   final _audioKey = GlobalKey();
 
+  /// Scroll position, and how far the compact header has come in (0 to 1).
+  final _scroll = ScrollController();
+  final _barProgress = ValueNotifier<double>(0);
+
   @override
   void initState() {
     super.initState();
@@ -79,10 +83,20 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     });
     _loadContent();
     _poll = Timer.periodic(const Duration(seconds: 12), (_) => _refreshQuiet());
+    _scroll.addListener(_onScroll);
+  }
+
+  /// The header fades in once most of the cover has scrolled away and is
+  /// fully there by the time the title would pass under it.
+  void _onScroll() {
+    final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+    _barProgress.value = ((offset - 190) / 80).clamp(0.0, 1.0);
   }
 
   @override
   void dispose() {
+    _scroll.dispose();
+    _barProgress.dispose();
     _poll?.cancel();
     _reconnect?.cancel();
     _uiFlush?.cancel();
@@ -1152,184 +1166,218 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       ),
     ];
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+    final barSubtitle = complete
+        ? (chapterCount > 0 ? 'Finished · $chapterCount chapters' : 'Finished')
+        : inProgress
+        ? (_liveChapter != null && chapterCount > 0
+              ? 'Writing chapter $_liveChapter of $chapterCount'
+              : 'Writing…')
+        : meta;
+
+    return ValueListenableBuilder<double>(
+      valueListenable: _barProgress,
+      // Dark status bar icons once the white header is in.
+      builder: (context, t, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: t > 0.5 ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+        child: child!,
+      ),
       child: Scaffold(
         backgroundColor: AppColors.white,
-        body: RefreshIndicator(
-          onRefresh: () async {
-            await Future.wait([_refreshQuiet(), _loadContent(), _loadAudios()]);
-          },
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              BookHero(
-                title: book.title,
-                coverImage: book.coverImage,
-                slug: book.slug,
-                edition: content?.edition ?? 1,
-                meta: meta,
-                description: book.description,
-                coverBusy: _coverBusy,
-                onBack: _back,
-                pill: StatusPill(
-                  status: book.status,
-                  inProgress: inProgress,
-                  chapterCount: chapterCount,
-                  liveChapter: _liveChapter,
-                ),
-                actions: actions,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (complete)
-                      BookStats(
-                        stats: [
-                          (
-                            'Pages',
-                            '${book.currentPages > 0 ? book.currentPages : book.targetPages}',
+        body: Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: () async {
+                await Future.wait([_refreshQuiet(), _loadContent(), _loadAudios()]);
+              },
+              child: ListView(
+                controller: _scroll,
+                padding: EdgeInsets.zero,
+                children: [
+                  BookHero(
+                    title: book.title,
+                    coverImage: book.coverImage,
+                    slug: book.slug,
+                    edition: content?.edition ?? 1,
+                    meta: meta,
+                    description: book.description,
+                    coverBusy: _coverBusy,
+                    onBack: _back,
+                    pill: StatusPill(
+                      status: book.status,
+                      inProgress: inProgress,
+                      chapterCount: chapterCount,
+                      liveChapter: _liveChapter,
+                    ),
+                    actions: actions,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (complete)
+                          BookStats(
+                            stats: [
+                              (
+                                'Pages',
+                                '${book.currentPages > 0 ? book.currentPages : book.targetPages}',
+                              ),
+                              ('Words', formatWords(words)),
+                              ('Chapters', '$chapterCount'),
+                              ('Read', readingTime(words)),
+                            ],
+                          )
+                        else
+                          WritingProgress(
+                            label: progressLabel,
+                            progress: book.progress,
+                            currentPages: book.currentPages,
+                            targetPages: book.targetPages,
+                            states: states,
+                            error: error,
                           ),
-                          ('Words', formatWords(words)),
-                          ('Chapters', '$chapterCount'),
-                          ('Read', readingTime(words)),
+                        if (complete && (error ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0x99FDE8E8),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              error!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.destructive,
+                              ),
+                            ),
+                          ),
                         ],
-                      )
-                    else
-                      WritingProgress(
-                        label: progressLabel,
-                        progress: book.progress,
-                        currentPages: book.currentPages,
-                        targetPages: book.targetPages,
-                        states: states,
-                        error: error,
-                      ),
-                    if (complete && (error ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                        if (inProgress || _liveText.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          KeyedSubtree(key: _liveKey, child: _liveCard(book)),
+                        ],
+                        if (complete) ...[
+                          const SizedBox(height: 32),
+                          KeyedSubtree(key: _audioKey, child: _audioSection(book)),
+                        ],
+                        if (content != null &&
+                            (content.includeIllustrations ||
+                                complete ||
+                                doneCount > 0)) ...[
+                          const SizedBox(height: 32),
+                          IllustrationsPanel(
+                            bookId: book.id,
+                            enabled: content.includeIllustrations,
+                            generating: inProgress,
+                            onPicturesAdded: _loadContent,
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+                        PageSectionTitle(
+                          'Chapters',
+                          trailing: chapterCount > 0
+                              ? '$doneCount of $chapterCount written'
+                              : null,
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0x99FDE8E8),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          error!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.destructive,
+                        if (content == null)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 32),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (chapterCount == 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 48,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F8FB),
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: Text(
+                              inProgress
+                                  ? 'Outlining chapters… they’ll appear here in a moment.'
+                                  : 'No chapters yet. Start writing to create the outline.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          )
+                        else
+                          ChapterList(
+                            chapters: chapters,
+                            inProgress: inProgress,
+                            liveChapterId: _liveChapterId,
+                            canRewrite: canRewrite,
+                            rewriting: _rewritingChapter,
+                            onRewrite: _rewriteChapter,
+                            onRead: _read,
+                          ),
+                        if (content != null && content.editions.length > 1) ...[
+                          const SizedBox(height: 32),
+                          EditionsList(
+                            editions: content.editions,
+                            currentId: book.id,
+                            onOpen: (e) => context.push('/books/${e.id}'),
+                          ),
+                        ],
+                        if (hasNotes) ...[
+                          const SizedBox(height: 32),
+                          StoryNotes(
+                            characters: content.characters,
+                            themes: content.themes,
+                            instructions: content.customInstructions,
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+                        VisibilityCard(
+                          isPublic: book.isPublic,
+                          canMakePrivate: book.canMakePrivate,
+                          busy: false,
+                          onChanged: _togglePublic,
+                          onViewPublic: book.publicUrl == null ? null : _openPublic,
+                          showUpgrade: AppBilling.iapEnabled,
+                          onUpgrade: () => showPremiumUpgradeSheet(
+                            context,
+                            featureLabel:
+                                'Private books are included on Pro and Premium.',
                           ),
                         ),
-                      ),
-                    ],
-                    if (inProgress || _liveText.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      KeyedSubtree(key: _liveKey, child: _liveCard(book)),
-                    ],
-                    if (complete) ...[
-                      const SizedBox(height: 32),
-                      KeyedSubtree(key: _audioKey, child: _audioSection(book)),
-                    ],
-                    if (content != null &&
-                        (content.includeIllustrations ||
-                            complete ||
-                            doneCount > 0)) ...[
-                      const SizedBox(height: 32),
-                      IllustrationsPanel(
-                        bookId: book.id,
-                        enabled: content.includeIllustrations,
-                        generating: inProgress,
-                        onPicturesAdded: _loadContent,
-                      ),
-                    ],
-                    const SizedBox(height: 32),
-                    PageSectionTitle(
-                      'Chapters',
-                      trailing: chapterCount > 0
-                          ? '$doneCount of $chapterCount written'
-                          : null,
-                    ),
-                    if (content == null)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (chapterCount == 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 48,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF7F8FB),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Text(
-                          inProgress
-                              ? 'Outlining chapters… they’ll appear here in a moment.'
-                              : 'No chapters yet. Start writing to create the outline.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textMuted,
+                        if (content != null) ...[
+                          const SizedBox(height: 16),
+                          BookSettingsCard(
+                            rows: BookSettingsCard.rowsFor(content),
                           ),
-                        ),
-                      )
-                    else
-                      ChapterList(
-                        chapters: chapters,
-                        inProgress: inProgress,
-                        liveChapterId: _liveChapterId,
-                        canRewrite: canRewrite,
-                        rewriting: _rewritingChapter,
-                        onRewrite: _rewriteChapter,
-                        onRead: _read,
-                      ),
-                    if (content != null && content.editions.length > 1) ...[
-                      const SizedBox(height: 32),
-                      EditionsList(
-                        editions: content.editions,
-                        currentId: book.id,
-                        onOpen: (e) => context.push('/books/${e.id}'),
-                      ),
-                    ],
-                    if (hasNotes) ...[
-                      const SizedBox(height: 32),
-                      StoryNotes(
-                        characters: content.characters,
-                        themes: content.themes,
-                        instructions: content.customInstructions,
-                      ),
-                    ],
-                    const SizedBox(height: 32),
-                    VisibilityCard(
-                      isPublic: book.isPublic,
-                      canMakePrivate: book.canMakePrivate,
-                      busy: false,
-                      onChanged: _togglePublic,
-                      onViewPublic: book.publicUrl == null ? null : _openPublic,
-                      showUpgrade: AppBilling.iapEnabled,
-                      onUpgrade: () => showPremiumUpgradeSheet(
-                        context,
-                        featureLabel:
-                            'Private books are included on Pro and Premium.',
-                      ),
+                        ],
+                      ],
                     ),
-                    if (content != null) ...[
-                      const SizedBox(height: 16),
-                      BookSettingsCard(
-                        rows: BookSettingsCard.rowsFor(content),
-                      ),
-                    ],
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _barProgress,
+                builder: (_, t, _) => CollapsedBookBar(
+                  progress: t,
+                  title: book.title,
+                  coverImage: book.coverImage,
+                  slug: book.slug,
+                  subtitle: barSubtitle,
+                  onBack: _back,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
