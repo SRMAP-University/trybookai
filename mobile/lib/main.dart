@@ -266,6 +266,19 @@ GoRouter _buildRouter(AuthProvider auth, {required String initialLocation}) {
                         slug: state.pathParameters['slug']!,
                       ),
                     ),
+                    routes: [
+                      GoRoute(
+                        path: 'read',
+                        parentNavigatorKey: _rootNavigatorKey,
+                        pageBuilder: (context, state) => AppPage.slide(
+                          state,
+                          BookReaderScreen(
+                            publicSlug: state.pathParameters['slug']!,
+                            chapterId: state.uri.queryParameters['chapter'],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

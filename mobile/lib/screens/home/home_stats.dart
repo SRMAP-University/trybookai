@@ -4,6 +4,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
@@ -15,6 +16,81 @@ const homePeekHeight = 52.0;
 const homeStatsHeight = 236.0;
 
 const _lavender = Color(0xFFC9C5FF);
+
+/// The colours of the layer behind Home: navy, or metallic gold for
+/// Premium. On gold the text turns a deep warm ink; every label stays at
+/// 4.5:1 or better against the darkest part of the gold.
+class DockTheme {
+  const DockTheme({
+    required this.base,
+    required this.ink,
+    required this.label,
+    required this.detail,
+    required this.accent,
+    required this.track,
+    required this.wash,
+    required this.overlay,
+    this.gradient,
+  });
+
+  /// The solid colour, under the gradient if there is one.
+  final Color base;
+
+  /// Values, the logo and the studio icons.
+  final Color ink;
+
+  /// A tile's label, and the small print under its value.
+  final Color label;
+  final Color detail;
+
+  /// Bars and the plan name, and the bars' empty track.
+  final Color accent;
+  final Color track;
+
+  /// Tiles, the plan pill and the studio buttons.
+  final Color wash;
+
+  /// Status-bar icons that read on it.
+  final SystemUiOverlayStyle overlay;
+  final List<Color>? gradient;
+
+  static const navy = DockTheme(
+    base: AppColors.navy,
+    ink: Colors.white,
+    label: Color(0xA6FFFFFF),
+    detail: Color(0x8CFFFFFF),
+    accent: _lavender,
+    track: Color(0x1FFFFFFF),
+    wash: Color(0x1AFFFFFF),
+    overlay: SystemUiOverlayStyle.light,
+  );
+
+  static const gold = DockTheme(
+    base: Color(0xFFD6AB45),
+    ink: Color(0xFF2A1C02),
+    label: Color(0xCC2A1C02),
+    detail: Color(0xBF2A1C02),
+    accent: Color(0xFF5A3E0A),
+    track: Color(0x262A1C02),
+    wash: Color(0x38FFFFFF),
+    overlay: SystemUiOverlayStyle.dark,
+    // Rich gold, a lit band through the middle, then gold again.
+    gradient: [Color(0xFFC9982F), Color(0xFFF2D27A), Color(0xFFD6AB45)],
+  );
+
+  /// The layer's paint. Gold runs left to right, so the status-bar band
+  /// painted with it lines up with the layer below at every point.
+  Decoration get decoration => BoxDecoration(
+    color: gradient == null ? base : null,
+    gradient: gradient == null ? null : LinearGradient(colors: gradient!),
+  );
+
+  /// Gold for Premium (and Unlimited) members.
+  static DockTheme forUser(UserModel? u) =>
+      u != null && u.isPaid && (u.plan == 'ENTERPRISE' || u.plan == 'UNLIMITED')
+      ? gold
+      : navy;
+}
 
 /// The grab handle at the top of the Home sheet; tap to open or close.
 class SheetHandle extends StatelessWidget {
@@ -70,8 +146,10 @@ class HomePeekBar extends StatelessWidget {
     required this.onTap,
     required this.onAudioStudio,
     required this.onSongStudio,
+    this.dock = DockTheme.navy,
   });
 
+  final DockTheme dock;
   final VoidCallback onTap;
   final VoidCallback onAudioStudio;
   final VoidCallback onSongStudio;
@@ -81,8 +159,8 @@ class HomePeekBar extends StatelessWidget {
       tooltip: label,
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        backgroundColor: Colors.white.withValues(alpha: 0.1),
-        foregroundColor: Colors.white,
+        backgroundColor: dock.wash,
+        foregroundColor: dock.ink,
         fixedSize: const Size(40, 40),
       ),
       icon: Icon(icon, size: 20),
@@ -103,7 +181,7 @@ class HomePeekBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const BookAiLogo(height: 24, color: Colors.white),
+                BookAiLogo(height: 24, color: dock.ink),
                 const Spacer(),
                 _studio(
                   Icons.headphones_rounded,
@@ -130,7 +208,10 @@ class HomeStatsPanel extends StatelessWidget {
     required this.books,
     required this.writing,
     required this.onUpgrade,
+    this.dock = DockTheme.navy,
   });
+
+  final DockTheme dock;
 
   final UserModel? user;
   final List<BookModel> books;
@@ -164,6 +245,7 @@ class HomeStatsPanel extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _Tile(
+                      dock: dock,
                       label: 'Pages left',
                       value: u == null ? '–' : number.format(u.pagesRemaining),
                       detail: u == null
@@ -177,6 +259,7 @@ class HomeStatsPanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _Tile(
+                      dock: dock,
                       label: 'Audio left',
                       value: u == null || u.audioMinutesLimit <= 0
                           ? '–'
@@ -196,6 +279,7 @@ class HomeStatsPanel extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _Tile(
+                      dock: dock,
                       label: 'Books finished',
                       value: '$finished',
                       detail: writing > 0
@@ -206,6 +290,7 @@ class HomeStatsPanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _Tile(
+                      dock: dock,
                       label: 'Pages written',
                       value: number.format(pagesWritten),
                       detail: 'across all your books',
@@ -222,13 +307,13 @@ class HomeStatsPanel extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: dock.wash,
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: Text(
                       _planLabel(u),
-                      style: const TextStyle(
-                        color: _lavender,
+                      style: TextStyle(
+                        color: dock.accent,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -258,6 +343,7 @@ class HomeStatsPanel extends StatelessWidget {
 
 class _Tile extends StatelessWidget {
   const _Tile({
+    required this.dock,
     required this.label,
     required this.value,
     required this.detail,
@@ -268,32 +354,27 @@ class _Tile extends StatelessWidget {
   final String value;
   final String detail;
   final double? fraction;
+  final DockTheme dock;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: dock.wash,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.65),
-              fontSize: 11.5,
-            ),
-          ),
+          Text(label, style: TextStyle(color: dock.label, fontSize: 11.5)),
           const SizedBox(height: 2),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: dock.ink,
               fontSize: 20,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.3,
@@ -306,8 +387,8 @@ class _Tile extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: fraction!.clamp(0.0, 1.0),
                 minHeight: 3,
-                color: _lavender,
-                backgroundColor: Colors.white.withValues(alpha: 0.12),
+                color: dock.accent,
+                backgroundColor: dock.track,
               ),
             ),
           ],
@@ -316,10 +397,7 @@ class _Tile extends StatelessWidget {
             detail,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
-              fontSize: 11.5,
-            ),
+            style: TextStyle(color: dock.detail, fontSize: 11.5),
           ),
         ],
       ),
