@@ -61,13 +61,33 @@ String _planLabel(UserModel? u) {
   return u.onTrial ? u.displayPlanLabel : '${u.displayPlanLabel} plan';
 }
 
-/// The always-visible strip of the dark layer: logo on the left, plan on
-/// the right. Tap it to open or close the stats.
+/// The always-visible strip of the dark layer: logo on the left, Audio
+/// Studio and Song Studio on the right. Tap the strip to open or close the
+/// stats.
 class HomePeekBar extends StatelessWidget {
-  const HomePeekBar({super.key, required this.user, required this.onTap});
+  const HomePeekBar({
+    super.key,
+    required this.onTap,
+    required this.onAudioStudio,
+    required this.onSongStudio,
+  });
 
-  final UserModel? user;
   final VoidCallback onTap;
+  final VoidCallback onAudioStudio;
+  final VoidCallback onSongStudio;
+
+  Widget _studio(IconData icon, String label, VoidCallback onPressed) {
+    return IconButton(
+      tooltip: label,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: 0.1),
+        foregroundColor: Colors.white,
+        fixedSize: const Size(40, 40),
+      ),
+      icon: Icon(icon, size: 20),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,24 +105,13 @@ class HomePeekBar extends StatelessWidget {
               children: [
                 const BookAiLogo(height: 24, color: Colors.white),
                 const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    _planLabel(user),
-                    style: const TextStyle(
-                      color: _lavender,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                _studio(
+                  Icons.headphones_rounded,
+                  'Audio Studio',
+                  onAudioStudio,
                 ),
+                const SizedBox(width: 8),
+                _studio(Icons.music_note_rounded, 'Song Studio', onSongStudio),
               ],
             ),
           ),
@@ -120,14 +129,12 @@ class HomeStatsPanel extends StatelessWidget {
     required this.user,
     required this.books,
     required this.writing,
-    required this.onUsage,
     required this.onUpgrade,
   });
 
   final UserModel? user;
   final List<BookModel> books;
   final int writing;
-  final VoidCallback onUsage;
   final VoidCallback onUpgrade;
 
   @override
@@ -209,13 +216,23 @@ class HomeStatsPanel extends StatelessWidget {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  TextButton(
-                    onPressed: onUsage,
-                    style: TextButton.styleFrom(
-                      foregroundColor: _lavender,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                    child: const Text('See full usage →'),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      _planLabel(u),
+                      style: const TextStyle(
+                        color: _lavender,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   const Spacer(),
                   if (u != null && !u.isPaid)

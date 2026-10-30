@@ -27,19 +27,7 @@ class _PublicBooksScreenState extends State<PublicBooksScreen> {
     final pub = context.watch<PublicBooksProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Public books'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
-              onPressed: () => context.push('/reels'),
-              icon: const Icon(Icons.smart_display_outlined),
-              label: const Text('Reels'),
-            ),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Public books')),
       body: RefreshIndicator(
         onRefresh: () => context.read<PublicBooksProvider>().load(),
         child: pub.loading && pub.books.isEmpty

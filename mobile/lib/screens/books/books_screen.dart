@@ -27,43 +27,59 @@ class _BooksScreenState extends State<BooksScreen> {
   Widget build(BuildContext context) {
     final books = context.watch<BooksProvider>();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Your books')),
-      body: RefreshIndicator(
-        onRefresh: books.load,
-        child: books.loading && books.books.isEmpty
-            ? const BookGridSkeleton()
-            : books.books.isEmpty
-                ? ListView(
-                    children: const [
-                      SizedBox(height: 80),
-                      Center(
-                        child: Text(
-                          'No books yet. Tap New book to start.',
-                          style: TextStyle(color: AppColors.textMuted),
-                        ),
+    // No tab of its own (Reels has it): back goes Home.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go('/home');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            tooltip: 'Home',
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => context.go('/home'),
+          ),
+          title: const Text('Your books'),
+        ),
+        body: RefreshIndicator(
+          onRefresh: books.load,
+          child: books.loading && books.books.isEmpty
+              ? const BookGridSkeleton()
+              : books.books.isEmpty
+              ? ListView(
+                  children: const [
+                    SizedBox(height: 80),
+                    Center(
+                      child: Text(
+                        'No books yet. Tap New book to start.',
+                        style: TextStyle(color: AppColors.textMuted),
                       ),
-                    ],
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      const gap = 18.0;
-                      final cell = (constraints.maxWidth - 40 - gap) / 2;
-                      final cover = cell - 10;
-                      return GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: gap,
-                          mainAxisSpacing: 22,
-                          mainAxisExtent: cover * 1.6 + 70,
-                        ),
-                        itemCount: books.books.length,
-                        itemBuilder: (context, i) =>
-                            BookShelfItem(book: books.books[i], coverWidth: cover),
-                      );
-                    },
-                  ),
+                    ),
+                  ],
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const gap = 18.0;
+                    final cell = (constraints.maxWidth - 40 - gap) / 2;
+                    final cover = cell - 10;
+                    return GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: gap,
+                        mainAxisSpacing: 22,
+                        mainAxisExtent: cover * 1.6 + 70,
+                      ),
+                      itemCount: books.books.length,
+                      itemBuilder: (context, i) => BookShelfItem(
+                        book: books.books[i],
+                        coverWidth: cover,
+                      ),
+                    );
+                  },
+                ),
+        ),
       ),
     );
   }
@@ -71,19 +87,23 @@ class _BooksScreenState extends State<BooksScreen> {
 
 /// One book on the shelf: 3D cover, title and a friendly status line.
 class BookShelfItem extends StatelessWidget {
-  const BookShelfItem({super.key, required this.book, required this.coverWidth});
+  const BookShelfItem({
+    super.key,
+    required this.book,
+    required this.coverWidth,
+  });
 
   final BookModel book;
   final double coverWidth;
 
   static String statusLabel(BookModel b) => switch (b.status) {
-        'COMPLETED' => 'Ready to read',
-        'GENERATING' => 'Writing · ${b.progress.round()}%',
-        'OUTLINING' => 'Planning chapters',
-        'FAILED' => 'Needs attention',
-        'CANCELLED' => 'Stopped',
-        _ => 'Draft',
-      };
+    'COMPLETED' => 'Ready to read',
+    'GENERATING' => 'Writing · ${b.progress.round()}%',
+    'OUTLINING' => 'Planning chapters',
+    'FAILED' => 'Needs attention',
+    'CANCELLED' => 'Stopped',
+    _ => 'Draft',
+  };
 
   @override
   Widget build(BuildContext context) {

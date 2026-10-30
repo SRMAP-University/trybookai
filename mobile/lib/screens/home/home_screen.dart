@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/config/book_options.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
@@ -250,7 +252,6 @@ class _HomeScreenState extends State<HomeScreen>
                     user: user,
                     books: books.books,
                     writing: writing.length,
-                    onUsage: () => context.push('/usage'),
                     onUpgrade: () => context.push('/billing'),
                   ),
                 ),
@@ -449,7 +450,15 @@ class _HomeScreenState extends State<HomeScreen>
                   height: homePeekHeight,
                   child: child!,
                 ),
-                child: HomePeekBar(user: user, onTap: _toggleStats),
+                child: HomePeekBar(
+                  onTap: _toggleStats,
+                  onAudioStudio: () => context.go('/studio'),
+                  // Song Studio is on the website for now.
+                  onSongStudio: () => launchUrl(
+                    Uri.parse('${ApiConfig.baseUrl}/dashboard/songs'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
               ),
               // The status bar keeps its dark band as the page scrolls under.
               Positioned(

@@ -424,7 +424,11 @@ class _ReelPlayerScreenState extends State<ReelPlayerScreen> {
 
 /// Reels from public books, one after another: swipe up for the next.
 class ReelsFeedScreen extends StatefulWidget {
-  const ReelsFeedScreen({super.key});
+  const ReelsFeedScreen({super.key, this.inTab = false});
+
+  /// Shown as a bottom-bar tab: no close button, and it pauses whenever the
+  /// tab is left or something opens on top of it.
+  final bool inTab;
 
   @override
   State<ReelsFeedScreen> createState() => _ReelsFeedScreenState();
@@ -445,11 +449,28 @@ class _ReelsFeedScreenState extends State<ReelsFeedScreen> {
 
   ReelsApi get _api => ReelsApi(context.read<ApiClient>());
 
+  bool _pausedOffscreen = false;
+
   @override
   void initState() {
     super.initState();
     _controller.onEnded = _next;
     _loadMore();
+  }
+
+  /// Tabs that aren't showing (and screens covered by another) have their
+  /// tickers muted; follow that to pause and resume the narration.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.of(context);
+    if (!visible && _controller.playing) {
+      _pausedOffscreen = true;
+      _controller.pause();
+    } else if (visible && _pausedOffscreen) {
+      _pausedOffscreen = false;
+      _controller.toggle();
+    }
   }
 
   @override
@@ -576,7 +597,7 @@ class _ReelsFeedScreenState extends State<ReelsFeedScreen> {
         body: Stack(
           children: [
             Positioned.fill(child: body),
-            _closeButton(context),
+            if (!widget.inTab) _closeButton(context),
           ],
         ),
       ),
