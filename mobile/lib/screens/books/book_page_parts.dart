@@ -331,10 +331,11 @@ class _BookHeroState extends State<BookHero>
   }
 }
 
-/// The hero cover's width, and the box a [BookCover3D] of width [w] takes
-/// (page edges add a little right and below).
+/// The hero cover's width, and the box its cover of width [w] takes (drawn
+/// for a dark stage: no page edges, as on the website).
 const heroCoverWidth = 150.0;
-Size coverBox(double w) => Size(w * 1.035, w * 1.45 + w * 0.035);
+Size coverBox(double w) =>
+    BookCover3D.sizeFor(w, ribbon: false, onDark: true);
 TextStyle heroTitleStyle() => AppType.display(size: 34, color: Colors.white);
 
 /// Draws the hero's cover and title above the page and flies them into the
@@ -615,6 +616,7 @@ class _HeroFlightState extends State<HeroFlight> with TickerProviderStateMixin {
           slug: widget.slug,
           width: width,
           ribbon: false,
+          onDark: true,
         ),
         // One light sweep across the cover.
         if (_sheen.value > 0 && _sheen.value < 1)

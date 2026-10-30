@@ -6,6 +6,9 @@ import 'package:bookai_mobile/theme/app_theme.dart';
 /// A cover drawn as a physical book: spine shading on the left, page edges
 /// peeking out at the bottom, a ribbon bookmark and a soft drop shadow.
 /// Falls back to a coloured cover with the title when there's no image.
+///
+/// On a dark stage ([onDark]) it's drawn like the website's hero cover
+/// instead: no page edges, a deep black shadow and a faint light outline.
 class BookCover3D extends StatelessWidget {
   const BookCover3D({
     super.key,
@@ -14,6 +17,7 @@ class BookCover3D extends StatelessWidget {
     this.slug,
     this.width = 110,
     this.ribbon = true,
+    this.onDark = false,
   });
 
   final String title;
@@ -21,6 +25,14 @@ class BookCover3D extends StatelessWidget {
   final String? slug;
   final double width;
   final bool ribbon;
+  final bool onDark;
+
+  /// The space a cover of [width] takes, page edges and ribbon included.
+  static Size sizeFor(double width, {bool ribbon = true, bool onDark = false}) {
+    final height = width * _aspect;
+    final pages = onDark ? 0.0 : width * 0.035;
+    return Size(width + pages, height + pages + (ribbon ? height * 0.07 : 0));
+  }
 
   static const _aspect = 1.45;
   // Cool tones around the brand indigo, so placeholders sit with the UI.
@@ -37,7 +49,7 @@ class BookCover3D extends StatelessWidget {
   Widget build(BuildContext context) {
     final height = width * _aspect;
     final url = ApiConfig.coverUrl(coverImage, slug);
-    final pages = width * 0.035;
+    final pages = onDark ? 0.0 : width * 0.035;
     const radius = BorderRadius.only(
       topLeft: Radius.circular(4),
       bottomLeft: Radius.circular(4),
@@ -52,31 +64,50 @@ class BookCover3D extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           // Page block, visible below and to the right of the cover.
-          Positioned(
-            left: width * 0.06,
-            top: pages,
-            width: width - width * 0.04,
-            height: height,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8F2E7),
-                borderRadius: radius,
-                border: Border.all(color: const Color(0xFFE6D9C6)),
+          if (!onDark)
+            Positioned(
+              left: width * 0.06,
+              top: pages,
+              width: width - width * 0.04,
+              height: height,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: radius,
+                  border: Border.all(color: const Color(0xFFE3E7EE)),
+                ),
               ),
             ),
-          ),
           Container(
             width: width,
             height: height,
             decoration: BoxDecoration(
               borderRadius: radius,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.navy.withValues(alpha: 0.22),
-                  blurRadius: width * 0.12,
-                  offset: Offset(width * 0.03, width * 0.06),
-                ),
-              ],
+              border: onDark
+                  ? Border.all(color: Colors.white.withValues(alpha: 0.1))
+                  : null,
+              boxShadow: onDark
+                  // The website's hero cover shadow.
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.85),
+                        blurRadius: 60,
+                        spreadRadius: -24,
+                        offset: const Offset(0, 34),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: AppColors.navy.withValues(alpha: 0.22),
+                        blurRadius: width * 0.12,
+                        offset: Offset(width * 0.03, width * 0.06),
+                      ),
+                    ],
             ),
             child: ClipRRect(
               borderRadius: radius,

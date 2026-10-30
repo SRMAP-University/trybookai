@@ -300,6 +300,25 @@ class ChapterRowsSkeleton extends StatelessWidget {
   }
 }
 
+/// The four stat tiles on a finished book's page.
+class StatsSkeleton extends StatelessWidget {
+  const StatsSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Skeleton(
+      child: Row(
+        children: [
+          for (var i = 0; i < 4; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            const Expanded(child: Bone(height: 58, radius: 16)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// Your book's page while it loads: the dark hero, stats and chapters.
 class BookPageSkeleton extends StatelessWidget {
   const BookPageSkeleton({super.key});
@@ -345,16 +364,7 @@ class BookPageSkeleton extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Skeleton(
-                child: Row(
-                  children: [
-                    for (var i = 0; i < 4; i++) ...[
-                      if (i > 0) const SizedBox(width: 8),
-                      const Expanded(child: Bone(height: 58, radius: 16)),
-                    ],
-                  ],
-                ),
-              ),
+              const StatsSkeleton(),
               const SizedBox(height: 32),
               const Skeleton(child: Bone(width: 96, height: 16, radius: 4)),
               const SizedBox(height: 14),

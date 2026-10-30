@@ -29,7 +29,7 @@ class BookShelfRow extends StatelessWidget {
     final coverHeight = coverWidth * 1.45;
     final pages = coverWidth * 0.035;
     // Where the bottom of a cover's page block sits (see BookCover3D).
-    final plankTop = coverHeight + pages - 3;
+    final plankTop = coverHeight + pages - 2;
     return SizedBox(
       // Cover, page edges and the ribbon hanging over the shelf, plus room
       // for the shelf's shadow.
@@ -37,24 +37,28 @@ class BookShelfRow extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // A thin ledge: light top edge, short soft shadow.
           if (shelf)
             Positioned(
               left: -20,
               right: -20,
               top: plankTop,
-              height: 12,
+              height: 6,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFFF0F3F7), Color(0xFFDDE3EB)],
+                    colors: [Color(0xFFF6F8FB), Color(0xFFDDE3EB)],
+                  ),
+                  border: const Border(
+                    top: BorderSide(color: Color(0xFFFFFFFF)),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.navy.withValues(alpha: 0.12),
-                      blurRadius: 10,
-                      offset: const Offset(0, 6),
+                      color: AppColors.navy.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),

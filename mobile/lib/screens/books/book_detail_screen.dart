@@ -1200,7 +1200,9 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (complete)
+                        if (complete && content == null)
+                          const StatsSkeleton()
+                        else if (complete)
                           BookStats(
                             stats: [
                               (
