@@ -102,10 +102,11 @@ class _PremiumUpgradeSheetState extends State<_PremiumUpgradeSheet> {
     if (mounted) setState(() => _loadingStore = false);
   }
 
-  Future<void> _buy(String plan) async {
-    setState(() => _loadingPlan = plan);
+  /// [prepaid] buys one month once (no auto-renew; Play balance works).
+  Future<void> _buy(String plan, {bool prepaid = false}) async {
+    setState(() => _loadingPlan = prepaid ? '$plan:prepaid' : plan);
     try {
-      final bought = await _purchase.buy(plan);
+      final bought = await _purchase.buy(plan, prepaid: prepaid);
       if (!bought || !mounted) return;
       final label = context.read<AuthProvider>().user?.planLabel;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -173,6 +174,13 @@ class _PremiumUpgradeSheetState extends State<_PremiumUpgradeSheet> {
                                 interval: 'month',
                               ) !=
                               null,
+                      oneTimePrice: billedOnWeb
+                          ? null
+                          : store.priceLabelForPlan(
+                              _plans[i].key,
+                              interval: 'month',
+                              prepaid: true,
+                            ),
                     ),
                   ),
                 ],
@@ -180,7 +188,8 @@ class _PremiumUpgradeSheetState extends State<_PremiumUpgradeSheet> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Renews monthly until you cancel in your store subscriptions.',
+              'Monthly renews until you cancel. “Pay once” is one month with '
+              'no auto-renew — Google Play balance works.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
             ),
@@ -203,6 +212,7 @@ class _PremiumUpgradeSheetState extends State<_PremiumUpgradeSheet> {
     }) plan, {
     required String price,
     required bool enabled,
+    String? oneTimePrice,
   }) {
     final busy = _loadingPlan == plan.key;
     return Container(
@@ -315,6 +325,25 @@ class _PremiumUpgradeSheetState extends State<_PremiumUpgradeSheet> {
                   : Text(plan.highlight ? 'Get Premium' : 'Get Pro'),
             ),
           ),
+          if (oneTimePrice != null)
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: _loadingPlan == null
+                    ? () => _buy(plan.key, prepaid: true)
+                    : null,
+                child: _loadingPlan == '${plan.key}:prepaid'
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        'Pay once · $oneTimePrice',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+              ),
+            ),
         ],
       ),
     );

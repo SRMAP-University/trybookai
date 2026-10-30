@@ -190,20 +190,36 @@ class RevenueCatService extends ChangeNotifier {
     return null;
   }
 
+  /// One-time "1 month" plans (Play prepaid base plans): no auto-renew, and
+  /// Google accepts Play balance / gift cards for them.
+  bool isPrepaid(Package p) =>
+      p.storeProduct.defaultOption?.isPrepaid == true ||
+      _words(_packageText(p)).contains('prepaid');
+
   /// Resolve a package for a BookAI plan. Unlimited is a subscription like
   /// the others, or a lifetime purchase when that's what the store sells.
-  Package? packageForPlan(String plan, {required String interval}) {
+  /// [prepaid] picks the one-time version instead of the auto-renewing one.
+  Package? packageForPlan(
+    String plan, {
+    required String interval,
+    bool prepaid = false,
+  }) {
     final packages = availablePackages;
     if (packages.isEmpty) return null;
 
     final wantAnnual = interval == 'year';
     final intervalPkgs = packages
-        .where((p) => _matchesInterval(p, wantAnnual: wantAnnual))
+        .where(
+          (p) =>
+              _matchesInterval(p, wantAnnual: wantAnnual) &&
+              isPrepaid(p) == prepaid,
+        )
         .toList();
 
     for (final p in intervalPkgs) {
       if (_planIdForPackage(p) == plan) return p;
     }
+    if (prepaid) return null;
 
     if (plan == 'UNLIMITED') {
       for (final p in packages) {
@@ -232,6 +248,7 @@ class RevenueCatService extends ChangeNotifier {
   Future<CustomerInfo?> purchasePlan(
     String plan, {
     required String interval,
+    bool prepaid = false,
   }) async {
     if (!_configured) {
       throw Exception(
@@ -241,7 +258,7 @@ class RevenueCatService extends ChangeNotifier {
     if (!hasPackages) {
       await refreshOfferings();
     }
-    final package = packageForPlan(plan, interval: interval);
+    final package = packageForPlan(plan, interval: interval, prepaid: prepaid);
     if (package == null) {
       throw Exception(
         plan == 'UNLIMITED'
@@ -249,7 +266,8 @@ class RevenueCatService extends ChangeNotifier {
             : 'This plan is not available as an in-app purchase on this device.',
       );
     }
-    final change = await _playPlanChange(package);
+    // A one-time month can't replace (or be replaced by) a subscription.
+    final change = prepaid ? null : await _playPlanChange(package);
     if (kDebugMode) {
       debugPrint(
         'RevenueCat purchase plan=$plan → ${package.identifier} / '
@@ -272,6 +290,7 @@ class RevenueCatService extends ChangeNotifier {
     for (final e in info.entitlements.active.values) {
       if (e.store != Store.playStore || e.productIdentifier.isEmpty) continue;
       final plan = e.productPlanIdentifier;
+      if (plan != null && plan.contains('prepaid')) continue;
       final currentId = plan == null || plan.isEmpty
           ? e.productIdentifier
           : '${e.productIdentifier}:$plan';
@@ -316,8 +335,12 @@ class RevenueCatService extends ChangeNotifier {
     }
   }
 
-  String? priceLabelForPlan(String plan, {required String interval}) {
-    final package = packageForPlan(plan, interval: interval);
+  String? priceLabelForPlan(
+    String plan, {
+    required String interval,
+    bool prepaid = false,
+  }) {
+    final package = packageForPlan(plan, interval: interval, prepaid: prepaid);
     return package?.storeProduct.priceString;
   }
 }
