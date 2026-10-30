@@ -13,6 +13,7 @@ import 'package:bookai_mobile/screens/home/home_widgets.dart';
 import 'package:bookai_mobile/services/reader_memory.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/book_shelf.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -108,7 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ValueListenableBuilder<LastRead?>(
                 valueListenable: ReaderMemory.last,
                 builder: (context, last, _) {
-                  final row = _continueRow(books, last);
+                  final loading = books.loading && books.books.isEmpty;
+                  final row = loading
+                      ? const ContinueRowSkeleton()
+                      : _continueRow(books, last);
                   if (row == null) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.only(top: 14),
@@ -145,11 +149,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ],
-              if (books.loading && books.books.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 24),
-                  child: LinearProgressIndicator(minHeight: 2),
-                ),
+              if (books.loading && books.books.isEmpty) ...[
+                const SizedBox(height: 32),
+                const Skeleton(child: Bone(width: 150, height: 20, radius: 4)),
+                const SizedBox(height: 16),
+                const ShelfSkeleton(),
+              ],
               if (books.completed.isNotEmpty) ...[
                 const SizedBox(height: 32),
                 reveal(
@@ -194,6 +199,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Browse published manuscripts on Discover.',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 )
+              else if (pub.books.isEmpty)
+                const ShelfSkeleton()
               else
                 reveal(
                   BookShelfRow(

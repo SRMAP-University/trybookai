@@ -5,6 +5,7 @@ import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/config/book_options.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -93,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Writing defaults')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const FormSkeleton()
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
               children: [

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/book_cover_3d.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 
 class PublicBooksScreen extends StatefulWidget {
   const PublicBooksScreen({super.key});
@@ -30,7 +31,7 @@ class _PublicBooksScreenState extends State<PublicBooksScreen> {
       body: RefreshIndicator(
         onRefresh: () => context.read<PublicBooksProvider>().load(),
         child: pub.loading && pub.books.isEmpty
-            ? const Center(child: CircularProgressIndicator())
+            ? const BookGridSkeleton(horizontalPadding: 16, extraHeight: 62)
             : pub.error != null && pub.books.isEmpty
                 ? ListView(
                     children: [

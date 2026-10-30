@@ -5,6 +5,7 @@ import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 import 'package:bookai_mobile/widgets/manuscript_view.dart';
 
@@ -67,7 +68,7 @@ class _PublicBookDetailScreenState extends State<PublicBookDetailScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PublicBookSkeleton()
           : _error != null || book == null
               ? Center(child: Text(_error ?? 'Not found'))
               : ListView(

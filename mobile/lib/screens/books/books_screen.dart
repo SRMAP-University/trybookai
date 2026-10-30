@@ -5,6 +5,7 @@ import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/book_cover_3d.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 
 class BooksScreen extends StatefulWidget {
   const BooksScreen({super.key});
@@ -31,10 +32,7 @@ class _BooksScreenState extends State<BooksScreen> {
       body: RefreshIndicator(
         onRefresh: books.load,
         child: books.loading && books.books.isEmpty
-            ? const Padding(
-                padding: EdgeInsets.all(24),
-                child: LinearProgressIndicator(minHeight: 2),
-              )
+            ? const BookGridSkeleton()
             : books.books.isEmpty
                 ? ListView(
                     children: const [

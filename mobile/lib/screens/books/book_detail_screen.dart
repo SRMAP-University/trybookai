@@ -20,6 +20,7 @@ import 'package:bookai_mobile/services/file_download.dart';
 import 'package:bookai_mobile/services/generation_stream.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 import 'package:bookai_mobile/widgets/audiobook_player.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 import 'package:bookai_mobile/widgets/generation_speed_sheet.dart';
@@ -1031,13 +1032,18 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   Widget build(BuildContext context) {
     final book = _book;
     if (book == null) {
+      if (_loading) {
+        return const AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light,
+          child: Scaffold(
+            backgroundColor: AppColors.white,
+            body: BookPageSkeleton(),
+          ),
+        );
+      }
       return Scaffold(
         appBar: AppBar(),
-        body: Center(
-          child: _loading
-              ? const CircularProgressIndicator()
-              : const Text('Book not found'),
-        ),
+        body: const Center(child: Text('Book not found')),
       );
     }
 
@@ -1263,10 +1269,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                               : null,
                         ),
                         if (content == null)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 32),
-                            child: Center(child: CircularProgressIndicator()),
-                          )
+                          const ChapterRowsSkeleton()
                         else if (chapterCount == 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
