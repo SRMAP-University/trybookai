@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/book_options.dart';
@@ -9,6 +10,7 @@ import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/providers/new_book_draft_provider.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
+import 'package:bookai_mobile/screens/home/home_stats.dart';
 import 'package:bookai_mobile/screens/home/home_widgets.dart';
 import 'package:bookai_mobile/services/reader_memory.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
@@ -28,9 +30,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Timer? _poll;
 
+  /// Home is a sheet over your stats; it rests [homeStatsHeight] down the
+  /// scroll, so scrolling up past its top pulls it down to show them.
+  final _scroll = ScrollController(initialScrollOffset: homeStatsHeight);
+  bool _statsOpen = false;
+
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     unawaited(ReaderMemory.load());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final books = context.read<BooksProvider>();
@@ -47,7 +55,39 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  /// Opening the stats also refreshes them (this is Home's pull-to-refresh).
+  void _onScroll() {
+    final offset = _scroll.offset;
+    if (offset <= 1 && !_statsOpen) {
+      _statsOpen = true;
+      unawaited(_refresh());
+    } else if (offset >= homeStatsHeight - 1) {
+      _statsOpen = false;
+    }
+  }
+
+  Future<void> _refresh() async {
+    final books = context.read<BooksProvider>();
+    await Future.wait([
+      books.load(),
+      books.loadActiveJobs(),
+      context.read<AuthProvider>().refreshUser(),
+      context.read<PublicBooksProvider>().load(),
+    ]);
+  }
+
+  void _toggleStats() {
+    if (!_scroll.hasClients) return;
+    final open = _scroll.offset < homeStatsHeight / 2;
+    _scroll.animateTo(
+      open ? homeStatsHeight : 0,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _useIdea(BookIdea idea) {
@@ -91,147 +131,207 @@ class _HomeScreenState extends State<HomeScreen> {
       child: child,
     );
 
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await Future.wait([
-              books.load(),
-              books.loadActiveJobs(),
-              auth.refreshUser(),
-              pub.load(),
-            ]);
-          },
-          child: ListView(
-            // Room at the bottom so the last row scrolls clear of the bottom
-            // bar and the floating New book button.
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 170),
-            children: [
-              reveal(HomeHero(name: _firstName(user), covers: heroCovers)),
-              ValueListenableBuilder<LastRead?>(
-                valueListenable: ReaderMemory.last,
-                builder: (context, last, _) {
-                  final loading = books.loading && books.books.isEmpty;
-                  final row = loading
-                      ? const ContinueRowSkeleton()
-                      : _continueRow(books, last);
-                  if (row == null) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: Column(
-                      children: [
-                        const Divider(height: 1, color: AppColors.border),
-                        const SizedBox(height: 10),
-                        row,
-                        const SizedBox(height: 10),
-                        const Divider(height: 1, color: AppColors.border),
-                      ],
+    final top = MediaQuery.paddingOf(context).top;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.navy,
+        body: Stack(
+          children: [
+            // Your stats, behind the sheet; they rise in as it's pulled down.
+            Positioned(
+              top: top,
+              left: 0,
+              right: 0,
+              height: homeStatsHeight,
+              child: AnimatedBuilder(
+                animation: _scroll,
+                builder: (context, child) {
+                  final shown = _scroll.hasClients
+                      ? (1 - _scroll.offset / homeStatsHeight).clamp(0.0, 1.0)
+                      : 0.0;
+                  return Opacity(
+                    opacity: shown,
+                    child: Transform.translate(
+                      offset: Offset(0, -16 * (1 - shown)),
+                      child: child,
                     ),
                   );
                 },
-              ),
-              if (writing.isNotEmpty) ...[
-                const SizedBox(height: 32),
-                reveal(
-                  HomeHeading(
-                    'Writing now',
-                    action: HomeLink(
-                      'All books',
-                      onTap: () => context.go('/books'),
-                    ),
-                  ),
-                ),
-                for (var i = 0; i < writing.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, color: AppColors.border),
-                  reveal(
-                    WritingNowRow(
-                      book: writing[i],
-                      onTap: () => context.push('/books/${writing[i].id}'),
-                    ),
-                  ),
-                ],
-              ],
-              if (books.loading && books.books.isEmpty) ...[
-                const SizedBox(height: 32),
-                const Skeleton(child: Bone(width: 150, height: 20, radius: 4)),
-                const SizedBox(height: 16),
-                const ShelfSkeleton(coverWidth: _shelfCover),
-              ],
-              if (books.completed.isNotEmpty) ...[
-                const SizedBox(height: 32),
-                reveal(
-                  HomeHeading(
-                    'Your bookshelf',
-                    action: HomeLink(
-                      'View all',
-                      onTap: () => context.go('/books'),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                reveal(
-                  BookShelfRow(
-                    coverWidth: _shelfCover,
-                    books: [
-                      for (final b in books.completed.take(8))
-                        (
-                          title: b.title,
-                          coverImage: b.coverImage,
-                          slug: b.slug,
-                          onTap: () => context.push('/books/${b.id}'),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 28),
-              reveal(IdeaList(onPick: _useIdea)),
-              const SizedBox(height: 28),
-              reveal(
-                HomeHeading(
-                  'Popular on BookAI',
-                  action: HomeLink(
-                    'View all',
-                    onTap: () => context.go('/discover'),
-                  ),
+                child: HomeStatsPanel(
+                  user: user,
+                  books: books.books,
+                  writing: writing.length,
+                  onUsage: () => context.push('/usage'),
+                  onUpgrade: () => context.push('/billing'),
                 ),
               ),
-              const SizedBox(height: 12),
-              if (pub.books.isEmpty && !pub.loading)
-                const Text(
-                  'Browse published manuscripts on Discover.',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                )
-              else if (pub.books.isEmpty)
-                const ShelfSkeleton(coverWidth: _shelfCover)
-              else
-                reveal(
-                  BookShelfRow(
-                    coverWidth: _shelfCover,
-                    books: [
-                      for (final b in pub.books.take(10))
-                        (
-                          title: b.title,
-                          coverImage: b.coverImage,
-                          slug: b.slug,
-                          onTap: () => context.push('/discover/${b.slug}'),
-                        ),
-                    ],
-                  ),
+            ),
+            CustomScrollView(
+              controller: _scroll,
+              physics: const HomeSheetPhysics(restOffset: homeStatsHeight),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: SizedBox(height: top + 8 + homeStatsHeight),
                 ),
-              if (user != null) ...[
-                const SizedBox(height: 32),
-                reveal(
-                  PlanLine(
-                    user: user,
-                    onTap: () => context.push('/usage'),
-                    onUpgrade: () => context.push('/billing'),
+                DecoratedSliver(
+                  decoration: const BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  sliver: SliverPadding(
+                    // Room at the bottom so the last row scrolls clear of the
+                    // bottom bar and the floating New book button.
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 170),
+                    sliver: SliverList.list(
+                      children: [
+                        SheetHandle(onTap: _toggleStats),
+                        reveal(
+                          HomeHero(name: _firstName(user), covers: heroCovers),
+                        ),
+                        ValueListenableBuilder<LastRead?>(
+                          valueListenable: ReaderMemory.last,
+                          builder: (context, last, _) {
+                            final loading =
+                                books.loading && books.books.isEmpty;
+                            final row = loading
+                                ? const ContinueRowSkeleton()
+                                : _continueRow(books, last);
+                            if (row == null) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: Column(
+                                children: [
+                                  const Divider(
+                                    height: 1,
+                                    color: AppColors.border,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  row,
+                                  const SizedBox(height: 10),
+                                  const Divider(
+                                    height: 1,
+                                    color: AppColors.border,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        if (writing.isNotEmpty) ...[
+                          const SizedBox(height: 32),
+                          reveal(
+                            HomeHeading(
+                              'Writing now',
+                              action: HomeLink(
+                                'All books',
+                                onTap: () => context.go('/books'),
+                              ),
+                            ),
+                          ),
+                          for (var i = 0; i < writing.length; i++) ...[
+                            if (i > 0)
+                              const Divider(height: 1, color: AppColors.border),
+                            reveal(
+                              WritingNowRow(
+                                book: writing[i],
+                                onTap: () =>
+                                    context.push('/books/${writing[i].id}'),
+                              ),
+                            ),
+                          ],
+                        ],
+                        if (books.loading && books.books.isEmpty) ...[
+                          const SizedBox(height: 32),
+                          const Skeleton(
+                            child: Bone(width: 150, height: 20, radius: 4),
+                          ),
+                          const SizedBox(height: 16),
+                          const ShelfSkeleton(coverWidth: _shelfCover),
+                        ],
+                        if (books.completed.isNotEmpty) ...[
+                          const SizedBox(height: 32),
+                          reveal(
+                            HomeHeading(
+                              'Your bookshelf',
+                              action: HomeLink(
+                                'View all',
+                                onTap: () => context.go('/books'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          reveal(
+                            BookShelfRow(
+                              coverWidth: _shelfCover,
+                              books: [
+                                for (final b in books.completed.take(8))
+                                  (
+                                    title: b.title,
+                                    coverImage: b.coverImage,
+                                    slug: b.slug,
+                                    onTap: () => context.push('/books/${b.id}'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 28),
+                        reveal(IdeaList(onPick: _useIdea)),
+                        const SizedBox(height: 28),
+                        reveal(
+                          HomeHeading(
+                            'Popular on BookAI',
+                            action: HomeLink(
+                              'View all',
+                              onTap: () => context.go('/discover'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (pub.books.isEmpty && !pub.loading)
+                          const Text(
+                            'Browse published manuscripts on Discover.',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 13,
+                            ),
+                          )
+                        else if (pub.books.isEmpty)
+                          const ShelfSkeleton(coverWidth: _shelfCover)
+                        else
+                          reveal(
+                            BookShelfRow(
+                              coverWidth: _shelfCover,
+                              books: [
+                                for (final b in pub.books.take(10))
+                                  (
+                                    title: b.title,
+                                    coverImage: b.coverImage,
+                                    slug: b.slug,
+                                    onTap: () =>
+                                        context.push('/discover/${b.slug}'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ],
-            ],
-          ),
+            ),
+            // The status bar keeps its dark backing as the sheet scrolls under.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: top,
+              child: const ColoredBox(color: AppColors.navy),
+            ),
+          ],
         ),
       ),
     );
