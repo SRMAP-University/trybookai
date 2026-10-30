@@ -100,15 +100,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ]);
           },
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+            // Room at the bottom so the last row scrolls clear of the bottom
+            // bar and the floating New book button.
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 170),
             children: [
-              reveal(
-                HomeHero(
-                  name: _firstName(user),
-                  covers: heroCovers,
-                  onWrite: () => context.push('/books/new'),
-                ),
-              ),
+              reveal(HomeHero(name: _firstName(user), covers: heroCovers)),
               ValueListenableBuilder<LastRead?>(
                 valueListenable: ReaderMemory.last,
                 builder: (context, last, _) {

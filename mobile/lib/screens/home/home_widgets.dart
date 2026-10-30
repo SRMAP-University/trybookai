@@ -181,18 +181,13 @@ class HomeLink extends StatelessWidget {
   }
 }
 
-/// Greeting on the cream page, with a few books floating beside it.
+/// Greeting with a few books floating beside it. Starting a book lives in
+/// the floating New book button, so this stays quiet.
 class HomeHero extends StatefulWidget {
-  const HomeHero({
-    super.key,
-    required this.name,
-    required this.covers,
-    required this.onWrite,
-  });
+  const HomeHero({super.key, required this.name, required this.covers});
 
   final String? name;
   final List<HeroCover> covers;
-  final VoidCallback onWrite;
 
   @override
   State<HomeHero> createState() => _HomeHeroState();
@@ -238,7 +233,7 @@ class _HomeHeroState extends State<HomeHero>
     final covers = [...widget.covers, ...placeholders].take(3).toList();
 
     return SizedBox(
-      height: 196,
+      height: 172,
       child: Stack(
         children: [
           Positioned(
@@ -281,23 +276,6 @@ class _HomeHeroState extends State<HomeHero>
                     fontSize: 15,
                     height: 1.4,
                   ),
-                ),
-                const SizedBox(height: 16),
-                // Sized to its label, not the column: the one primary action
-                // on Home without shouting. 44 visible, 48 to the touch.
-                FilledButton.icon(
-                  onPressed: widget.onWrite,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    tapTargetSize: MaterialTapTargetSize.padded,
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('New book'),
                 ),
               ],
             ),

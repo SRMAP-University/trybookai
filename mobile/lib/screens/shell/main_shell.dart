@@ -84,6 +84,8 @@ class _MainShellState extends State<MainShell> {
     final index = widget.navigationShell.currentIndex;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final accountSelected = index == 4;
+    // Home and Books: the one way to start a book, in thumb reach.
+    final showNewBook = index == 0 || index == 1;
 
     return Scaffold(
       extendBody: true,
@@ -93,7 +95,8 @@ class _MainShellState extends State<MainShell> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 78 + bottomInset,
+            // Sit above the New book button instead of under it.
+            bottom: 78 + bottomInset + (showNewBook ? 72 : 0),
             child: const GlobalGenerationWidget(),
           ),
         ],
@@ -165,15 +168,20 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
       ),
-      floatingActionButton: index == 1
+      floatingActionButton: showNewBook
           ? Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: FloatingActionButton.extended(
+                heroTag: 'new-book',
                 onPressed: () => context.push('/books/new'),
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                icon: const Icon(Icons.add),
-                label: const Text('New book'),
+                shape: const StadiumBorder(),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text(
+                  'New book',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             )
           : null,
