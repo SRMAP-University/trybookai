@@ -27,9 +27,18 @@ class PlanPurchase {
   }
 
   /// False when the user backs out of the store sheet; throws on failure.
-  Future<bool> buy(String plan, {String interval = 'month'}) async {
+  /// [prepaid] buys one month once (no auto-renew; Play balance works).
+  Future<bool> buy(
+    String plan, {
+    String interval = 'month',
+    bool prepaid = false,
+  }) async {
     await prepare();
-    final info = await store.purchasePlan(plan, interval: interval);
+    final info = await store.purchasePlan(
+      plan,
+      interval: interval,
+      prepaid: prepaid,
+    );
     if (info == null) return false;
     try {
       await sync(info, requestedPlan: plan);

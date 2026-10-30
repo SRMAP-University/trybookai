@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/book_options.dart';
 import 'package:bookai_mobile/config/app_billing.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
@@ -11,18 +12,7 @@ import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 import 'package:bookai_mobile/widgets/premium_upgrade_sheet.dart';
 
-const _genres = [
-  'Fiction',
-  'Non-Fiction',
-  'Self-Help',
-  'Business',
-  'Science Fiction',
-  'Fantasy',
-  'Romance',
-  'Thriller',
-  'Mystery',
-  'Technology',
-];
+const _genres = BookOptions.genres;
 
 class NewBookScreen extends StatefulWidget {
   const NewBookScreen({super.key});

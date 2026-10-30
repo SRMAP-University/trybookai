@@ -10,12 +10,13 @@ class ApiConfig {
   /// Must match `version:` in pubspec.yaml (name part before +build).
   static const String appVersion = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.0.5',
+    defaultValue: '1.0.6',
   );
 
   static const String login = '/api/mobile/auth/login';
   static const String register = '/api/mobile/auth/register';
-  static const String google = '/api/mobile/auth/google';
+  static const String webSignIn = '/api/mobile/auth/web';
+  static const String webSignInExchange = '/api/mobile/auth/web/exchange';
   static const String me = '/api/mobile/auth/me';
   static const String account = '/api/account';
   static const String devices = '/api/mobile/devices';

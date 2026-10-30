@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
-import 'package:bookai_mobile/models/models.dart';
-import 'package:bookai_mobile/providers/public_books_provider.dart';
+import 'package:bookai_mobile/models/book_content.dart';
+import 'package:bookai_mobile/screens/books/book_page_parts.dart';
+import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
-import 'package:bookai_mobile/widgets/common.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 
+/// Someone's public book, laid out like your own book's page: the hero lit
+/// by its cover (flying into the top bar as you scroll), stats and the
+/// chapters, read in the same book reader.
 class PublicBookDetailScreen extends StatefulWidget {
   const PublicBookDetailScreen({super.key, required this.slug});
 
@@ -17,10 +24,17 @@ class PublicBookDetailScreen extends StatefulWidget {
 }
 
 class _PublicBookDetailScreenState extends State<PublicBookDetailScreen> {
-  PublicBookDetail? _book;
+  final _scroll = ScrollController();
+  final _coverKey = GlobalKey();
+  final _titleKey = GlobalKey();
+
+  BookContent? _book;
+  String _author = 'BookAI author';
+  int _pages = 0;
   bool _loading = true;
   String? _error;
-  int? _openChapter;
+
+  String get _publicUrl => '${ApiConfig.baseUrl}/books/${widget.slug}';
 
   @override
   void initState() {
@@ -28,187 +42,206 @@ class _PublicBookDetailScreenState extends State<PublicBookDetailScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-    final book = await context.read<PublicBooksProvider>().fetch(widget.slug);
-    if (!mounted) return;
-    setState(() {
-      _book = book;
-      _loading = false;
-      _error = book == null ? 'Book not found' : null;
-    });
+    final api = context.read<ApiClient>();
+    try {
+      final res = await api.dio.get('${ApiConfig.publicBooks}/${widget.slug}');
+      final json = res.data as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _book = BookContent.fromJson(publicBookAsContent(json));
+        _author = json['author'] as String? ?? 'BookAI author';
+        _pages = (json['currentPages'] as num?)?.toInt() ?? 0;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = api.extractError(e);
+      });
+    }
+  }
+
+  void _read([ChapterContent? from]) {
+    final query = from == null ? '' : '?chapter=${from.id}';
+    context.push('/discover/${widget.slug}/read$query');
+  }
+
+  Future<void> _share() async {
+    final book = _book;
+    await SharePlus.instance.share(
+      ShareParams(text: _publicUrl, subject: book?.title),
+    );
   }
 
   Future<void> _openWeb() async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/books/${widget.slug}');
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await launchUrl(
+      Uri.parse(_publicUrl),
+      mode: LaunchMode.externalApplication,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final book = _book;
-    final cover = book == null
-        ? ''
-        : ApiConfig.coverUrl(book.coverImage, book.slug);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(book?.title ?? 'Book'),
-        actions: [
-          IconButton(
-            onPressed: _openWeb,
-            icon: const Icon(Icons.open_in_new_rounded),
-            tooltip: 'Open on web',
+    if (book == null) {
+      if (_loading) {
+        return const AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light,
+          child: Scaffold(
+            backgroundColor: AppColors.white,
+            body: BookPageSkeleton(),
           ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null || book == null
-              ? Center(child: Text(_error ?? 'Not found'))
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 96,
-                            height: 140,
-                            color: AppColors.mutedBg,
-                            child: cover.isNotEmpty
-                                ? Image.network(cover, fit: BoxFit.cover)
-                                : const Icon(Icons.menu_book_outlined,
-                                    color: AppColors.primary, size: 32),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                book.title,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                book.author,
-                                style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                [
-                                  if (book.genre != null) book.genre!,
-                                  '${book.chapters.length} chapters',
-                                  '${book.currentPages} pages',
-                                ].join(' · '),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textBody,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+        );
+      }
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text(_error ?? 'Book not found')),
+      );
+    }
+
+    final chapters = book.chapters;
+    final words = book.wordCount;
+    final inProgress =
+        book.status == 'GENERATING' || book.status == 'OUTLINING';
+    final meta = [
+      'By $_author',
+      if ((book.genre ?? '').isNotEmpty) book.genre!,
+    ].join(' · ');
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.white,
+        body: Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                controller: _scroll,
+                padding: EdgeInsets.zero,
+                children: [
+                  BookHero(
+                    title: book.title,
+                    coverImage: book.coverImage,
+                    slug: book.slug,
+                    edition: 1,
+                    meta: meta,
+                    description: book.description,
+                    coverKey: _coverKey,
+                    titleKey: _titleKey,
+                    pill: StatusPill(
+                      status: book.status,
+                      inProgress: inProgress,
+                      chapterCount: chapters.length,
                     ),
-                    if (book.description != null &&
-                        book.description!.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      ExpandableText(
-                        book.description!,
-                        maxLines: 3,
-                        style: const TextStyle(
-                          color: AppColors.textBody,
-                          height: 1.45,
-                          fontSize: 14,
+                    actions: [
+                      if (chapters.isNotEmpty)
+                        StageButton(
+                          tone: StageTone.primary,
+                          icon: Icons.auto_stories_outlined,
+                          label: 'Read the book',
+                          onPressed: _read,
                         ),
+                      StageButton(
+                        icon: Icons.ios_share_rounded,
+                        label: 'Share',
+                        onPressed: _share,
+                      ),
+                      StageMenu(
+                        onSelected: (v) {
+                          if (v == 'web') _openWeb();
+                        },
+                        items: [
+                          stageMenuItem(
+                            'web',
+                            Icons.open_in_new_rounded,
+                            'Open on the website',
+                          ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: 24),
-                    const SectionHeader('Chapters'),
-                    const SizedBox(height: 8),
-                    if (book.chapters.isEmpty)
-                      const Text(
-                        'Chapters will appear when the manuscript is ready.',
-                        style: TextStyle(color: AppColors.textMuted),
-                      )
-                    else
-                      ...book.chapters.map((ch) {
-                        final open = _openChapter == ch.number;
-                        final body = ch.sections
-                            .map((s) => s.content ?? '')
-                            .where((c) => c.isNotEmpty)
-                            .join('\n\n');
-                        return StripeCard(
-                          onTap: () => setState(
-                            () => _openChapter = open ? null : ch.number,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '${ch.number}. ${ch.title}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ),
-                                  Icon(
-                                    open
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        BookStats(
+                          stats: [
+                            ('Pages', '$_pages'),
+                            ('Words', formatWords(words)),
+                            ('Chapters', '${chapters.length}'),
+                            ('Read', readingTime(words)),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        PageSectionTitle(
+                          'Chapters',
+                          trailing: chapters.isEmpty
+                              ? null
+                              : '${chapters.length} chapters',
+                        ),
+                        if (chapters.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 48,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F8FB),
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: const Text(
+                              'Chapters appear here as they are finished.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textMuted,
                               ),
-                              if (ch.summary != null &&
-                                  ch.summary!.isNotEmpty) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  ch.summary!,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ),
-                              ],
-                              if (open && body.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  body,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    height: 1.55,
-                                    color: AppColors.navy,
-                                  ),
-                                ),
-                              ],
-                            ],
+                            ),
+                          )
+                        else
+                          ChapterList(
+                            chapters: chapters,
+                            inProgress: false,
+                            canRewrite: false,
+                            rewriting: null,
+                            onRewrite: (_) {},
+                            onRead: _read,
                           ),
-                        );
-                      }).expand(
-                        (w) => [w, const SizedBox(height: 10)],
-                      ),
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned.fill(
+              child: HeroFlight(
+                scroll: _scroll,
+                coverKey: _coverKey,
+                titleKey: _titleKey,
+                title: book.title,
+                coverImage: book.coverImage,
+                slug: book.slug,
+                coverBusy: false,
+                onBack: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

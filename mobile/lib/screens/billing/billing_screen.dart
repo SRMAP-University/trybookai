@@ -97,10 +97,11 @@ class _BillingScreenState extends State<BillingScreen> {
     await _loadStore();
   }
 
-  Future<void> _buy(String plan) async {
-    setState(() => _busy = plan);
+  /// [prepaid] buys one month once (no auto-renew; Play balance works).
+  Future<void> _buy(String plan, {bool prepaid = false}) async {
+    setState(() => _busy = prepaid ? '$plan:prepaid' : plan);
     try {
-      final bought = await _purchase.buy(plan);
+      final bought = await _purchase.buy(plan, prepaid: prepaid);
       if (!bought || !mounted) return;
       _customer = await _purchase.store.customerInfo();
       if (!mounted) return;
@@ -167,6 +168,11 @@ class _BillingScreenState extends State<BillingScreen> {
     final billedOnWeb = user?.hasStripeSubscription ?? false;
     final hasStoreSubscription =
         _customer?.activeSubscriptions.isNotEmpty ?? false;
+    // Current access comes from a one-time month (it can be topped up).
+    final onPrepaid = _customer?.entitlements.active.values.any(
+          (e) => e.productPlanIdentifier?.contains('prepaid') ?? false,
+        ) ??
+        false;
 
     return Scaffold(
       appBar: AppBar(
@@ -262,14 +268,23 @@ class _BillingScreenState extends State<BillingScreen> {
                 name: p.plan.name,
                 current: _isCurrent(user, p.plan.key),
                 enabled: storeReady && !billedOnWeb,
-                switching: hasStoreSubscription,
+                switching: hasStoreSubscription && !onPrepaid,
+                onPrepaid: onPrepaid,
+                oneTimePrice: storeReady
+                    ? store.priceLabelForPlan(
+                        p.plan.key,
+                        interval: 'month',
+                        prepaid: true,
+                      )
+                    : null,
               ),
             ),
           ],
           const SizedBox(height: 16),
           Text(
-            'Subscriptions renew monthly at the price shown until you cancel. '
-            'Cancel anytime in $_storeName → Subscriptions.'
+            'Monthly subscriptions renew at the price shown until you cancel; '
+            'cancel anytime in $_storeName → Subscriptions. One-time months '
+            'don’t renew — buy another when yours ends.'
             '${showsUnlimited ? ' *Unlimited is subject to fair-use Terms (rate limits).' : ''}',
             style: const TextStyle(
               fontSize: 11,
@@ -292,24 +307,55 @@ class _BillingScreenState extends State<BillingScreen> {
     required bool current,
     required bool enabled,
     required bool switching,
+    required bool onPrepaid,
+    String? oneTimePrice,
   }) {
+    Widget spinner(Color color) => SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: color),
+        );
+    final oneTime = oneTimePrice == null
+        ? null
+        : OutlinedButton(
+            onPressed: enabled && _busy == null
+                ? () => _buy(plan, prepaid: true)
+                : null,
+            child: _busy == '$plan:prepaid'
+                ? spinner(AppColors.primary)
+                : Text(
+                    current
+                        ? 'Add another month · $oneTimePrice'
+                        : 'Pay once · 1 month · $oneTimePrice',
+                  ),
+          );
+
     if (current) {
+      // A one-time month can be extended; a subscription is just current.
+      if (onPrepaid && oneTime != null) return oneTime;
       return const OutlinedButton(onPressed: null, child: Text('Current plan'));
     }
-    final busy = _busy == plan;
     final waiting = _loadingStore && !enabled;
-    return FilledButton(
-      onPressed: enabled && _busy == null ? () => _buy(plan) : null,
-      child: busy || waiting
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : Text(switching ? 'Switch to $name' : 'Subscribe to $name'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton(
+          onPressed: enabled && _busy == null ? () => _buy(plan) : null,
+          child: _busy == plan || waiting
+              ? spinner(Colors.white)
+              : Text(switching ? 'Switch to $name' : 'Subscribe to $name'),
+        ),
+        if (oneTime != null) ...[
+          const SizedBox(height: 8),
+          oneTime,
+          const SizedBox(height: 4),
+          const Text(
+            'No auto-renew · Google Play balance & gift cards work',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+          ),
+        ],
+      ],
     );
   }
 
@@ -362,7 +408,7 @@ class _BillingScreenState extends State<BillingScreen> {
                   child: const Text(
                     'Current',
                     style: TextStyle(
-                      color: AppColors.primary,
+                      color: AppColors.primaryText,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),

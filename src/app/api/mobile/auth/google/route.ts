@@ -3,8 +3,8 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { cleanEnv } from "@/lib/env";
-import { isTrialActive } from "@/lib/billing";
 import { signMobileToken } from "@/lib/mobile-auth";
+import { mobileUserPayload, mobileUserSelect } from "@/lib/mobile-user";
 import { sendWelcomeEmail } from "@/lib/emails/transactional";
 import { countryCodeFromRequest, persistUserCountryFromRequest } from "@/lib/geo";
 
@@ -27,52 +27,6 @@ function allowedAudiences(): string[] {
     .filter(Boolean);
   return [...new Set(list)];
 }
-
-function userPayload(user: {
-  id: string;
-  email: string;
-  name: string | null;
-  image: string | null;
-  plan: string;
-  pagesUsed: number;
-  pagesLimit: number;
-  audioMinutesUsed: number;
-  audioMinutesLimit: number;
-  trialEndsAt: Date | null;
-  hasUsedPremiumTrial: boolean;
-  stripeSubId: string | null;
-}) {
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    image: user.image,
-    plan: user.plan,
-    pagesUsed: user.pagesUsed,
-    pagesLimit: user.pagesLimit,
-    audioMinutesUsed: user.audioMinutesUsed,
-    audioMinutesLimit: user.audioMinutesLimit,
-    onTrial: isTrialActive(user),
-    trialEndsAt: user.trialEndsAt?.toISOString() ?? null,
-    hasUsedPremiumTrial: user.hasUsedPremiumTrial,
-    hasStripeSubscription: Boolean(user.stripeSubId),
-  };
-}
-
-const userSelect = {
-  id: true,
-  email: true,
-  name: true,
-  image: true,
-  plan: true,
-  pagesUsed: true,
-  pagesLimit: true,
-  audioMinutesUsed: true,
-  audioMinutesLimit: true,
-  trialEndsAt: true,
-  hasUsedPremiumTrial: true,
-  stripeSubId: true,
-} as const;
 
 /** POST /api/mobile/auth/google — exchange Google ID token for mobile JWT. */
 export async function POST(request: Request) {
@@ -143,7 +97,7 @@ export async function POST(request: Request) {
           providerAccountId: googleSub,
         },
       },
-      include: { user: { select: userSelect } },
+      include: { user: { select: mobileUserSelect } },
     });
 
     if (existingAccount?.user) {
@@ -155,14 +109,14 @@ export async function POST(request: Request) {
       void persistUserCountryFromRequest(existingAccount.user.id, request);
       return NextResponse.json({
         token,
-        user: userPayload(existingAccount.user),
+        user: mobileUserPayload(existingAccount.user),
         isNew: false,
       });
     }
 
     let user = await db.user.findUnique({
       where: { email },
-      select: userSelect,
+      select: mobileUserSelect,
     });
 
     let isNew = false;
@@ -184,7 +138,7 @@ export async function POST(request: Request) {
             name: user.name ?? name,
             image: user.image ?? picture,
           },
-          select: userSelect,
+          select: mobileUserSelect,
         });
       }
     } else {
@@ -206,7 +160,7 @@ export async function POST(request: Request) {
             },
           },
         },
-        select: userSelect,
+        select: mobileUserSelect,
       });
 
       sendWelcomeEmail({ to: user.email, name: user.name }).catch((error) => {
@@ -224,7 +178,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       token,
-      user: userPayload(user),
+      user: mobileUserPayload(user),
       isNew,
     });
   } catch (error) {

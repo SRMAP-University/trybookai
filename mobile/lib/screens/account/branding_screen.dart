@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/skeleton.dart';
 
 class BrandingScreen extends StatefulWidget {
   const BrandingScreen({super.key});
@@ -98,7 +99,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Branding')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const FormSkeleton()
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [

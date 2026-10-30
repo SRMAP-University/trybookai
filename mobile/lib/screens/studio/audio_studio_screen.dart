@@ -204,13 +204,13 @@ class _AudioStudioScreenState extends State<AudioStudioScreen> {
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: selected ? AppColors.primary : AppColors.textMuted),
+            Icon(icon, size: 18, color: selected ? AppColors.primaryText : AppColors.textMuted),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: selected ? AppColors.primary : AppColors.navy,
+                color: selected ? AppColors.primaryText : AppColors.navy,
               ),
             ),
           ],
