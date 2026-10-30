@@ -5,12 +5,8 @@ import QRCode from "qrcode";
 import { Navbar } from "@/components/marketing/navbar";
 import { Footer } from "@/components/marketing/footer";
 import { WebInstallSection } from "@/components/pwa/web-install-section";
-import { getAppUrl } from "@/lib/book-public";
-import {
-  ANDROID_APP_VERSION,
-  getAndroidApkUrl,
-  getAndroidDownloadPageUrl,
-} from "@/lib/app-download";
+import { getAndroidDownloadPageUrl } from "@/lib/app-download";
+import { ANDROID_PLAY_STORE_URL } from "@/lib/constants";
 import { buildPageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +14,13 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = buildPageMetadata({
   title: "Download the BookAI App for Android and Web",
   description:
-    "Install BookAI as a web app on your phone or desktop, or download the Android APK to write books on the go.",
+    "Install BookAI as a web app on your phone or desktop, or get the Book AI app on Google Play to write books on the go.",
   path: "/download",
 });
 
 export default async function DownloadPage() {
-  const apkUrl = getAndroidApkUrl();
   const pageUrl = getAndroidDownloadPageUrl();
-  const qrDataUrl = await QRCode.toDataURL(apkUrl, {
+  const qrDataUrl = await QRCode.toDataURL(ANDROID_PLAY_STORE_URL, {
     width: 280,
     margin: 2,
     color: { dark: "#0a2540", light: "#ffffff" },
@@ -45,8 +40,8 @@ export default async function DownloadPage() {
               Install on any device
             </h1>
             <p className="mx-auto mt-4 max-w-[560px] text-center text-[17px] leading-relaxed text-[#425466]">
-              Install the BookAI web app for quick access, or download the native
-              Android APK if you prefer a standalone mobile build.
+              Install the BookAI web app for quick access, or get the official
+              Book AI app for Android on Google Play.
             </p>
 
             <div id="pwa" className="mx-auto mt-10 max-w-[760px]">
@@ -58,35 +53,27 @@ export default async function DownloadPage() {
                 Android app
               </p>
               <h2 className="landing-heading mt-3 text-center text-[32px]">
-                Download APK
+                Get it on Google Play
               </h2>
             </div>
 
             <p className="mx-auto mt-4 max-w-[520px] text-center text-[17px] leading-relaxed text-[#425466] md:hidden">
-              Tap the button below to install the APK on this phone. Enable
-              “Install unknown apps” if Android asks.
+              Tap the button below to open Book AI in the Play Store and
+              install it.
             </p>
             <p className="mx-auto mt-4 hidden max-w-[520px] text-center text-[17px] leading-relaxed text-[#425466] md:block">
-              Scan the QR code with your phone, or use the download button.
-              Updates can ship over-the-air via Shorebird.
+              Scan the QR code with your Android phone to open Book AI on
+              Google Play. Updates arrive through the Play Store.
             </p>
 
-            <div className="mx-auto mt-10 max-w-[420px] space-y-4 md:hidden">
-              <p className="text-center text-[14px] font-medium text-[#0a2540]">
-                Version {ANDROID_APP_VERSION}
-              </p>
+            <div className="mx-auto mt-10 max-w-[420px] md:hidden">
               <a
-                href={apkUrl}
+                href={ANDROID_PLAY_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="landing-btn-dark inline-flex w-full items-center justify-center"
-                download="bookai.apk"
               >
-                Download APK
-              </a>
-              <a
-                href={apkUrl}
-                className="inline-flex w-full items-center justify-center rounded-full border border-[#e8e8e6] bg-white px-5 py-3 text-[15px] font-medium text-[#0a2540]"
-              >
-                Direct install link
+                Get it on Google Play
               </a>
             </div>
 
@@ -95,44 +82,47 @@ export default async function DownloadPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qrDataUrl}
-                  alt="QR code to download BookAI Android APK"
+                  alt="QR code for Book AI on Google Play"
                   width={280}
                   height={280}
                   className="h-[280px] w-[280px]"
                 />
                 <p className="mt-3 text-center text-[13px] text-[#6b6b6b]">
-                  Scan to download
+                  Scan to open Google Play
                 </p>
               </div>
 
               <div className="space-y-5">
                 <div>
                   <p className="text-[14px] font-medium text-[#0a2540]">
-                    Version {ANDROID_APP_VERSION}
+                    Book AI for Android
                   </p>
                   <p className="mt-1 text-[14px] leading-relaxed text-[#6b6b6b]">
-                    Direct install APK for Android. Enable “Install unknown
-                    apps” for your browser if prompted.
+                    The official app, installed and kept up to date by Google
+                    Play.
                   </p>
                 </div>
 
                 <a
-                  href={apkUrl}
+                  href={ANDROID_PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="landing-btn-dark inline-flex w-auto items-center justify-center"
-                  download="bookai.apk"
                 >
-                  Download APK
+                  Get it on Google Play
                 </a>
 
                 <div className="rounded-xl border border-[#e8e8e6] bg-[#fafafa] px-4 py-3">
                   <p className="text-[12px] font-medium uppercase tracking-[0.06em] text-[#6b6b6b]">
-                    Download link
+                    Play Store link
                   </p>
                   <a
-                    href={apkUrl}
+                    href={ANDROID_PLAY_STORE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="mt-1 block break-all text-[14px] text-[#635bff] hover:underline"
                   >
-                    {apkUrl}
+                    {ANDROID_PLAY_STORE_URL}
                   </a>
                 </div>
 
@@ -149,9 +139,8 @@ export default async function DownloadPage() {
             </div>
 
             <ol className="mx-auto mt-14 max-w-[560px] list-decimal space-y-3 pl-5 text-[15px] leading-relaxed text-[#425466]">
-              <li>Tap Download APK on your Android phone.</li>
-              <li>Allow installs from the browser if Android asks.</li>
-              <li>Open the APK and tap Install.</li>
+              <li>Open Book AI on Google Play from your Android phone.</li>
+              <li>Tap Install.</li>
               <li>Sign in with the same BookAI account you use on the web.</li>
             </ol>
           </div>

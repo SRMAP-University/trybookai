@@ -1,6 +1,11 @@
 import { cleanEnv } from "@/lib/env";
 import type { PricingRegion } from "@/lib/regional-pricing";
 
+/** The official Book AI listing; on Android it opens the Play Store app. */
+export const ANDROID_PLAY_STORE_URL =
+  cleanEnv(process.env.NEXT_PUBLIC_ANDROID_PLAY_STORE_URL) ||
+  "https://play.google.com/store/apps/details?id=com.trybookai.bookai_mobile";
+
 export const PLANS = {
   FREE: {
     name: "Free",

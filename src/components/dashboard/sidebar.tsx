@@ -24,7 +24,7 @@ import {
   formatTrialCountdown,
   isClientTrialActive,
 } from "@/components/dashboard/trial-banner";
-import { PREMIUM_TRIAL } from "@/lib/constants";
+import { ANDROID_PLAY_STORE_URL, PREMIUM_TRIAL } from "@/lib/constants";
 import { LogoMark } from "@/components/marketing/landing-showcase";
 
 function AndroidIcon({ className }: { className?: string }) {
@@ -152,18 +152,15 @@ export function DashboardSidebar() {
           <Download className="h-4 w-4 shrink-0" />
           Install app
         </Link>
-        <Link
-          href="/download"
-          className={cn(
-            "mb-2 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors",
-            isActive(pathname, "/download")
-              ? "bg-[#f0fdf6] font-medium text-[#2bb673]"
-              : "text-[#3ddc84] hover:bg-[#f0fdf6] hover:text-[#2bb673]"
-          )}
+        <a
+          href={ANDROID_PLAY_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-2 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] text-[#3ddc84] transition-colors hover:bg-[#f0fdf6] hover:text-[#2bb673]"
         >
           <AndroidIcon className="h-4 w-4 shrink-0" />
-          Android APK
-        </Link>
+          Google Play
+        </a>
       </div>
 
       <div className="p-3 pt-0">
