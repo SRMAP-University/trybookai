@@ -10,16 +10,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { ANDROID_PLAY_STORE_URL as PLAY_STORE_URL } from "@/lib/constants";
 
 const SHEET_STORAGE_KEY = "bookai_android_drawer_dismissed_v2";
 const LANDING_QR_STORAGE_KEY = "bookai_landing_qr_collapsed_v1";
 const DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const OPEN_DELAY_MS = 800;
-
-/** The official Book AI listing; on Android it opens the Play Store app. */
-const PLAY_STORE_URL =
-  process.env.NEXT_PUBLIC_ANDROID_PLAY_STORE_URL?.trim() ||
-  "https://play.google.com/store/apps/details?id=com.trybookai.bookai_mobile";
 
 function wasDismissedRecently(key: string): boolean {
   try {

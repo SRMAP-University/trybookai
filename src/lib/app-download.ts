@@ -16,6 +16,3 @@ export function getAndroidApkUrl(): string {
 export function getAndroidDownloadPageUrl(): string {
   return `${getAppUrl()}/download`;
 }
-
-export const ANDROID_APP_VERSION =
-  process.env.NEXT_PUBLIC_ANDROID_APP_VERSION?.trim() || "1.0.1";
