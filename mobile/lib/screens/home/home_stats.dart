@@ -3,8 +3,6 @@
 /// written; let go and it settles open or closed.
 library;
 
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:bookai_mobile/models/models.dart';
@@ -17,72 +15,6 @@ const homePeekHeight = 52.0;
 const homeStatsHeight = 236.0;
 
 const _lavender = Color(0xFFC9C5FF);
-
-/// Scrolling for the Home sheet. The first [restOffset] of the scroll is
-/// the stats area: let go there and the sheet springs open or shut, by
-/// position or by the direction of the flick. A fling up from the books
-/// stops at the sheet's top instead of flying the stats open.
-class HomeSheetPhysics extends ScrollPhysics {
-  const HomeSheetPhysics({required this.restOffset, super.parent});
-
-  final double restOffset;
-
-  @override
-  HomeSheetPhysics applyTo(ScrollPhysics? ancestor) =>
-      HomeSheetPhysics(restOffset: restOffset, parent: buildParent(ancestor));
-
-  @override
-  bool shouldAcceptUserOffset(ScrollMetrics position) => true;
-
-  @override
-  Simulation? createBallisticSimulation(
-    ScrollMetrics position,
-    double velocity,
-  ) {
-    final p = position.pixels;
-    if (p < restOffset - 0.5 && p > position.minScrollExtent) {
-      final double target;
-      if (velocity < -250) {
-        target = 0;
-      } else if (velocity > 250) {
-        target = restOffset;
-      } else {
-        target = p < restOffset * 0.6 ? 0 : restOffset;
-      }
-      return ScrollSpringSimulation(
-        SpringDescription.withDampingRatio(
-          mass: 0.5,
-          stiffness: 120,
-          ratio: 1.0,
-        ),
-        p,
-        target,
-        velocity,
-        tolerance: toleranceFor(position),
-      );
-    }
-    final sim = super.createBallisticSimulation(position, velocity);
-    if (sim == null || p < restOffset || velocity >= 0) return sim;
-    return _StopAt(sim, restOffset);
-  }
-}
-
-/// [inner], stopped where it would pass [stop] on its way up.
-class _StopAt extends Simulation {
-  _StopAt(this.inner, this.stop);
-
-  final Simulation inner;
-  final double stop;
-
-  @override
-  double x(double time) => math.max(stop, inner.x(time));
-
-  @override
-  double dx(double time) => inner.x(time) <= stop ? 0 : inner.dx(time);
-
-  @override
-  bool isDone(double time) => inner.isDone(time) || inner.x(time) <= stop;
-}
 
 /// The grab handle at the top of the Home sheet; tap to open or close.
 class SheetHandle extends StatelessWidget {
