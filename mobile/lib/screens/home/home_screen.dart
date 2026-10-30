@@ -111,13 +111,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   final row = _continueRow(books, last);
                   if (row == null) return const SizedBox.shrink();
                   return Padding(
-                    padding: const EdgeInsets.only(top: 18),
+                    padding: const EdgeInsets.only(top: 14),
                     child: Column(
                       children: [
                         const Divider(height: 1, color: AppColors.border),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         row,
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
                         const Divider(height: 1, color: AppColors.border),
                       ],
                     ),
@@ -253,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return ContinueReadingRow(
       book: newest,
       label: 'Ready to read',
-      detail: '${newest.currentPages} pages · tap to start',
+      detail: '${newest.currentPages} pages',
       progress: 0,
       onTap: () => context.push('/books/${newest.id}/read'),
     );

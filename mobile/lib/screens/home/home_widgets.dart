@@ -99,9 +99,10 @@ class _PressableState extends State<Pressable> {
 
 /// A thin progress bar that animates to each new value.
 class AnimatedBar extends StatelessWidget {
-  const AnimatedBar({super.key, required this.value});
+  const AnimatedBar({super.key, required this.value, this.height = 4});
 
   final double value;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +114,7 @@ class AnimatedBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(99),
         child: LinearProgressIndicator(
           value: v,
-          minHeight: 4,
+          minHeight: height,
           color: AppColors.primary,
           backgroundColor: AppColors.mutedBg,
         ),
@@ -363,51 +364,43 @@ class ContinueReadingRow extends StatelessWidget {
             title: book.title,
             coverImage: book.coverImage,
             slug: book.slug,
-            width: 54,
+            width: 34,
             ribbon: false,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
                   book.title,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.navy,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
-                  detail,
+                  '$label · $detail',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     color: AppColors.textMuted,
                   ),
                 ),
-                const SizedBox(height: 8),
-                AnimatedBar(value: progress),
+                const SizedBox(height: 6),
+                AnimatedBar(value: progress, height: 3),
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Container(
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
             decoration: const BoxDecoration(
               color: AppColors.navy,
               shape: BoxShape.circle,
@@ -415,7 +408,7 @@ class ContinueReadingRow extends StatelessWidget {
             child: const Icon(
               Icons.play_arrow_rounded,
               color: Colors.white,
-              size: 26,
+              size: 22,
             ),
           ),
         ],
