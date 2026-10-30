@@ -13,6 +13,7 @@ import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/reader/book_pages.dart';
 import 'package:bookai_mobile/reader/reader_blocks.dart';
 import 'package:bookai_mobile/reader/reader_cache.dart';
+import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/reader_memory.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 
@@ -20,9 +21,18 @@ import 'package:bookai_mobile/theme/app_theme.dart';
 /// title page, laid-out pages with running heads and page numbers, the end
 /// and the back cover. Swipe or tap the sides to turn pages.
 class BookReaderScreen extends StatefulWidget {
-  const BookReaderScreen({super.key, required this.bookId, this.chapterId});
+  const BookReaderScreen({
+    super.key,
+    this.bookId = '',
+    this.chapterId,
+    this.publicSlug,
+  });
 
+  /// Your own book.
   final String bookId;
+
+  /// Someone's public book instead, read the same way.
+  final String? publicSlug;
 
   /// Open at this chapter instead of where the reader left off.
   final String? chapterId;
@@ -40,8 +50,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   static const _topBar = 52.0;
   static const _bottomBar = 60.0;
 
-  String get _anchorKey => 'reader_anchor_${widget.bookId}';
-  String get _oldPosKey => 'reader_pos_${widget.bookId}';
+  /// Where this book's copy, layout and place are kept on the phone.
+  String get _key =>
+      widget.publicSlug != null ? 'pub_${widget.publicSlug}' : widget.bookId;
+  String get _anchorKey => 'reader_anchor_$_key';
+  String get _oldPosKey => 'reader_pos_$_key';
+
+  /// A public book's author, for its cover and title page.
+  String? _publicAuthor;
 
   BookContent? _book;
   List<ChapterContent> _chapters = const [];
@@ -121,7 +137,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       _read(_anchorKey),
       _read(_oldPosKey),
     ]);
-    final cached = await ReaderCache.book(widget.bookId);
+    final cached = await ReaderCache.book(_key);
     if (!mounted) return;
 
     _theme = ReaderTheme.byId(prefs[0]);
@@ -139,12 +155,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     BookContent? shown;
     if (cached != null) {
       try {
+        _publicAuthor = cached['author'] as String?;
         shown = BookContent.fromJson(cached);
         _applyBook(shown);
       } catch (_) {}
     }
 
-    final fresh = await books.fetchReaderJson(widget.bookId);
+    final fresh = await _fetch(books);
     if (!mounted) return;
     if (fresh == null) {
       // Offline or failed: keep reading the saved copy if there is one.
@@ -156,10 +173,25 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       }
       return;
     }
-    unawaited(ReaderCache.saveBook(widget.bookId, fresh));
+    _publicAuthor = fresh['author'] as String?;
+    unawaited(ReaderCache.saveBook(_key, fresh));
     final latest = BookContent.fromJson(fresh);
     if (shown == null || _signature(latest) != _signature(shown)) {
       _applyBook(latest);
+    }
+  }
+
+  /// The book's text: yours from the reading-only API, a public one from
+  /// the public API in the same shape.
+  Future<Map<String, dynamic>?> _fetch(BooksProvider books) async {
+    final slug = widget.publicSlug;
+    if (slug == null) return books.fetchReaderJson(widget.bookId);
+    try {
+      final api = context.read<ApiClient>();
+      final res = await api.dio.get('${ApiConfig.publicBooks}/$slug');
+      return publicBookAsContent(res.data as Map<String, dynamic>);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -704,7 +736,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
   }
 
-  String? get _author => context.read<AuthProvider>().user?.name;
+  String? get _author => widget.publicSlug != null
+      ? _publicAuthor
+      : context.read<AuthProvider>().user?.name;
 
   Widget _cover(PageGeometry g) {
     final book = _book!;

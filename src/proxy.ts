@@ -4,6 +4,7 @@ import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { verifyMobileToken } from "@/lib/mobile-auth";
 import { countryCodeFromRequest } from "@/lib/geo";
+import { newAccountFinishUrl } from "@/lib/mobile-web-auth";
 
 const { auth } = NextAuth(authConfig);
 
@@ -34,6 +35,16 @@ function withCountryHeader(req: NextRequest) {
 export default async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const bearer = req.headers.get("authorization");
+
+  // A new account made while signing in to the phone app goes back to the
+  // app, not to the dashboard NextAuth sends new accounts to.
+  if (path === "/dashboard") {
+    const finish = newAccountFinishUrl(
+      req.nextUrl.searchParams.get("callbackUrl"),
+      req.nextUrl
+    );
+    if (finish) return NextResponse.redirect(finish);
+  }
 
   if (bearer?.startsWith("Bearer ") && isApiProtected(path)) {
     const payload = await verifyMobileToken(bearer.slice(7));

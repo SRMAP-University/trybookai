@@ -26,7 +26,11 @@ class _MainShellState extends State<MainShell> {
 
   static const _mainTabs = <_NavItem>[
     _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
-    _NavItem(Icons.menu_book_outlined, Icons.menu_book_rounded, 'Books'),
+    _NavItem(
+      Icons.smart_display_outlined,
+      Icons.smart_display_rounded,
+      'Reels',
+    ),
     _NavItem(Icons.public_outlined, Icons.public_rounded, 'Discover'),
     _NavItem(Icons.headphones_outlined, Icons.headphones_rounded, 'Studio'),
   ];
@@ -84,8 +88,9 @@ class _MainShellState extends State<MainShell> {
     final index = widget.navigationShell.currentIndex;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final accountSelected = index == 4;
-    // Home and Books: the one way to start a book, in thumb reach.
-    final showNewBook = index == 0 || index == 1;
+    // Home and Your books (branch 5, reached from Home): the one way to
+    // start a book, in thumb reach.
+    final showNewBook = index == 0 || index == 5;
 
     return Scaffold(
       extendBody: true,

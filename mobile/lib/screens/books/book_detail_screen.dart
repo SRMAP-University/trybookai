@@ -14,6 +14,7 @@ import 'package:bookai_mobile/models/book_content.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
+import 'package:bookai_mobile/reels/story_reels_panel.dart';
 import 'package:bookai_mobile/screens/books/book_page_parts.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/file_download.dart';
@@ -1261,6 +1262,13 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                             enabled: content.includeIllustrations,
                             generating: inProgress,
                             onPicturesAdded: _loadContent,
+                          ),
+                        ],
+                        if (complete && content != null) ...[
+                          const SizedBox(height: 32),
+                          StoryReelsPanel(
+                            bookId: book.id,
+                            chapters: content.chapters,
                           ),
                         ],
                         const SizedBox(height: 32),

@@ -199,3 +199,35 @@ class EditionRef {
     slug: json['slug'] as String?,
   );
 }
+
+/// A public book (`GET /api/public/books/:slug`) in the shape of
+/// [BookContent]'s JSON, so the reader and book page work on it unchanged.
+/// Public chapters carry no ids, so they get stable ones from their numbers;
+/// the text is the markdown with pictures.
+Map<String, dynamic> publicBookAsContent(Map<String, dynamic> j) => {
+  ...j,
+  'chapters': [
+    for (final c in (j['chapters'] as List?) ?? const [])
+      if (c is Map)
+        {
+          'id': 'ch-${c['number']}',
+          'number': c['number'],
+          'title': c['title'],
+          'status': 'COMPLETED',
+          'summary': c['summary'],
+          'imageUrl': c['imageUrl'],
+          'pageCount': c['pageCount'],
+          'sections': [
+            for (final s in (c['sections'] as List?) ?? const [])
+              if (s is Map)
+                {
+                  'id': 'sec-${c['number']}-${s['number']}',
+                  'number': s['number'],
+                  'title': s['title'],
+                  'content': s['markdown'] ?? s['content'],
+                },
+          ],
+        },
+  ],
+  'editions': const [],
+};

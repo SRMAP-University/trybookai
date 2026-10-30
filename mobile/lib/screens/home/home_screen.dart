@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/config/book_options.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
@@ -216,10 +218,11 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     final top = MediaQuery.paddingOf(context).top;
+    final dock = DockTheme.forUser(user);
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: dock.overlay,
       child: Scaffold(
-        backgroundColor: AppColors.navy,
+        backgroundColor: dock.base,
         body: Listener(
           onPointerDown: _onPointerDown,
           onPointerMove: _onPointerMove,
@@ -227,6 +230,10 @@ class _HomeScreenState extends State<HomeScreen>
           onPointerCancel: _onPointerEnd,
           child: Stack(
             children: [
+              if (dock.gradient != null)
+                Positioned.fill(
+                  child: DecoratedBox(decoration: dock.decoration),
+                ),
               // Your stats, between the logo strip and the sheet; they rise in
               // as the sheet is pulled down.
               Positioned(
@@ -247,10 +254,10 @@ class _HomeScreenState extends State<HomeScreen>
                     );
                   },
                   child: HomeStatsPanel(
+                    dock: dock,
                     user: user,
                     books: books.books,
                     writing: writing.length,
-                    onUsage: () => context.push('/usage'),
                     onUpgrade: () => context.push('/billing'),
                   ),
                 ),
@@ -449,7 +456,16 @@ class _HomeScreenState extends State<HomeScreen>
                   height: homePeekHeight,
                   child: child!,
                 ),
-                child: HomePeekBar(user: user, onTap: _toggleStats),
+                child: HomePeekBar(
+                  dock: dock,
+                  onTap: _toggleStats,
+                  onAudioStudio: () => context.go('/studio'),
+                  // Song Studio is on the website for now.
+                  onSongStudio: () => launchUrl(
+                    Uri.parse('${ApiConfig.baseUrl}/dashboard/songs'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
               ),
               // The status bar keeps its dark band as the page scrolls under.
               Positioned(
@@ -457,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen>
                 left: 0,
                 right: 0,
                 height: top,
-                child: const ColoredBox(color: AppColors.navy),
+                child: DecoratedBox(decoration: dock.decoration),
               ),
             ],
           ),

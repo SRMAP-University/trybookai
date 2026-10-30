@@ -25,6 +25,7 @@ import 'package:bookai_mobile/screens/books/book_detail_screen.dart';
 import 'package:bookai_mobile/screens/books/book_reader_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_books_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_book_detail_screen.dart';
+import 'package:bookai_mobile/screens/reels/reel_player_screen.dart';
 import 'package:bookai_mobile/screens/studio/audio_studio_screen.dart';
 import 'package:bookai_mobile/screens/account/account_screen.dart';
 import 'package:bookai_mobile/screens/account/usage_screen.dart';
@@ -160,10 +161,7 @@ class _BookAiAppState extends State<BookAiApp> {
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter _buildRouter(
-  AuthProvider auth, {
-  required String initialLocation,
-}) {
+GoRouter _buildRouter(AuthProvider auth, {required String initialLocation}) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: initialLocation,
@@ -226,43 +224,27 @@ GoRouter _buildRouter(
               ),
             ],
           ),
+          // Reels: second tab. Your books stay a branch (Home's View all)
+          // but no longer have a tab of their own.
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/books',
+                path: '/reels',
                 pageBuilder: (context, state) =>
-                    AppPage.none(state, const BooksScreen()),
+                    AppPage.none(state, const ReelsFeedScreen(inTab: true)),
                 routes: [
-                  GoRoute(
-                    path: 'new',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    pageBuilder: (context, state) =>
-                        AppPage.slide(state, const NewBookScreen()),
-                  ),
                   GoRoute(
                     path: ':id',
                     parentNavigatorKey: _rootNavigatorKey,
                     pageBuilder: (context, state) => AppPage.slide(
                       state,
-                      BookDetailScreen(
-                        bookId: state.pathParameters['id']!,
-                        promptGenerate:
-                            state.uri.queryParameters['generate'] == '1',
-                      ),
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: 'read',
-                        parentNavigatorKey: _rootNavigatorKey,
-                        pageBuilder: (context, state) => AppPage.slide(
-                          state,
-                          BookReaderScreen(
-                            bookId: state.pathParameters['id']!,
-                            chapterId: state.uri.queryParameters['chapter'],
-                          ),
+                      ReelPlayerScreen(
+                        reelId: state.pathParameters['id']!,
+                        startEpisode: int.tryParse(
+                          state.uri.queryParameters['episode'] ?? '',
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -284,6 +266,19 @@ GoRouter _buildRouter(
                         slug: state.pathParameters['slug']!,
                       ),
                     ),
+                    routes: [
+                      GoRoute(
+                        path: 'read',
+                        parentNavigatorKey: _rootNavigatorKey,
+                        pageBuilder: (context, state) => AppPage.slide(
+                          state,
+                          BookReaderScreen(
+                            publicSlug: state.pathParameters['slug']!,
+                            chapterId: state.uri.queryParameters['chapter'],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -333,12 +328,51 @@ GoRouter _buildRouter(
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/books',
+                pageBuilder: (context, state) =>
+                    AppPage.none(state, const BooksScreen()),
+                routes: [
+                  GoRoute(
+                    path: 'new',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    pageBuilder: (context, state) =>
+                        AppPage.slide(state, const NewBookScreen()),
+                  ),
+                  GoRoute(
+                    path: ':id',
+                    parentNavigatorKey: _rootNavigatorKey,
+                    pageBuilder: (context, state) => AppPage.slide(
+                      state,
+                      BookDetailScreen(
+                        bookId: state.pathParameters['id']!,
+                        promptGenerate:
+                            state.uri.queryParameters['generate'] == '1',
+                      ),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'read',
+                        parentNavigatorKey: _rootNavigatorKey,
+                        pageBuilder: (context, state) => AppPage.slide(
+                          state,
+                          BookReaderScreen(
+                            bookId: state.pathParameters['id']!,
+                            chapterId: state.uri.queryParameters['chapter'],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
-      GoRoute(
-        path: '/usage',
-        redirect: (context, state) => '/account/usage',
-      ),
+      GoRoute(path: '/usage', redirect: (context, state) => '/account/usage'),
       GoRoute(
         path: '/settings',
         redirect: (context, state) => '/account/settings',
