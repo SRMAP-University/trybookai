@@ -111,9 +111,9 @@ export function IllustrationsPanel({
       </div>
 
       {!status ? (
-        <div className="h-24 animate-pulse rounded-xl border border-[#e6ebf1] bg-[#f6f9fc]" />
+        <div className="h-24 animate-pulse rounded-2xl bg-[#f6f9fc]" />
       ) : !on ? (
-        <div className="flex flex-col items-start gap-4 rounded-xl border border-[#e6ebf1] bg-[#f6f9fc] p-5 sm:flex-row sm:items-center">
+        <div className="flex flex-col items-start gap-4 rounded-2xl bg-[#f6f9fc] p-5 sm:flex-row sm:items-center">
           <div className="relative h-[84px] w-[118px] shrink-0" aria-hidden>
             <span className="absolute left-0 top-4 h-[58px] w-[82px] -rotate-[6deg] rounded-md bg-linear-to-br from-[#2b3d55] to-[#c9d3dd] shadow-md" />
             <span className="absolute left-[30px] top-0 h-[62px] w-[86px] rotate-[4deg] rounded-md bg-linear-to-br from-[#3a2a1c] to-[#e0a96d] shadow-lg" />
@@ -126,7 +126,7 @@ export function IllustrationsPanel({
             </p>
           </div>
           <Button
-            className="h-9 shrink-0 bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+            className="h-9 shrink-0 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
             disabled={starting}
             onClick={() => void start()}
           >
@@ -139,7 +139,7 @@ export function IllustrationsPanel({
           </Button>
         </div>
       ) : (
-        <div className="rounded-xl border border-[#e6ebf1] bg-white p-4">
+        <div className="rounded-2xl bg-white p-4 shadow-soft">
           {working || (generating && done < total) || total === 0 ? (
             <div>
               <div className="flex items-center justify-between gap-3 text-[13px]">
@@ -165,7 +165,7 @@ export function IllustrationsPanel({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 border-[#e6ebf1] text-[12px]"
+                className="h-8 rounded-full border-transparent bg-[#f6f9fc] px-3 text-[12px] hover:bg-[#eef0f5]"
                 disabled={starting}
                 onClick={() => void start(true)}
               >
@@ -182,7 +182,7 @@ export function IllustrationsPanel({
               {status.openers.slice(0, 6).map((opener) => (
                 <div
                   key={opener.number}
-                  className="group relative overflow-hidden rounded-md bg-[#eef2f7]"
+                  className="group relative overflow-hidden rounded-lg bg-[#eef2f7]"
                   title={`Chapter ${opener.number}: ${opener.title}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -192,7 +192,7 @@ export function IllustrationsPanel({
                     loading="lazy"
                     className="aspect-[3/2] w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
-                  <span className="absolute bottom-1 left-1 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="absolute bottom-1 left-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                     {opener.number}
                   </span>
                 </div>

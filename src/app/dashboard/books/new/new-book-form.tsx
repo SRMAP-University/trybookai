@@ -406,7 +406,7 @@ export function NewBookForm({
           className="min-w-0 space-y-8"
         >
           {/* Composer */}
-          <div className="rounded-2xl border border-[#e6ebf1] bg-white shadow-[0_1px_2px_rgba(10,37,64,0.04),0_12px_32px_-20px_rgba(10,37,64,0.25)] transition-[border-color,box-shadow] duration-200 focus-within:border-[#c9c5ff] focus-within:ring-4 focus-within:ring-[#635bff]/10">
+          <div className="rounded-3xl bg-white shadow-[0_0_0_1px_rgba(10,37,64,0.05),0_2px_6px_rgba(10,37,64,0.04),0_18px_40px_-18px_rgba(10,37,64,0.22)] transition-shadow duration-200 focus-within:shadow-[0_0_0_1px_rgba(99,91,255,0.3),0_0_0_5px_rgba(99,91,255,0.08),0_18px_40px_-18px_rgba(10,37,64,0.22)]">
             <label htmlFor="book-title" className="sr-only">
               Title
             </label>
@@ -429,7 +429,7 @@ export function NewBookForm({
               placeholder="What’s it about? A few sentences on plot, topic, or who it’s for…"
               className="block w-full resize-none bg-transparent px-5 pb-3 pt-3 text-[16px] leading-relaxed text-[#0a2540] outline-none placeholder:text-[#a3acb9] lg:text-[15px]"
             />
-            <div className="flex items-center justify-between gap-3 border-t border-[#eef1f5] px-3 py-2">
+            <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-1">
               <span className="px-2 text-[12px] tabular-nums text-[#a3acb9]">
                 {descriptionWords > 0 &&
                   `${descriptionWords} word${descriptionWords === 1 ? "" : "s"}`}
@@ -549,7 +549,7 @@ export function NewBookForm({
           </Field>
 
           {/* More options */}
-          <div className="rounded-2xl border border-[#e6ebf1] bg-white">
+          <div className="rounded-2xl bg-white shadow-soft">
             <button
               type="button"
               aria-expanded={showAdvanced}
@@ -573,7 +573,7 @@ export function NewBookForm({
             </button>
 
             <Collapse open={showAdvanced}>
-              <div className="space-y-8 border-t border-[#eef1f5] px-5 py-6">
+              <div className="space-y-8 px-5 pb-6 pt-2">
                 <section className="space-y-4">
                   <GroupHeading title="Voice & structure" />
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -808,7 +808,7 @@ export function NewBookForm({
 
         {/* Live preview + generation options */}
         <aside className="lg:sticky lg:top-6">
-          <div className="rounded-2xl border border-[#e6ebf1] bg-white p-5">
+          <div className="rounded-2xl bg-white p-5 shadow-soft">
             <div className="flex gap-5 lg:flex-col lg:items-center">
               <BookPreviewCover
                 title={form.title.trim()}
@@ -833,7 +833,7 @@ export function NewBookForm({
               </div>
             </div>
 
-            <div className="mt-4 border-t border-[#eef1f5] pt-3">
+            <div className="mt-4 rounded-xl bg-[#f7f8fb] px-2.5 py-1">
               <SwitchRow
                 label="Start writing right away"
                 checked={form.startGeneration}
@@ -911,7 +911,7 @@ export function NewBookForm({
         featureLabel={premiumFeatureLabel}
       />
 
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-[#e6ebf1] bg-white/95 px-4 py-3 lg:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 bg-white/95 px-4 py-3 shadow-[0_-6px_20px_-12px_rgba(10,37,64,0.25)] lg:hidden">
         <Button
           form="new-book-form"
           type="submit"
@@ -950,8 +950,9 @@ function TemplatePicker({
 
   return (
     <div className="mt-6">
-      <p className="mb-2.5 text-[13px] font-medium text-[#425466]">Start from</p>
-      <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-7 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
+      <p className="mb-1.5 text-[13px] font-medium text-[#425466]">Start from</p>
+      {/* pt-1 keeps the selected tile's ring from being clipped by the scroller. */}
+      <div className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:grid-cols-7 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const active = selected === item.id;
           return (
@@ -961,13 +962,13 @@ function TemplatePicker({
               aria-pressed={active}
               onClick={() => onSelect(item.id)}
               className={cn(
-                "group flex w-[120px] shrink-0 snap-start flex-col rounded-xl border p-2 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 lg:w-auto",
+                "group flex w-[120px] shrink-0 snap-start flex-col rounded-2xl p-2 text-left transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 lg:w-auto",
                 active
-                  ? "border-[#c9c5ff] bg-[#f8f7ff] ring-2 ring-[#635bff]/15"
-                  : "border-[#e6ebf1] bg-white hover:border-[#c9c5ff] hover:shadow-[0_10px_24px_-16px_rgba(99,91,255,0.5)]"
+                  ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+                  : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7] hover:shadow-[0_10px_24px_-16px_rgba(99,91,255,0.5)]"
               )}
             >
-              <span className="flex h-[76px] items-center justify-center rounded-lg bg-[#f6f9fc]">
+              <span className="flex h-[76px] items-center justify-center rounded-xl bg-white">
                 {covers[item.id] ? (
                   <span className="relative h-[64px] w-[48px] overflow-hidden rounded-[2px_4px_4px_2px] bg-[#0a2540] shadow-[0_6px_14px_-6px_rgba(10,37,64,0.65)] transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-105">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1032,10 +1033,10 @@ function LengthCard({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "rounded-xl border px-3 py-3 text-left transition-[border-color,background-color,box-shadow] duration-200",
+        "rounded-xl px-3 py-3 text-left transition-[background-color,box-shadow] duration-200",
         selected
-          ? "border-[#c9c5ff] bg-[#f8f7ff] ring-2 ring-[#635bff]/15"
-          : "border-[#e6ebf1] bg-white hover:border-[#c9c5ff]"
+          ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+          : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7]"
       )}
     >
       <span className="block text-[13.5px] font-semibold text-[#0a2540]">

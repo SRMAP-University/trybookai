@@ -354,7 +354,7 @@ export function SongStudioClient() {
           </p>
         </div>
         {!audioLocked && user && (
-          <div className="min-w-[200px] rounded-lg border border-[#e6ebf1] bg-white px-3.5 py-2.5">
+          <div className="min-w-[200px] rounded-2xl bg-white px-4 py-2.5 shadow-soft">
             <div className="flex items-center justify-between gap-3 text-[12px]">
               <span className="text-[#697386]">Audio left</span>
               <span className="tabular-nums font-medium text-[#0a2540]">
@@ -376,7 +376,7 @@ export function SongStudioClient() {
       </div>
 
       {audioLocked && (
-        <div className="rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] px-4 py-3 text-[13px] text-[#425466]">
+        <div className="rounded-2xl bg-[#f6f9fc] px-5 py-3.5 text-[13px] text-[#425466]">
           Song generation is available on Pro, Premium, or during a Premium
           trial.{" "}
           <UpgradeLink
@@ -389,8 +389,8 @@ export function SongStudioClient() {
       )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="overflow-hidden rounded-xl border border-[#e6ebf1] bg-white">
-          <div className="border-b border-[#e6ebf1] px-5 py-4 sm:px-6">
+        <section className="overflow-hidden rounded-2xl bg-white shadow-soft">
+          <div className="px-5 pt-5 sm:px-6">
             <p className="text-[13px] font-medium text-[#0a2540]">New song</p>
             <p className="mt-0.5 text-[12px] text-[#697386]">
               About 90 seconds · uses 2 minutes of audio quota
@@ -416,10 +416,10 @@ export function SongStudioClient() {
                     type="button"
                     onClick={() => setStyle(preset)}
                     className={cn(
-                      "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                      "rounded-full px-3 py-1.5 text-[12px] font-medium ring-1 transition-colors",
                       style === preset
-                        ? "border-[#635bff] bg-[#f0efff] text-[#635bff]"
-                        : "border-[#e6ebf1] text-[#425466] hover:border-[#c9c5ff]"
+                        ? "bg-[#f0efff] text-[#635bff] ring-[#635bff]/40"
+                        : "bg-[#f7f8fb] text-[#425466] ring-transparent hover:bg-[#f0f2f7]"
                     )}
                   >
                     {preset}
@@ -454,7 +454,7 @@ export function SongStudioClient() {
             <Button
               onClick={() => void handleGenerate()}
               disabled={busy || audioLocked}
-              className="h-11 w-full bg-[#635bff] text-white hover:bg-[#4b44d4]"
+              className="h-11 w-full rounded-full bg-[#635bff] text-white hover:bg-[#4b44d4]"
             >
               {busy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -485,10 +485,10 @@ export function SongStudioClient() {
                       type="button"
                       onClick={() => openProject(project)}
                       className={cn(
-                        "w-full rounded-xl border px-3.5 py-3 text-left transition-colors",
+                        "w-full rounded-2xl px-3.5 py-3 text-left transition-[background-color,box-shadow]",
                         activeBookId === project.id
-                          ? "border-[#635bff] bg-[#f8f7ff]"
-                          : "border-[#e6ebf1] bg-white hover:border-[#c9c5ff]"
+                          ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+                          : "bg-white shadow-soft hover:shadow-soft-lg"
                       )}
                     >
                       <span className="block text-[13px] font-medium text-[#0a2540]">

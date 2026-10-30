@@ -50,7 +50,7 @@ type GeneratingBook = {
 export function AnimatedCoverGrid({ covers }: { covers: CoverBook[] }) {
   return (
     <motion.div
-      className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4"
       variants={list}
       initial="hidden"
       animate="show"
@@ -67,21 +67,20 @@ export function AnimatedCoverGrid({ covers }: { covers: CoverBook[] }) {
           <motion.div key={book.id} variants={item} className="h-full">
             <Link
               href={href}
-              className="group block h-full overflow-hidden rounded-lg border border-[#e6ebf1] bg-white transition-colors hover:border-[#635bff]/40"
+              className="group block h-full"
             >
               <motion.div
-                className="overflow-hidden"
-                whileHover={{ scale: 1.03 }}
+                whileHover={{ y: -4 }}
                 transition={{ type: "spring", stiffness: 320, damping: 22 }}
               >
                 <BookCover
                   title={book.title}
                   coverImage={book.coverImage}
                   aspect="card"
-                  className="rounded-none border-0 shadow-none ring-0"
+                  className="rounded-xl shadow-[0_8px_22px_-10px_rgba(10,37,64,0.35)] transition-shadow duration-300 group-hover:shadow-[0_16px_32px_-12px_rgba(10,37,64,0.4)]"
                 />
               </motion.div>
-              <div className="p-3">
+              <div className="px-0.5 pt-2.5">
                 <p className="line-clamp-1 text-[13px] font-medium text-[#0a2540] transition-colors group-hover:text-[#635bff]">
                   {book.title}
                 </p>
@@ -163,7 +162,7 @@ export function AnimatedGeneratingList({ books }: { books: GeneratingBook[] }) {
         <motion.div key={book.id} variants={item}>
           <Link
             href={`/dashboard/books/${book.id}`}
-            className="block overflow-hidden rounded-md border border-[#e6ebf1] bg-white px-2.5 py-2 transition-colors hover:border-[#635bff]/40"
+            className="block overflow-hidden rounded-xl bg-[#f6f9fc] px-3 py-2.5 transition-colors hover:bg-[#f0efff]"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">

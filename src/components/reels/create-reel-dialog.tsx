@@ -172,9 +172,9 @@ export function CreateReelDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton
-        className="flex max-h-[min(92dvh,820px)] flex-col gap-0 overflow-hidden border-[#e6ebf1] bg-white p-0 sm:max-w-[640px]"
+        className="flex max-h-[min(92dvh,820px)] flex-col gap-0 overflow-hidden bg-white p-0 sm:max-w-[640px]"
       >
-        <div className="border-b border-[#e6ebf1] bg-[#f6f9fc] px-5 pb-4 pt-6 sm:px-6">
+        <div className="bg-[#f6f9fc] px-5 pb-4 pt-6 sm:px-6">
           <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#635bff]">
             Story Reels
           </p>
@@ -202,11 +202,11 @@ export function CreateReelDialog({
                     onClick={() => setFormat(option.id)}
                     aria-pressed={format === option.id}
                     className={cn(
-                      "flex flex-col items-start rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed",
+                      "flex flex-col items-start rounded-xl p-3 text-left transition-colors disabled:cursor-not-allowed",
                       format === option.id
-                        ? "border-[#635bff] shadow-[0_0_0_3px_#ebe9ff]"
-                        : "border-[#e6ebf1] hover:border-[#c9c5ff]",
-                      disabled && "opacity-70 hover:border-[#e6ebf1]"
+                        ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+                        : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7]",
+                      disabled && "opacity-70 hover:bg-[#f7f8fb]"
                     )}
                   >
                     <span className="flex w-full items-center justify-between">
@@ -254,12 +254,12 @@ export function CreateReelDialog({
                   </button>
                 )}
               </div>
-              <div className="mt-2 max-h-[180px] space-y-1 overflow-y-auto rounded-xl border border-[#e6ebf1] p-2">
+              <div className="mt-2 max-h-[180px] space-y-1 overflow-y-auto rounded-2xl bg-[#f7f8fb] p-2">
                 {chapters.map((chapter) => (
                   <label
                     key={chapter.id}
                     className={cn(
-                      "flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] hover:bg-[#f6f9fc]",
+                      "flex cursor-pointer items-center gap-2.5 rounded-xl px-2 py-1.5 text-[13px] hover:bg-white",
                       !chapter.written && "cursor-not-allowed opacity-50"
                     )}
                   >
@@ -291,8 +291,8 @@ export function CreateReelDialog({
                 >
                   <span
                     className={cn(
-                      "block aspect-[9/13] w-full rounded-lg ring-offset-2 transition-shadow",
-                      style === option.id ? "ring-2 ring-[#635bff]" : "ring-1 ring-[#e6ebf1]"
+                      "block aspect-[9/13] w-full rounded-xl ring-offset-2 transition-shadow",
+                      style === option.id ? "ring-2 ring-[#635bff]" : "ring-1 ring-[#0a2540]/5"
                     )}
                     style={{ background: option.swatch }}
                   />
@@ -319,10 +319,10 @@ export function CreateReelDialog({
                     aria-checked={pacing === id}
                     onClick={() => setPacing(id)}
                     className={cn(
-                      "rounded-xl border p-3 text-left transition-colors",
+                      "rounded-xl p-3 text-left transition-colors",
                       pacing === id
-                        ? "border-[#635bff] shadow-[0_0_0_3px_#ebe9ff]"
-                        : "border-[#e6ebf1] hover:border-[#c9c5ff]"
+                        ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+                        : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7]"
                     )}
                   >
                     <span className="flex items-center justify-between">
@@ -367,7 +367,7 @@ export function CreateReelDialog({
           </section>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6ebf1] bg-[#fafbfc] px-5 py-3.5 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[#f7f8fb] px-5 py-3.5 sm:px-6">
           <div className="text-[12px] leading-snug text-[#697386]">
             {allowance ? (
               <>
@@ -388,7 +388,7 @@ export function CreateReelDialog({
             )}
           </div>
           <Button
-            className="h-9 bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+            className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
             disabled={!canSubmit}
             onClick={submit}
           >

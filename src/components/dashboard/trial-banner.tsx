@@ -64,7 +64,7 @@ export function TrialBanner({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-[#f0e0a8] bg-linear-to-br from-[#fffbeb] via-white to-[#f6f9fc]",
+        "overflow-hidden rounded-2xl bg-linear-to-br from-[#fff6d6] via-[#fffbeb] to-[#f6f9fc]",
         className
       )}
     >
@@ -95,7 +95,7 @@ export function TrialBanner({
           {onEndTrial && (
             <Button
               size="sm"
-              className="h-8 bg-[#0e6245] text-[12px] hover:bg-[#0a4d37]"
+              className="h-8 rounded-full bg-[#0e6245] px-3 text-[12px] hover:bg-[#0a4d37]"
               onClick={onEndTrial}
               disabled={ending}
             >
@@ -105,7 +105,7 @@ export function TrialBanner({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 border-[#e6ebf1] text-[12px]"
+            className="h-8 rounded-full border-transparent bg-white px-3 text-[12px] hover:bg-[#f6f9fc]"
             asChild
           >
             <Link href="/dashboard/billing">Billing</Link>
@@ -113,7 +113,7 @@ export function TrialBanner({
         </div>
       </div>
 
-      <div className="grid gap-3 border-t border-[#f0e0a8]/70 bg-white/60 px-5 py-3 sm:grid-cols-2">
+      <div className="mx-2 mb-2 grid gap-3 rounded-xl bg-white/70 px-3 py-3 sm:grid-cols-2">
         <div>
           <div className="flex justify-between text-[11px] text-[#697386]">
             <span>Pages</span>

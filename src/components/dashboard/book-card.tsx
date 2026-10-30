@@ -60,9 +60,9 @@ export function DashboardBookCard({ book }: DashboardBookCardProps) {
     >
       <Link
         href={`/dashboard/books/${book.id}`}
-        className="group flex h-full flex-col overflow-hidden rounded-xl border border-[#e6ebf1] bg-white transition-colors hover:border-[#635bff]/35 hover:shadow-[0_12px_36px_rgba(99,91,255,0.12)]"
+        className="group flex h-full flex-col"
       >
-        <div className="relative flex items-end justify-center bg-linear-to-b from-[#f6f9fc] to-[#eef2f7] px-5 pb-5 pt-6">
+        <div className="relative flex items-end justify-center rounded-2xl bg-linear-to-b from-[#f6f9fc] to-[#eef2f7] px-5 pb-5 pt-6 transition-shadow duration-300 group-hover:shadow-[0_12px_36px_rgba(99,91,255,0.14)]">
           <div className="relative w-full max-w-[148px]">
             <div
               aria-hidden
@@ -78,7 +78,7 @@ export function DashboardBookCard({ book }: DashboardBookCardProps) {
                 coverImage={book.coverImage}
                 generating={coverGenerating}
                 aspect="card"
-                className="relative w-full shadow-[0_12px_28px_rgba(10,37,64,0.18)] ring-1 ring-black/5"
+                className="relative w-full rounded-md shadow-[0_12px_28px_rgba(10,37,64,0.18)]"
               />
             </motion.div>
             <span
@@ -93,7 +93,7 @@ export function DashboardBookCard({ book }: DashboardBookCardProps) {
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col gap-3 border-t border-[#e6ebf1] p-4">
+        <div className="flex flex-1 flex-col gap-3 px-1 pb-1 pt-3.5">
           <div className="min-w-0 flex-1">
             <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-[#0a2540] transition-colors group-hover:text-[#635bff]">
               {book.title}

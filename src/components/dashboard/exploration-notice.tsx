@@ -9,24 +9,26 @@ export function ExplorationNotice() {
   if (status !== "unauthenticated") return null;
 
   return (
-    <div className="border-b border-[#e6ebf1] bg-[#f0efff] px-4 py-2 text-center text-[13px] text-[#0a2540]">
-      <span className="hidden sm:inline">
-        You&rsquo;re exploring BookAI.{" "}
-      </span>
-      <Link
-        href="/login?callbackUrl=/dashboard"
-        className="font-medium text-[#635bff] underline hover:text-[#4338ca]"
-      >
-        Sign in
-      </Link>{" "}
-      or{" "}
-      <Link
-        href="/register?callbackUrl=/dashboard"
-        className="font-medium text-[#635bff] underline hover:text-[#4338ca]"
-      >
-        create a free account
-      </Link>{" "}
-      to generate books.
+    <div className="px-4 pt-2 lg:px-10">
+      <div className="mx-auto max-w-[960px] rounded-xl bg-[#f0efff] px-4 py-2 text-center text-[13px] text-[#0a2540]">
+        <span className="hidden sm:inline">
+          You&rsquo;re exploring BookAI.{" "}
+        </span>
+        <Link
+          href="/login?callbackUrl=/dashboard"
+          className="font-medium text-[#635bff] underline hover:text-[#4338ca]"
+        >
+          Sign in
+        </Link>{" "}
+        or{" "}
+        <Link
+          href="/register?callbackUrl=/dashboard"
+          className="font-medium text-[#635bff] underline hover:text-[#4338ca]"
+        >
+          create a free account
+        </Link>{" "}
+        to generate books.
+      </div>
     </div>
   );
 }

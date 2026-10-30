@@ -46,7 +46,7 @@ export default async function BooksPage() {
           </p>
         </div>
         <Button
-          className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+          className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
           asChild
         >
           <Link href="/dashboard/books/new">
@@ -57,7 +57,7 @@ export default async function BooksPage() {
       </div>
 
       {books.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[#e6ebf1] px-6 py-14 text-center">
+        <div className="rounded-3xl bg-[#f7f8fb] px-6 py-14 text-center">
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#f0efff] text-[#635bff]">
             <BookOpen className="h-5 w-5" />
           </div>

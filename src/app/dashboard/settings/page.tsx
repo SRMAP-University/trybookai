@@ -230,7 +230,7 @@ function SettingsPageContent() {
 
   if (error || !settings) {
     return (
-      <div className="rounded-lg border border-[#e6ebf1] px-6 py-16 text-center">
+      <div className="rounded-3xl bg-[#f7f8fb] px-6 py-16 text-center">
         <p className="text-[15px] font-medium text-[#0a2540]">
           Couldn’t load settings
         </p>
@@ -238,7 +238,7 @@ function SettingsPageContent() {
           {error ?? "Please try again."}
         </p>
         <Button
-          className="mt-6 h-9 bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+          className="mt-6 h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
           onClick={() => window.location.reload()}
         >
           Reload
@@ -261,24 +261,24 @@ function SettingsPageContent() {
         {settings.plan === "FREE" && (
           <UpgradeButton
             plan="PRO"
-            className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+            className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
           >
             Upgrade to Pro
           </UpgradeButton>
         )}
       </div>
 
-      <div className="mt-8 flex gap-1 overflow-x-auto border-b border-[#e6ebf1]">
+      <div className="mt-8 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full bg-[#f6f9fc] p-1">
         {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
             className={cn(
-              "whitespace-nowrap border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors",
+              "whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
               tab === item.id
-                ? "border-[#635bff] text-[#635bff]"
-                : "border-transparent text-[#697386] hover:text-[#0a2540]"
+                ? "bg-white text-[#0a2540] shadow-[0_1px_3px_rgba(10,37,64,0.12)]"
+                : "text-[#697386] hover:text-[#0a2540]"
             )}
           >
             {item.label}
@@ -345,7 +345,7 @@ function SettingsPageContent() {
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Button
                   variant="outline"
-                  className="h-10 border-[#e6ebf1] text-[13px]"
+                  className="h-10 rounded-full border-transparent bg-[#f6f9fc] px-4 text-[13px] hover:bg-[#eef0f5]"
                   onClick={openBillingPortal}
                   disabled={portalLoading}
                 >
@@ -384,7 +384,7 @@ function SettingsPageContent() {
               </p>
               <Button
                 variant="outline"
-                className="mt-4 h-10 border-[#f8d7da] text-[13px] text-[#df1b41] hover:bg-[#fff5f5]"
+                className="mt-4 h-10 rounded-full border-[#f8d7da] px-4 text-[13px] text-[#df1b41] hover:bg-[#fff5f5]"
                 onClick={deleteAccount}
                 disabled={deleting}
               >
@@ -629,10 +629,10 @@ function SettingsPageContent() {
                     setSettings({ ...settings, styleGuide: preset.style })
                   }
                   className={cn(
-                    "rounded-md border px-3 py-2.5 text-left transition-colors",
+                    "rounded-xl px-3 py-2.5 text-left transition-colors",
                     settings.styleGuide === preset.style
-                      ? "border-[#635bff] bg-[#f0efff]/50"
-                      : "border-[#e6ebf1] hover:border-[#635bff]"
+                      ? "bg-[#f0efff] ring-2 ring-[#635bff]/40"
+                      : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7]"
                   )}
                 >
                   <p className="text-[13px] font-medium text-[#0a2540]">
@@ -663,7 +663,7 @@ function SettingsPageContent() {
             type="button"
             onClick={save}
             disabled={saving}
-            className="h-10 rounded-md bg-[#635bff] px-5 text-[14px] hover:bg-[#5851e5]"
+            className="h-10 rounded-full bg-[#635bff] px-5 text-[14px] hover:bg-[#5851e5]"
           >
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save changes
@@ -685,7 +685,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-4 rounded-lg border border-[#e6ebf1] bg-white p-6">
+    <div className="space-y-4 rounded-2xl bg-white p-6 shadow-soft">
       <h2 className="text-[15px] font-medium text-[#0a2540]">{title}</h2>
       {children}
     </div>
@@ -722,7 +722,7 @@ function Toggle({
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex w-full items-start justify-between gap-4 rounded-md border border-[#e6ebf1] px-4 py-3 text-left hover:bg-[#f6f9fc]"
+      className="flex w-full items-start justify-between gap-4 rounded-xl bg-[#f7f8fb] px-4 py-3 text-left transition-colors hover:bg-[#f0f2f7]"
     >
       <div>
         <p className="text-[14px] font-medium text-[#0a2540]">{label}</p>
@@ -731,7 +731,7 @@ function Toggle({
       <span
         className={cn(
           "mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors",
-          checked ? "bg-[#635bff]" : "bg-[#e6ebf1]"
+          checked ? "bg-[#635bff]" : "bg-[#dfe4ec]"
         )}
       >
         <span

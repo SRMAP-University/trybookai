@@ -244,7 +244,7 @@ function AudioCard({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#e6ebf1] bg-white">
+    <div className="overflow-hidden rounded-2xl bg-white shadow-soft">
       <audio
         ref={audioRef}
         preload="metadata"
@@ -297,7 +297,7 @@ function AudioCard({
       )}
 
       {track && (
-        <div className="border-t border-[#e6ebf1] bg-[#f6f9fc] px-4 py-4">
+        <div className="bg-[#f6f9fc] px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#697386]">
@@ -313,7 +313,7 @@ function AudioCard({
             <Button
               type="button"
               size="sm"
-              className="h-9 text-white hover:opacity-90"
+              className="h-9 rounded-full px-4 text-white hover:opacity-90"
               style={{ backgroundColor: meta.accent }}
               onClick={togglePlay}
             >
@@ -329,7 +329,7 @@ function AudioCard({
           <div className="mt-4 flex items-center gap-3">
             <button
               type="button"
-              className="rounded-md p-1.5 text-[#697386] hover:bg-white hover:text-[#0a2540] disabled:opacity-40"
+              className="rounded-full p-1.5 text-[#697386] hover:bg-white hover:text-[#0a2540] disabled:opacity-40"
               onClick={() => playTrack(Math.max(0, index - 1))}
               disabled={index === 0}
               aria-label="Previous track"
@@ -351,7 +351,7 @@ function AudioCard({
             </button>
             <button
               type="button"
-              className="rounded-md p-1.5 text-[#697386] hover:bg-white hover:text-[#0a2540] disabled:opacity-40"
+              className="rounded-full p-1.5 text-[#697386] hover:bg-white hover:text-[#0a2540] disabled:opacity-40"
               onClick={() => playTrack(Math.min(tracks.length - 1, index + 1))}
               disabled={index >= tracks.length - 1}
               aria-label="Next track"
@@ -411,7 +411,7 @@ function AudioCard({
       )}
 
       {tracks.length > 0 && (
-        <div className="divide-y divide-[#e6ebf1] border-t border-[#e6ebf1]">
+        <div className="divide-y divide-[#f0f2f6]">
           {tracks.map((t, i) => (
             <div
               key={t.id}
@@ -433,7 +433,7 @@ function AudioCard({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 border-[#e6ebf1] text-[12px]"
+                  className="h-8 rounded-full border-[#e6ebf1] px-3 text-[12px]"
                   onClick={() => {
                     if (playing && i === index) {
                       togglePlay();
@@ -453,7 +453,7 @@ function AudioCard({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 border-[#e6ebf1] text-[12px]"
+                  className="h-8 rounded-full border-[#e6ebf1] px-3 text-[12px]"
                   onClick={() =>
                     downloadUrl(
                       t.audioUrl,
@@ -473,7 +473,7 @@ function AudioCard({
       {audio.status === "COMPLETED" &&
         tracks.length === 0 &&
         audio.audioUrl && (
-          <div className="flex flex-wrap items-center gap-3 border-t border-[#e6ebf1] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3">
             <audio
               controls
               preload="none"
@@ -485,7 +485,7 @@ function AudioCard({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 border-[#e6ebf1]"
+              className="h-8 rounded-full border-[#e6ebf1] px-3"
               onClick={() =>
                 downloadUrl(
                   audio.audioUrl!,
@@ -541,9 +541,12 @@ type BookAudioPanelProps = {
 function CreateTypeGrid({
   missing,
   onPickType,
+  onTint = false,
 }: {
   missing: AudioDerivativeType[];
   onPickType: (type: AudioDerivativeType) => void;
+  /** Sits on a tinted box, so the tiles are white instead of tinted. */
+  onTint?: boolean;
 }) {
   const options = CREATE_OPTIONS.filter((o) => missing.includes(o.type));
   if (options.length === 0) return null;
@@ -556,7 +559,12 @@ function CreateTypeGrid({
             key={option.type}
             type="button"
             onClick={() => onPickType(option.type)}
-            className="flex items-start gap-3 rounded-xl border border-[#e6ebf1] bg-white px-3.5 py-3 text-left transition-colors hover:border-[#635bff]/40 hover:bg-[#f8f7ff]"
+            className={cn(
+              "flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-colors",
+              onTint
+                ? "bg-white shadow-[0_1px_2px_rgba(10,37,64,0.06)] hover:bg-[#f8f7ff]"
+                : "bg-[#f7f8fb] hover:bg-[#f0efff]"
+            )}
           >
             <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#635bff]" />
             <span>
@@ -608,7 +616,7 @@ export function BookAudioPanel({
   if (playable.length === 0 && !generatingType) {
     if (readOnly) return null;
     return (
-      <div className="rounded-xl border border-[#e6ebf1] bg-white p-5">
+      <div className="rounded-2xl bg-white p-5 shadow-soft">
         <div className="mb-4">
           <p className="text-[15px] font-semibold text-[#0a2540]">Audio</p>
           <p className="mt-1 text-[13px] text-[#697386]">
@@ -620,7 +628,7 @@ export function BookAudioPanel({
         ) : onOpenStudio ? (
           <Button
             onClick={onOpenStudio}
-            className="bg-[#635bff] text-white hover:bg-[#4b44d4]"
+            className="rounded-full bg-[#635bff] px-4 text-white hover:bg-[#4b44d4]"
           >
             Open audio studio
           </Button>
@@ -648,7 +656,7 @@ export function BookAudioPanel({
           <Button
             variant="outline"
             onClick={onOpenStudio}
-            className="border-[#e6ebf1] text-[#0a2540]"
+            className="rounded-full border-transparent bg-[#f6f9fc] px-4 text-[#0a2540] hover:bg-[#eef0f5]"
           >
             Audio studio
           </Button>
@@ -677,11 +685,11 @@ export function BookAudioPanel({
       })}
 
       {!readOnly && onPickType && missingTypes.length > 0 && (
-        <div className="rounded-xl border border-dashed border-[#e6ebf1] bg-[#fafbfc] p-4">
+        <div className="rounded-2xl bg-[#f7f8fb] p-4">
           <p className="mb-3 text-[13px] font-medium text-[#0a2540]">
             Create more audio
           </p>
-          <CreateTypeGrid missing={missingTypes} onPickType={onPickType} />
+          <CreateTypeGrid missing={missingTypes} onPickType={onPickType} onTint />
         </div>
       )}
     </div>

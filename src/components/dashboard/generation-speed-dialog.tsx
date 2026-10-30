@@ -37,7 +37,7 @@ export function GenerationSpeedDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md gap-0 overflow-hidden p-0 sm:max-w-md">
-          <DialogHeader className="space-y-1 border-b border-[#eef1f5] px-5 py-4 text-left">
+          <DialogHeader className="space-y-1 px-5 pt-5 text-left">
             <DialogTitle className="text-[17px] font-semibold tracking-tight text-[#0a2540]">
               {resume ? "Resume generation" : "Generate your book"}
             </DialogTitle>
@@ -52,7 +52,7 @@ export function GenerationSpeedDialog({
               type="button"
               disabled={busy}
               onClick={() => onChoose("normal")}
-              className="rounded-lg border border-[#e6ebf1] bg-white px-4 py-3.5 text-left transition hover:border-[#635bff]/40 hover:bg-[#f8f7ff] disabled:opacity-60"
+              className="rounded-xl bg-[#f7f8fb] px-4 py-3.5 text-left transition hover:bg-[#f0f2f7] disabled:opacity-60"
             >
               <div className="text-[14px] font-semibold text-[#0a2540]">
                 Normal
@@ -72,7 +72,7 @@ export function GenerationSpeedDialog({
                 }
                 setUpgradeOpen(true);
               }}
-              className="rounded-lg border border-[#635bff]/35 bg-[#f8f7ff] px-4 py-3.5 text-left transition hover:border-[#635bff] hover:bg-[#f1efff] disabled:opacity-60"
+              className="rounded-xl bg-[#f8f7ff] px-4 py-3.5 text-left ring-1 ring-[#635bff]/25 transition hover:bg-[#f1efff] hover:ring-[#635bff]/60 disabled:opacity-60"
             >
               <div className="flex items-center gap-1.5 text-[14px] font-semibold text-[#0a2540]">
                 {canUseSuperFast ? (
@@ -82,7 +82,7 @@ export function GenerationSpeedDialog({
                 )}
                 Super Fast
                 {!canUseSuperFast && (
-                  <span className="ml-1 rounded bg-[#eef1f5] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#62748e]">
+                  <span className="ml-1 rounded-full bg-[#eef1f5] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#62748e]">
                     Pro
                   </span>
                 )}
@@ -95,11 +95,11 @@ export function GenerationSpeedDialog({
             </button>
           </div>
 
-          <div className="border-t border-[#eef1f5] px-5 py-3">
+          <div className="px-5 pb-4">
             <Button
               type="button"
               variant="ghost"
-              className="h-8 w-full text-[13px] text-[#62748e]"
+              className="h-8 w-full rounded-full text-[13px] text-[#62748e]"
               disabled={busy}
               onClick={() => onOpenChange(false)}
             >

@@ -54,7 +54,7 @@ export function DashboardUpgradeBanner({
 
   if (canStartTrial) {
     return (
-      <div className="relative overflow-hidden rounded-lg border border-[#f0e0a8] bg-linear-to-br from-[#fffbeb] to-white px-4 py-3.5">
+      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#fff6d6] to-[#fffbeb] px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#9a6700]">
@@ -72,7 +72,7 @@ export function DashboardUpgradeBanner({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <Button
-              className="h-7 rounded-md bg-[#0e6245] px-3 text-[12px] hover:bg-[#0a4d37]"
+              className="h-7 rounded-full bg-[#0e6245] px-3 text-[12px] hover:bg-[#0a4d37]"
               onClick={startTrial}
               disabled={trialLoading}
             >
@@ -96,7 +96,7 @@ export function DashboardUpgradeBanner({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-[#e6ebf1] bg-linear-to-br from-[#f0efff] to-white px-4 py-3.5">
+    <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#f0efff] to-[#f7f8fb] px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#0a2540]">
@@ -108,7 +108,7 @@ export function DashboardUpgradeBanner({
         </div>
         <UpgradeButton
           plan="PRO"
-          className="h-7 shrink-0 rounded-md bg-[#635bff] px-3 text-[12px] hover:bg-[#5851e5]"
+          className="h-7 shrink-0 rounded-full bg-[#635bff] px-3 text-[12px] hover:bg-[#5851e5]"
         >
           Upgrade to Pro
           <ArrowRight className="ml-1 h-3 w-3" />

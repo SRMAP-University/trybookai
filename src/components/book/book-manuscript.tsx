@@ -197,7 +197,7 @@ export function BookManuscript({
           return (
             <div
               key={index}
-              className="overflow-x-auto rounded-lg border border-[#e6ebf1] bg-white"
+              className="overflow-x-auto rounded-2xl bg-white shadow-soft"
             >
               <table className="w-full min-w-[280px] border-collapse text-left">
                 <thead className="bg-[#f6f9fc]">
@@ -205,7 +205,7 @@ export function BookManuscript({
                     {block.headers.map((header, headerIndex) => (
                       <th
                         key={headerIndex}
-                        className="border-b border-[#e6ebf1] px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[#0a2540]"
+                        className="px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-[#0a2540]"
                       >
                         {inlineMarkdown(header)}
                       </th>
@@ -218,7 +218,7 @@ export function BookManuscript({
                       {row.map((cell, cellIndex) => (
                         <td
                           key={cellIndex}
-                          className="border-t border-[#eef1f5] px-3 py-2 text-[13px] text-[#425466]"
+                          className="border-t border-[#f0f2f6] px-3 py-2 text-[13px] text-[#425466]"
                         >
                           {inlineMarkdown(cell)}
                         </td>
@@ -247,7 +247,7 @@ export function BookManuscript({
                   loading="lazy"
                   className={cn(
                     "h-auto w-full bg-[#eef2f7]",
-                    reader ? "sm:rounded-2xl" : "rounded-lg"
+                    reader ? "sm:rounded-2xl" : "rounded-xl"
                   )}
                 />
                 {caption && (
@@ -268,10 +268,10 @@ export function BookManuscript({
           return (
             <figure
               key={index}
-              className="rounded-xl border border-dashed border-[#d8dee8] bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-5"
+              className="rounded-2xl bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-4 py-5"
             >
               <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#635bff] shadow-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#635bff] shadow-sm">
                   <ImageIcon className="h-4 w-4" />
                 </div>
                 <div>

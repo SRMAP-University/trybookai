@@ -27,16 +27,25 @@ export function BookCover({
     return (
       <div
         className={cn(
-          "overflow-hidden rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] shadow-sm",
+          "relative overflow-hidden rounded-lg bg-[#f6f9fc] shadow-sm",
           aspectClass,
           className
         )}
       >
+        {/* Covers that aren't 3:4 sit on a blurred copy of themselves
+            instead of grey bars. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={coverImage}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full scale-125 object-cover opacity-60 blur-xl"
+        />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={coverImage}
           alt={`${title} cover`}
-          className="h-full w-full object-contain"
+          className="relative h-full w-full object-contain"
         />
       </div>
     );
@@ -45,7 +54,7 @@ export function BookCover({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-lg border border-dashed border-[#e6ebf1] bg-linear-to-br from-[#f0efff] to-[#f6f9fc] text-center",
+        "flex flex-col items-center justify-center rounded-lg bg-linear-to-br from-[#f0efff] to-[#f6f9fc] text-center",
         aspectClass,
         className
       )}

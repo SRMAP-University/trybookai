@@ -99,7 +99,7 @@ function BrandingPageContent() {
         <Button
           onClick={save}
           disabled={saving}
-          className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+          className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
         >
           {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
           Save branding
@@ -173,7 +173,7 @@ function BrandingPageContent() {
                     onChange={(e) =>
                       setBranding({ ...branding, brandColor: e.target.value })
                     }
-                    className="h-10 w-12 cursor-pointer rounded border border-[#e6ebf1] bg-white p-1"
+                    className="h-10 w-12 cursor-pointer rounded-lg border border-[#e6ebf1] bg-white p-1"
                   />
                   <Input
                     value={branding.brandColor}
@@ -245,7 +245,7 @@ function BrandingPageContent() {
                   includeBrandInExport: !branding.includeBrandInExport,
                 })
               }
-              className="flex w-full items-center justify-between rounded-md border border-[#e6ebf1] px-4 py-3 text-left"
+              className="flex w-full items-center justify-between rounded-xl bg-[#f7f8fb] px-4 py-3 text-left transition-colors hover:bg-[#f0f2f7]"
             >
               <div>
                 <p className="text-[14px] font-medium text-[#0a2540]">
@@ -260,7 +260,7 @@ function BrandingPageContent() {
                   "flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors",
                   branding.includeBrandInExport
                     ? "bg-[#635bff]"
-                    : "bg-[#e6ebf1]"
+                    : "bg-[#dfe4ec]"
                 )}
               >
                 <span
@@ -278,7 +278,7 @@ function BrandingPageContent() {
           <p className="mb-3 text-[12px] font-medium uppercase tracking-wider text-[#697386]">
             Preview
           </p>
-          <div className="overflow-hidden rounded-lg border border-[#e6ebf1] bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl bg-white shadow-soft">
             <div className="h-1.5" style={{ backgroundColor: color }} />
             <div className="flex min-h-[360px] flex-col items-center justify-center px-8 py-12 text-center">
               {branding.logoUrl ? (
@@ -290,7 +290,7 @@ function BrandingPageContent() {
                 />
               ) : (
                 <div
-                  className="mb-6 flex h-10 w-10 items-center justify-center rounded-md text-[14px] font-semibold text-white"
+                  className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl text-[14px] font-semibold text-white"
                   style={{ backgroundColor: color }}
                 >
                   {displayName.slice(0, 1).toUpperCase()}
@@ -340,7 +340,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-4 rounded-lg border border-[#e6ebf1] bg-white p-6">
+    <div className="space-y-4 rounded-2xl bg-white p-6 shadow-soft">
       <h2 className="text-[15px] font-medium text-[#0a2540]">{title}</h2>
       {children}
     </div>
