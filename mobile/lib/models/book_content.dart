@@ -6,6 +6,9 @@ class BookContent {
     required this.status,
     this.coverImage,
     this.slug,
+    this.description,
+    this.genre,
+    this.templateId,
     required this.chapters,
     required this.editions,
   });
@@ -15,6 +18,9 @@ class BookContent {
   final String status;
   final String? coverImage;
   final String? slug;
+  final String? description;
+  final String? genre;
+  final String? templateId;
   final List<ChapterContent> chapters;
   final List<EditionRef> editions;
 
@@ -31,6 +37,9 @@ class BookContent {
       status: json['status'] as String? ?? 'DRAFT',
       coverImage: json['coverImage'] as String?,
       slug: json['slug'] as String?,
+      description: json['description'] as String?,
+      genre: json['genre'] as String?,
+      templateId: json['templateId'] as String?,
       chapters: list(json['chapters']).map(ChapterContent.fromJson).toList(),
       editions: list(json['editions']).map(EditionRef.fromJson).toList(),
     );
@@ -61,18 +70,18 @@ class ChapterContent {
   bool get hasText => sections.any((s) => (s.content ?? '').trim().isNotEmpty);
 
   factory ChapterContent.fromJson(Map<String, dynamic> json) => ChapterContent(
-        id: json['id'] as String,
-        number: (json['number'] as num?)?.toInt() ?? 0,
-        title: json['title'] as String? ?? '',
-        status: json['status'] as String? ?? 'PENDING',
-        summary: json['summary'] as String?,
-        imageUrl: json['imageUrl'] as String?,
-        pageCount: (json['pageCount'] as num?)?.toInt() ?? 0,
-        sections: ((json['sections'] as List?) ?? const [])
-            .whereType<Map<String, dynamic>>()
-            .map(SectionContent.fromJson)
-            .toList(),
-      );
+    id: json['id'] as String,
+    number: (json['number'] as num?)?.toInt() ?? 0,
+    title: json['title'] as String? ?? '',
+    status: json['status'] as String? ?? 'PENDING',
+    summary: json['summary'] as String?,
+    imageUrl: json['imageUrl'] as String?,
+    pageCount: (json['pageCount'] as num?)?.toInt() ?? 0,
+    sections: ((json['sections'] as List?) ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(SectionContent.fromJson)
+        .toList(),
+  );
 }
 
 class SectionContent {
@@ -89,11 +98,11 @@ class SectionContent {
   final String? content;
 
   factory SectionContent.fromJson(Map<String, dynamic> json) => SectionContent(
-        id: json['id'] as String,
-        number: (json['number'] as num?)?.toInt() ?? 0,
-        title: json['title'] as String? ?? '',
-        content: json['content'] as String?,
-      );
+    id: json['id'] as String,
+    number: (json['number'] as num?)?.toInt() ?? 0,
+    title: json['title'] as String? ?? '',
+    content: json['content'] as String?,
+  );
 }
 
 /// Another edition of the same book (same premise, fresh manuscript).
@@ -111,9 +120,9 @@ class EditionRef {
   final String? title;
 
   factory EditionRef.fromJson(Map<String, dynamic> json) => EditionRef(
-        id: json['id'] as String,
-        edition: (json['edition'] as num?)?.toInt() ?? 1,
-        status: json['status'] as String? ?? 'DRAFT',
-        title: json['title'] as String?,
-      );
+    id: json['id'] as String,
+    edition: (json['edition'] as num?)?.toInt() ?? 1,
+    status: json['status'] as String? ?? 'DRAFT',
+    title: json['title'] as String?,
+  );
 }
