@@ -296,27 +296,6 @@ class _HomeHeroState extends State<HomeHero>
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Soft floor shadow that breathes as the books float.
-        Positioned(
-          left: 18,
-          right: 4,
-          bottom: 14,
-          height: 14,
-          child: Transform.scale(
-            scaleX: 0.9 + 0.08 * (1 - t),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(99),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.navy.withValues(alpha: 0.10 + 0.04 * t),
-                    blurRadius: 16,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
         for (var i = 0; i < covers.length && i < layout.length; i++)
           Positioned(
             left: layout[i].left,

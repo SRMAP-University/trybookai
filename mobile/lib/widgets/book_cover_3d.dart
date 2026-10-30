@@ -101,11 +101,19 @@ class BookCover3D extends StatelessWidget {
                         offset: const Offset(0, 34),
                       ),
                     ]
+                  // A thin contact edge where the book meets the page, and a
+                  // short soft glow straight below; no sideways smear.
                   : [
                       BoxShadow(
-                        color: AppColors.navy.withValues(alpha: 0.22),
+                        color: AppColors.navy.withValues(alpha: 0.16),
+                        blurRadius: (width * 0.02).clamp(1.0, 3.0),
+                        offset: Offset(0, (width * 0.01).clamp(0.5, 2.0)),
+                      ),
+                      BoxShadow(
+                        color: AppColors.navy.withValues(alpha: 0.10),
                         blurRadius: width * 0.12,
-                        offset: Offset(width * 0.03, width * 0.06),
+                        spreadRadius: -width * 0.04,
+                        offset: Offset(0, width * 0.07),
                       ),
                     ],
             ),
