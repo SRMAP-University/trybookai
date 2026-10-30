@@ -15,6 +15,9 @@ import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/book_shelf.dart';
 import 'package:bookai_mobile/widgets/skeleton.dart';
 
+/// Cover width on Home's shelves (covers only, so they can be generous).
+const _shelfCover = 140.0;
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -153,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 32),
                 const Skeleton(child: Bone(width: 150, height: 20, radius: 4)),
                 const SizedBox(height: 16),
-                const ShelfSkeleton(),
+                const ShelfSkeleton(coverWidth: _shelfCover),
               ],
               if (books.completed.isNotEmpty) ...[
                 const SizedBox(height: 32),
@@ -169,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 reveal(
                   BookShelfRow(
+                    coverWidth: _shelfCover,
                     books: [
                       for (final b in books.completed.take(8))
                         (
@@ -200,10 +204,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 )
               else if (pub.books.isEmpty)
-                const ShelfSkeleton()
+                const ShelfSkeleton(coverWidth: _shelfCover)
               else
                 reveal(
                   BookShelfRow(
+                    coverWidth: _shelfCover,
                     books: [
                       for (final b in pub.books.take(10))
                         (
