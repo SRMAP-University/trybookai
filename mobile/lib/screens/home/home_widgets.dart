@@ -283,10 +283,21 @@ class _HomeHeroState extends State<HomeHero>
                   ),
                 ),
                 const SizedBox(height: 16),
+                // Sized to its label, not the column: the one primary action
+                // on Home without shouting. 44 visible, 48 to the touch.
                 FilledButton.icon(
                   onPressed: widget.onWrite,
-                  icon: const Icon(Icons.edit_rounded, size: 18),
-                  label: const Text('Write a book'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    tapTargetSize: MaterialTapTargetSize.padded,
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('New book'),
                 ),
               ],
             ),
