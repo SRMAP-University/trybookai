@@ -1,21 +1,33 @@
-/// Stripe-inspired BookAI design tokens.
+/// BookAI design tokens — warm "bookshop" look: cream pages, coral accent,
+/// rounded type. Token names predate the redesign (e.g. `navy` is the ink
+/// colour) so every screen picks the new palette up without edits.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  static const navy = Color(0xFF0A2540);
-  static const primary = Color(0xFF635BFF);
-  static const primaryHover = Color(0xFF5851E5);
-  static const primarySoft = Color(0xFFEBE9FF);
-  static const mutedBg = Color(0xFFF6F9FC);
-  static const border = Color(0xFFE6EBF1);
-  static const textMuted = Color(0xFF697386);
-  static const textBody = Color(0xFF425466);
-  static const destructive = Color(0xFFDF1B41);
-  static const success = Color(0xFF0E6245);
-  static const successSoft = Color(0xFFCBF4C9);
+  /// Ink — headings and primary text.
+  static const navy = Color(0xFF2A2320);
+  /// Accent (coral). Swap here to re-colour the whole app.
+  static const primary = Color(0xFFE4574E);
+  static const primaryHover = Color(0xFFCF463E);
+  static const primarySoft = Color(0xFFFCE6E2);
+  /// BookAI purple, kept as a secondary brand colour.
+  static const brand = Color(0xFF635BFF);
+  /// Page background (cream) and slightly deeper fills.
+  static const cream = Color(0xFFF6F0E8);
+  static const mutedBg = Color(0xFFEFE6DB);
+  /// Cards and sheets (warm white).
+  static const card = Color(0xFFFFFCF8);
+  static const border = Color(0xFFEADFD2);
+  static const textMuted = Color(0xFF7A6D64);
+  static const textBody = Color(0xFF4A3F38);
+  /// Bookmark ribbon on 3D covers.
+  static const ribbon = Color(0xFFF2B33D);
+  static const destructive = Color(0xFFD7263D);
+  static const success = Color(0xFF2E7D4F);
+  static const successSoft = Color(0xFFD6F2DF);
   static const warning = Color(0xFF9A6700);
   static const white = Color(0xFFFFFFFF);
 }
@@ -25,59 +37,66 @@ class AppTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.white,
+      scaffoldBackgroundColor: AppColors.cream,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
         onPrimary: AppColors.white,
-        surface: AppColors.white,
+        surface: AppColors.card,
         onSurface: AppColors.navy,
         error: AppColors.destructive,
       ),
     );
 
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    final textTheme = GoogleFonts.nunitoTextTheme(base.textTheme).apply(
       bodyColor: AppColors.navy,
       displayColor: AppColors.navy,
     );
+    const pill = StadiumBorder();
 
     return base.copyWith(
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.cream,
         foregroundColor: AppColors.navy,
         elevation: 0,
-        scrolledUnderElevation: 0.5,
+        scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.4,
-          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
+          fontSize: 21,
           color: AppColors.navy,
         ),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.white,
+        color: AppColors.card,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.border),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        fillColor: AppColors.card,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
@@ -88,27 +107,45 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
           minimumSize: const Size.fromHeight(48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          shape: pill,
+          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.navy,
+          backgroundColor: AppColors.card,
           minimumSize: const Size.fromHeight(48),
           side: const BorderSide(color: AppColors.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          shape: pill,
+          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          shape: pill,
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.card,
+        selectedColor: AppColors.primarySoft,
+        side: const BorderSide(color: AppColors.border),
+        shape: pill,
+        labelStyle: const TextStyle(
+          color: AppColors.navy,
+          fontWeight: FontWeight.w600,
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.card,
         indicatorColor: AppColors.primarySoft,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
             fontSize: 11,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
             color: selected ? AppColors.primary : AppColors.textMuted,
           );
         }),
@@ -120,10 +157,15 @@ class AppTheme {
           );
         }),
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.navy,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
       dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.primary,
-        linearTrackColor: AppColors.border,
+        linearTrackColor: AppColors.mutedBg,
       ),
     );
   }

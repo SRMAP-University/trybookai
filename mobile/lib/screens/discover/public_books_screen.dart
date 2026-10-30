@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/book_cover_3d.dart';
 
 class PublicBooksScreen extends StatefulWidget {
   const PublicBooksScreen({super.key});
@@ -58,76 +58,61 @@ class _PublicBooksScreenState extends State<PublicBooksScreen> {
                           ),
                         ],
                       )
-                    : GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                        itemCount: pub.books.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 14,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.58,
-                        ),
-                        itemBuilder: (context, i) {
-                          final b = pub.books[i];
-                          final cover =
-                              ApiConfig.coverUrl(b.coverImage, b.slug);
-                          return InkWell(
-                            onTap: () => context.push('/discover/${b.slug}'),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      width: double.infinity,
-                                      color: AppColors.mutedBg,
-                                      child: cover.isNotEmpty
-                                          ? Image.network(
-                                              cover,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, _, _) =>
-                                                  const Icon(
-                                                Icons.menu_book_outlined,
-                                                color: AppColors.primary,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.menu_book_outlined,
-                                              color: AppColors.primary,
-                                            ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  b.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.navy,
-                                  ),
-                                ),
-                                if (b.description != null &&
-                                    b.description!.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    b.description!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      height: 1.25,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          const gap = 18.0;
+                          final cell = (constraints.maxWidth - 32 - gap) / 2;
+                          final cover = cell - 10;
+                          return GridView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                            itemCount: pub.books.length,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: gap,
+                              mainAxisSpacing: 22,
+                              mainAxisExtent: cover * 1.6 + 62,
                             ),
+                            itemBuilder: (context, i) {
+                              final b = pub.books[i];
+                              return GestureDetector(
+                                onTap: () => context.push('/discover/${b.slug}'),
+                                behavior: HitTestBehavior.opaque,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    BookCover3D(
+                                      title: b.title,
+                                      coverImage: b.coverImage,
+                                      slug: b.slug,
+                                      width: cover,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      b.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      b.author,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           );
                         },
                       ),

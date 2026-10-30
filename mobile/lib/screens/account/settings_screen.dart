@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/config/book_options.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
@@ -104,16 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         initialValue: _genre,
                         decoration:
                             const InputDecoration(labelText: 'Default genre'),
-                        items: const [
-                          'Fiction',
-                          'Non-Fiction',
-                          'Self-Help',
-                          'Business',
-                          'Science Fiction',
-                          'Fantasy',
-                          'Romance',
-                          'Thriller',
-                        ]
+                        items: BookOptions.withCurrent(BookOptions.genres, _genre)
                             .map(
                               (g) =>
                                   DropdownMenuItem(value: g, child: Text(g)),
@@ -127,13 +119,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         initialValue: _tone,
                         decoration:
                             const InputDecoration(labelText: 'Default tone'),
-                        items: const [
-                          'Professional',
-                          'Casual',
-                          'Academic',
-                          'Narrative',
-                          'Inspirational',
-                        ]
+                        items: BookOptions.withCurrent(BookOptions.tones, _tone)
                             .map(
                               (t) =>
                                   DropdownMenuItem(value: t, child: Text(t)),
@@ -147,25 +133,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         initialValue: _pov,
                         decoration:
                             const InputDecoration(labelText: 'Point of view'),
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'first', child: Text('First person')),
-                          DropdownMenuItem(
-                              value: 'second', child: Text('Second person')),
-                          DropdownMenuItem(
-                              value: 'third', child: Text('Third person')),
-                        ],
+                        items: BookOptions.withCurrentKey(BookOptions.povs, _pov)
+                            .entries
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.key,
+                                child: Text(e.value),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (v) => setState(() => _pov = v ?? 'third'),
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
                         initialValue: _tense,
                         decoration: const InputDecoration(labelText: 'Tense'),
-                        items: const [
-                          DropdownMenuItem(value: 'past', child: Text('Past')),
-                          DropdownMenuItem(
-                              value: 'present', child: Text('Present')),
-                        ],
+                        items: BookOptions.withCurrentKey(BookOptions.tenses, _tense)
+                            .entries
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.key,
+                                child: Text(e.value),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (v) => setState(() => _tense = v ?? 'past'),
                       ),
                       const SizedBox(height: 14),
@@ -173,12 +164,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         initialValue: _language,
                         decoration:
                             const InputDecoration(labelText: 'Language'),
-                        items: const [
-                          DropdownMenuItem(value: 'en', child: Text('English')),
-                          DropdownMenuItem(value: 'es', child: Text('Spanish')),
-                          DropdownMenuItem(value: 'fr', child: Text('French')),
-                          DropdownMenuItem(value: 'de', child: Text('German')),
-                        ],
+                        items: BookOptions.withCurrentKey(
+                          BookOptions.languages,
+                          _language,
+                        )
+                            .entries
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.key,
+                                child: Text(e.value),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (v) =>
                             setState(() => _language = v ?? 'en'),
                       ),

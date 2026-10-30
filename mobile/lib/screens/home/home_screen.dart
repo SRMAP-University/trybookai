@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/widgets/book_shelf.dart';
 import 'package:bookai_mobile/widgets/bookai_logo.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 
@@ -224,106 +224,53 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             if (books.completed.isNotEmpty) ...[
               const SizedBox(height: 24),
-              const SectionHeader('Recent books'),
-              const SizedBox(height: 10),
-              ...books.completed.take(5).map(
-                    (b) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(b.title),
-                      subtitle: Text(
-                        '${b.genre ?? 'Book'} · ${b.currentPages} pages',
-                        style: const TextStyle(color: AppColors.textMuted),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
+              SectionHeader(
+                'Your recent books',
+                action: TextButton(
+                  onPressed: () => context.go('/books'),
+                  child: const Text('View all'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              BookShelfRow(
+                books: [
+                  for (final b in books.completed.take(8))
+                    (
+                      title: b.title,
+                      subtitle: '${b.genre ?? 'Book'} · ${b.currentPages} pages',
+                      coverImage: b.coverImage,
+                      slug: b.slug,
                       onTap: () => context.push('/books/${b.id}'),
                     ),
-                  ),
+                ],
+              ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             SectionHeader(
-              'Public books',
+              'Popular on BookAI',
               action: TextButton(
                 onPressed: () => context.go('/discover'),
-                child: const Text('See all'),
+                child: const Text('View all'),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             if (pub.books.isEmpty && !pub.loading)
               const Text(
                 'Browse published manuscripts on Discover.',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: pub.books.take(6).length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.62,
-                ),
-                itemBuilder: (context, i) {
-                  final b = pub.books[i];
-                  final cover = ApiConfig.coverUrl(b.coverImage, b.slug);
-                  return InkWell(
-                    onTap: () => context.push('/discover/${b.slug}'),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              width: double.infinity,
-                              color: AppColors.mutedBg,
-                              child: cover.isNotEmpty
-                                  ? Image.network(
-                                      cover,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => const Icon(
-                                        Icons.menu_book_outlined,
-                                        color: AppColors.primary,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.menu_book_outlined,
-                                      color: AppColors.primary,
-                                    ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          b.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.navy,
-                          ),
-                        ),
-                        if (b.description != null &&
-                            b.description!.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            b.description!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 9,
-                              height: 1.25,
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ],
+              BookShelfRow(
+                books: [
+                  for (final b in pub.books.take(10))
+                    (
+                      title: b.title,
+                      subtitle: b.author,
+                      coverImage: b.coverImage,
+                      slug: b.slug,
+                      onTap: () => context.push('/discover/${b.slug}'),
                     ),
-                  );
-                },
+                ],
               ),
           ],
         ),

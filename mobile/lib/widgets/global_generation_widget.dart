@@ -200,7 +200,10 @@ class _GlobalGenerationWidgetState extends State<GlobalGenerationWidget> {
                     subtitle:
                         '${a.typeLabel} · ${_statusLabel(a.status)} · ${a.progress.round()}%',
                     progress: a.progress,
-                    onTap: () => context.push('/books/${a.bookId}'),
+                    // Audio Studio jobs have no book of their own.
+                    onTap: () => a.bookId.isEmpty
+                        ? context.go('/studio')
+                        : context.push('/books/${a.bookId}'),
                   ),
               ],
             ),

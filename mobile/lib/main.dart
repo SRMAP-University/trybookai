@@ -22,6 +22,7 @@ import 'package:bookai_mobile/screens/home/home_screen.dart';
 import 'package:bookai_mobile/screens/books/books_screen.dart';
 import 'package:bookai_mobile/screens/books/new_book_screen.dart';
 import 'package:bookai_mobile/screens/books/book_detail_screen.dart';
+import 'package:bookai_mobile/screens/books/book_reader_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_books_screen.dart';
 import 'package:bookai_mobile/screens/discover/public_book_detail_screen.dart';
 import 'package:bookai_mobile/screens/studio/audio_studio_screen.dart';
@@ -249,6 +250,19 @@ GoRouter _buildRouter(
                             state.uri.queryParameters['generate'] == '1',
                       ),
                     ),
+                    routes: [
+                      GoRoute(
+                        path: 'read',
+                        parentNavigatorKey: _rootNavigatorKey,
+                        pageBuilder: (context, state) => AppPage.slide(
+                          state,
+                          BookReaderScreen(
+                            bookId: state.pathParameters['id']!,
+                            chapterId: state.uri.queryParameters['chapter'],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

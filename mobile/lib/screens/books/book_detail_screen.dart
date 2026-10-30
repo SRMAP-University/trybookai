@@ -1,21 +1,26 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bookai_mobile/config/api_config.dart';
 import 'package:bookai_mobile/config/app_billing.dart';
+import 'package:bookai_mobile/models/book_content.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/auth_provider.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
+import 'package:bookai_mobile/screens/books/books_screen.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 import 'package:bookai_mobile/services/file_download.dart';
 import 'package:bookai_mobile/services/generation_stream.dart';
 import 'package:bookai_mobile/services/push_notifications.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/audiobook_player.dart';
+import 'package:bookai_mobile/widgets/book_cover_3d.dart';
 import 'package:bookai_mobile/widgets/common.dart';
 import 'package:bookai_mobile/widgets/generation_speed_sheet.dart';
 import 'package:bookai_mobile/widgets/premium_upgrade_sheet.dart';
@@ -55,6 +60,12 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   bool _promptedGenerate = false;
   List<Map<String, dynamic>> _audios = [];
 
+  /// Chapters with their text, for the chapter list and the Read button.
+  BookContent? _content;
+  String? _rewritingChapter;
+  bool _coverBusy = false;
+  bool _showAllChapters = false;
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +74,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       if (_book?.status == 'COMPLETED') _loadAudios();
       _maybePromptGenerate();
     });
+    _loadContent();
     _poll = Timer.periodic(const Duration(seconds: 12), (_) => _refreshQuiet());
   }
 
@@ -83,6 +95,420 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       _book = book;
       _loading = false;
     });
+  }
+
+  Future<void> _loadContent() async {
+    final content =
+        await context.read<BooksProvider>().fetchContent(widget.bookId);
+    if (!mounted || content == null) return;
+    setState(() => _content = content);
+  }
+
+  void _read([ChapterContent? from]) {
+    final query = from == null ? '' : '?chapter=${from.id}';
+    context.push('/books/${widget.bookId}/read$query');
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String _errorText(Object e) => '$e'.replaceFirst('Exception: ', '');
+
+  Future<bool> _confirm({
+    required String title,
+    required String body,
+    required String action,
+    bool destructive = false,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: destructive
+                ? FilledButton.styleFrom(
+                    backgroundColor: AppColors.destructive,
+                  )
+                : null,
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _rewriteChapter(ChapterContent chapter) async {
+    if (_rewritingChapter != null) return;
+    final ok = await _confirm(
+      title: 'Rewrite chapter ${chapter.number}?',
+      body:
+          'BookAI writes this chapter again from its outline and replaces the current text. It can take a few minutes.',
+      action: 'Rewrite',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _rewritingChapter = chapter.id);
+    try {
+      await context
+          .read<BooksProvider>()
+          .regenerateChapter(widget.bookId, chapter.id);
+      if (!mounted) return;
+      _toast('Chapter ${chapter.number} rewritten');
+      await _loadContent();
+    } catch (e) {
+      if (mounted) _toast(_errorText(e));
+    } finally {
+      if (mounted) setState(() => _rewritingChapter = null);
+    }
+  }
+
+  Future<void> _newCover() async {
+    final book = _book;
+    if (book == null || _coverBusy) return;
+    setState(() => _coverBusy = true);
+    final oldUrl = ApiConfig.coverUrl(book.coverImage, book.slug);
+    try {
+      await context.read<BooksProvider>().regenerateCover(widget.bookId);
+      if (oldUrl.isNotEmpty) await CachedNetworkImage.evictFromCache(oldUrl);
+      await _refreshQuiet();
+      if (mounted) _toast('New cover ready');
+    } catch (e) {
+      if (mounted) _toast(_errorText(e));
+    } finally {
+      if (mounted) setState(() => _coverBusy = false);
+    }
+  }
+
+  Future<void> _newEdition() async {
+    final ok = await _confirm(
+      title: 'Write a new edition?',
+      body:
+          'BookAI starts a fresh manuscript from the same idea and settings. This book stays as it is, and the new edition uses page credits like any new book.',
+      action: 'Start new edition',
+    );
+    if (!ok || !mounted) return;
+    try {
+      final next =
+          await context.read<BooksProvider>().newEdition(widget.bookId);
+      if (!mounted) return;
+      context.pushReplacement('/books/${next.id}?generate=1');
+    } catch (e) {
+      if (mounted) _toast(_errorText(e));
+    }
+  }
+
+  Future<void> _delete() async {
+    final book = _book;
+    if (book == null) return;
+    final ok = await _confirm(
+      title: 'Delete this book?',
+      body: '"${book.title}" will be deleted for good. This can\'t be undone.',
+      action: 'Delete',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    try {
+      await context.read<BooksProvider>().deleteBook(widget.bookId);
+      if (!mounted) return;
+      _toast('Book deleted');
+      context.go('/books');
+    } catch (e) {
+      if (mounted) _toast(_errorText(e));
+    }
+  }
+
+  void _onMenu(String action) {
+    switch (action) {
+      case 'cover':
+        unawaited(_newCover());
+      case 'edition':
+        unawaited(_newEdition());
+      case 'download':
+        if (!_downloadingBook) unawaited(_downloadBook());
+      case 'troubleshoot':
+        _showReviewSheet(trigger: 'manual');
+      case 'web':
+        unawaited(_openExport());
+      case 'delete':
+        unawaited(_delete());
+    }
+  }
+
+  Widget _menuRow(IconData icon, String label, {Color? color}) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color ?? AppColors.textBody),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(color: color)),
+      ],
+    );
+  }
+
+  Widget _header(BookModel book) {
+    final completed = book.status == 'COMPLETED';
+    final chapterCount = _content?.chapters.length ?? 0;
+    final readable = _content?.readable.isNotEmpty == true;
+    final failed = book.status == 'FAILED';
+    return StripeCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  BookCover3D(
+                    title: book.title,
+                    coverImage: book.coverImage,
+                    slug: book.slug,
+                    width: 104,
+                    ribbon: false,
+                  ),
+                  if (_coverBusy)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      book.title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                        color: AppColors.navy,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      book.genre ?? 'Book',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: completed
+                            ? AppColors.successSoft
+                            : AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        BookShelfItem.statusLabel(book),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: completed
+                              ? AppColors.success
+                              : failed
+                                  ? AppColors.destructive
+                                  : AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      completed
+                          ? '${book.currentPages} pages${chapterCount > 0 ? ' · $chapterCount chapters' : ''}'
+                          : '${book.currentPages} / ${book.targetPages} pages',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (book.description != null && book.description!.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            ExpandableText(
+              book.description!,
+              maxLines: 3,
+              style: const TextStyle(color: AppColors.textBody, height: 1.45),
+            ),
+          ],
+          if (!completed) ...[
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: (book.progress / 100).clamp(0, 1),
+                minHeight: 8,
+              ),
+            ),
+          ],
+          if (readable) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _read,
+                icon: const Icon(Icons.auto_stories_rounded),
+                label: Text(completed ? 'Read book' : 'Read what\'s written'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _chaptersCard(BookModel book, BookContent content) {
+    final canRewrite = book.status == 'COMPLETED' ||
+        book.status == 'DRAFT' ||
+        book.status == 'FAILED';
+    final chapters = content.chapters;
+    final shown = _showAllChapters || chapters.length <= 6
+        ? chapters
+        : chapters.take(5).toList();
+    return StripeCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Chapters',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+              const Spacer(),
+              Text(
+                '${content.readable.length} of ${chapters.length} written',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final c in shown) _chapterRow(c, canRewrite),
+          if (shown.length < chapters.length)
+            TextButton(
+              onPressed: () => setState(() => _showAllChapters = true),
+              child: Text('Show all ${chapters.length} chapters'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chapterRow(ChapterContent c, bool canRewrite) {
+    final busy = _rewritingChapter == c.id;
+    final subtitle = busy
+        ? 'Rewriting…'
+        : c.hasText
+            ? (c.pageCount > 0 ? '${c.pageCount} pages' : 'Ready to read')
+            : switch (c.status) {
+                'GENERATING' => 'Writing now',
+                'FAILED' => 'Needs rewriting',
+                _ => 'Not written yet',
+              };
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: c.hasText && !busy ? () => _read(c) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: c.hasText ? AppColors.primarySoft : AppColors.mutedBg,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '${c.number}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: c.hasText ? AppColors.primary : AppColors.textMuted,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    c.title.isEmpty ? 'Chapter ${c.number}' : c.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: c.status == 'FAILED' && !c.hasText
+                          ? AppColors.destructive
+                          : AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (busy)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (canRewrite)
+              IconButton(
+                tooltip: 'Rewrite chapter',
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                color: AppColors.textMuted,
+                onPressed:
+                    _rewritingChapter == null ? () => _rewriteChapter(c) : null,
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadAudios() async {
@@ -110,6 +536,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       _reconnect?.cancel();
       _stream?.stop();
       setState(() => _streaming = false);
+      unawaited(_loadContent());
     }
     if (justCompleted) {
       await _loadAudios();
@@ -850,34 +1277,57 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       appBar: AppBar(
         title: Text(book?.title ?? 'Book'),
         actions: [
-          if (book?.status == 'COMPLETED')
-            IconButton(
-              onPressed: _downloadingBook ? null : _downloadBook,
-              icon: _downloadingBook
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download_rounded),
-              tooltip: 'Download book',
-            ),
-          if (book?.isPublic == true && book?.publicUrl != null)
+          if (book?.publicUrl != null)
             IconButton(
               onPressed: _share,
               icon: const Icon(Icons.ios_share_rounded),
               tooltip: 'Share',
             ),
-          IconButton(
-            onPressed: () => _showReviewSheet(trigger: 'manual'),
-            icon: const Icon(Icons.report_problem_outlined),
-            tooltip: 'Troubleshoot',
-          ),
-          IconButton(
-            onPressed: _openExport,
-            icon: const Icon(Icons.open_in_new_rounded),
-            tooltip: 'Open in web',
-          ),
+          if (book != null)
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              onSelected: _onMenu,
+              itemBuilder: (_) => [
+                if (book.status == 'COMPLETED' || book.isGenerating)
+                  PopupMenuItem(
+                    value: 'cover',
+                    enabled: !_coverBusy,
+                    child: _menuRow(Icons.auto_awesome_rounded, 'New AI cover'),
+                  ),
+                PopupMenuItem(
+                  value: 'edition',
+                  child: _menuRow(Icons.library_add_rounded, 'New edition'),
+                ),
+                if (book.status == 'COMPLETED')
+                  PopupMenuItem(
+                    value: 'download',
+                    enabled: !_downloadingBook,
+                    child: _menuRow(Icons.download_rounded, 'Download book'),
+                  ),
+                PopupMenuItem(
+                  value: 'troubleshoot',
+                  child: _menuRow(
+                    Icons.report_problem_outlined,
+                    'Troubleshoot',
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'web',
+                  child: _menuRow(Icons.open_in_new_rounded, 'Open in web'),
+                ),
+                if (!book.isGenerating) ...[
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: _menuRow(
+                      Icons.delete_outline_rounded,
+                      'Delete book',
+                      color: AppColors.destructive,
+                    ),
+                  ),
+                ],
+              ],
+            ),
         ],
       ),
       body: _loading && book == null
@@ -887,82 +1337,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
                   children: [
-                    StripeCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            book.title,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${book.genre ?? 'Book'} · ${book.status.toLowerCase()}',
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 13,
-                            ),
-                          ),
-                          TextButton.icon(
-                            onPressed: () =>
-                                _showReviewSheet(trigger: 'manual'),
-                            icon: const Icon(Icons.report_problem_outlined,
-                                size: 16),
-                            label: const Text('Troubleshoot'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                          if (book.description != null &&
-                              book.description!.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            ExpandableText(
-                              book.description!,
-                              maxLines: 3,
-                              style: const TextStyle(
-                                color: AppColors.textBody,
-                                height: 1.45,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Text(
-                                '${book.progress.round()}%',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${book.currentPages} / ${book.targetPages} pages',
-                                style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: LinearProgressIndicator(
-                              value: (book.progress / 100).clamp(0, 1),
-                              minHeight: 8,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _header(book),
                     if (book.isGenerating || _liveText.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       StripeCard(
@@ -1022,6 +1397,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                           ],
                         ),
                       ),
+                    ],
+                    if (_content != null && _content!.chapters.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _chaptersCard(book, _content!),
                     ],
                     const SizedBox(height: 16),
                     StripeCard(

@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:bookai_mobile/config/api_config.dart';
+import 'package:bookai_mobile/models/book_content.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/services/api_client.dart';
 
@@ -87,6 +89,10 @@ class BooksProvider extends ChangeNotifier {
           .map((s) => s.trim())
           .where((s) => s.isNotEmpty)
           .toList();
+      // POV, tense, language, model, creativity and style are left out so
+      // the server applies the user's saved writing defaults. Tone and
+      // audience have no server fallback, so read them from settings.
+      final defaults = await _writingDefaults();
       final res = await _api.dio.post(
         ApiConfig.books,
         data: {
@@ -96,11 +102,8 @@ class BooksProvider extends ChangeNotifier {
           'targetPages': targetPages,
           'startGeneration': startGeneration,
           'generateAudiobookOnComplete': generateAudiobookOnComplete,
-          'tone': 'Professional',
-          'audience': 'General readers',
-          'pov': 'third',
-          'tense': 'past',
-          'language': 'en',
+          'tone': defaults.tone ?? 'Professional',
+          'audience': defaults.audience ?? 'General readers',
           if (customInstructions != null && customInstructions.isNotEmpty)
             'customInstructions': customInstructions,
           if (characterList.isNotEmpty) 'characters': characterList,
@@ -114,6 +117,87 @@ class BooksProvider extends ChangeNotifier {
       error = _api.extractError(e);
       notifyListeners();
       return null;
+    }
+  }
+
+  /// The whole book with chapter and section text (for reading/managing).
+  Future<BookContent?> fetchContent(String id) async {
+    try {
+      final res = await _api.dio.get('${ApiConfig.books}/$id');
+      return BookContent.fromJson(res.data as Map<String, dynamic>);
+    } catch (e) {
+      error = _api.extractError(e);
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Rewrites one chapter; waits for the new text. Throws with a readable
+  /// message on failure.
+  Future<void> regenerateChapter(String bookId, String chapterId) async {
+    try {
+      await _api.dio.post(
+        '${ApiConfig.books}/$bookId/chapters/$chapterId/regenerate',
+        options: Options(receiveTimeout: const Duration(minutes: 6)),
+      );
+    } catch (e) {
+      throw Exception(_api.extractError(e));
+    }
+  }
+
+  /// Draws a new AI cover; waits until it's saved.
+  Future<void> regenerateCover(String bookId) async {
+    try {
+      await _api.dio.post(
+        '${ApiConfig.books}/$bookId/cover',
+        options: Options(receiveTimeout: const Duration(minutes: 3)),
+      );
+      await load();
+    } catch (e) {
+      throw Exception(_api.extractError(e));
+    }
+  }
+
+  /// Starts a fresh manuscript from the same premise; returns the new book.
+  Future<BookModel> newEdition(String bookId) async {
+    try {
+      final res = await _api.dio.post(
+        '${ApiConfig.books}/$bookId/edition',
+        data: {'startGeneration': true},
+      );
+      final book = BookModel.fromJson(res.data as Map<String, dynamic>);
+      books = [book, ...books];
+      notifyListeners();
+      return book;
+    } catch (e) {
+      throw Exception(_api.extractError(e));
+    }
+  }
+
+  Future<void> deleteBook(String bookId) async {
+    try {
+      await _api.dio.delete('${ApiConfig.books}/$bookId');
+      books = books.where((b) => b.id != bookId).toList();
+      notifyListeners();
+    } catch (e) {
+      throw Exception(_api.extractError(e));
+    }
+  }
+
+  Future<({String? tone, String? audience})> _writingDefaults() async {
+    try {
+      final res = await _api.dio.get(ApiConfig.settings);
+      final data = res.data;
+      final user = data is Map<String, dynamic>
+          ? (data['user'] is Map<String, dynamic> ? data['user'] : data)
+          : const <String, dynamic>{};
+      String? pick(String key) {
+        final v = user[key];
+        return v is String && v.trim().isNotEmpty ? v.trim() : null;
+      }
+      return (tone: pick('defaultTone'), audience: pick('defaultAudience'));
+    } catch (_) {
+      return (tone: null, audience: null);
     }
   }
 

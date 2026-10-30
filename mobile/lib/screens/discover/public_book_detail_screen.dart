@@ -6,6 +6,7 @@ import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/providers/public_books_provider.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/common.dart';
+import 'package:bookai_mobile/widgets/manuscript_view.dart';
 
 class PublicBookDetailScreen extends StatefulWidget {
   const PublicBookDetailScreen({super.key, required this.slug});
@@ -150,7 +151,7 @@ class _PublicBookDetailScreenState extends State<PublicBookDetailScreen> {
                       ...book.chapters.map((ch) {
                         final open = _openChapter == ch.number;
                         final body = ch.sections
-                            .map((s) => s.content ?? '')
+                            .map((s) => s.markdown ?? s.content ?? '')
                             .where((c) => c.isNotEmpty)
                             .join('\n\n');
                         return StripeCard(
@@ -192,13 +193,10 @@ class _PublicBookDetailScreenState extends State<PublicBookDetailScreen> {
                               ],
                               if (open && body.isNotEmpty) ...[
                                 const SizedBox(height: 12),
-                                Text(
-                                  body,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    height: 1.55,
-                                    color: AppColors.navy,
-                                  ),
+                                ManuscriptView(
+                                  content: body,
+                                  palette: ReaderPalette.paper,
+                                  fontSize: 16,
                                 ),
                               ],
                             ],
