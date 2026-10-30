@@ -16,18 +16,10 @@ const LANDING_QR_STORAGE_KEY = "bookai_landing_qr_collapsed_v1";
 const DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 const OPEN_DELAY_MS = 800;
 
-function apkUrl(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_ANDROID_APK_URL?.trim();
-  if (fromEnv) return fromEnv;
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/download/android`;
-  }
-  return "/download/android";
-}
-
-function appVersion(): string {
-  return process.env.NEXT_PUBLIC_ANDROID_APP_VERSION?.trim() || "1.0.1";
-}
+/** The official Book AI listing; on Android it opens the Play Store app. */
+const PLAY_STORE_URL =
+  process.env.NEXT_PUBLIC_ANDROID_PLAY_STORE_URL?.trim() ||
+  "https://play.google.com/store/apps/details?id=com.trybookai.bookai_mobile";
 
 function wasDismissedRecently(key: string): boolean {
   try {
@@ -83,7 +75,7 @@ function useViewport() {
   return { ready, isPhone, isLarge };
 }
 
-function useQrDataUrl(downloadHref: string, enabled: boolean) {
+function useQrDataUrl(href: string, enabled: boolean) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,7 +83,7 @@ function useQrDataUrl(downloadHref: string, enabled: boolean) {
     let cancelled = false;
     void import("qrcode").then(async (QRCode) => {
       try {
-        const url = await QRCode.toDataURL(downloadHref, {
+        const url = await QRCode.toDataURL(href, {
           width: 200,
           margin: 1,
           color: { dark: "#111111", light: "#ffffff" },
@@ -105,7 +97,7 @@ function useQrDataUrl(downloadHref: string, enabled: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [enabled, downloadHref]);
+  }, [enabled, href]);
 
   return qrDataUrl;
 }
@@ -115,16 +107,12 @@ function LandingQrDrawer({
   expanded,
   onExpand,
   onCollapse,
-  downloadHref,
-  version,
 }: {
   expanded: boolean;
   onExpand: () => void;
   onCollapse: () => void;
-  downloadHref: string;
-  version: string;
 }) {
-  const qrDataUrl = useQrDataUrl(downloadHref, expanded);
+  const qrDataUrl = useQrDataUrl(PLAY_STORE_URL, expanded);
 
   if (!expanded) {
     return (
@@ -165,7 +153,7 @@ function LandingQrDrawer({
             <p className="text-[13px] font-semibold leading-tight tracking-[-0.02em] text-[#111]">
               Get the app
             </p>
-            <p className="text-[11px] text-[#6b6b6b]">Scan to install</p>
+            <p className="text-[11px] text-[#6b6b6b]">Scan for Google Play</p>
           </div>
         </div>
 
@@ -174,7 +162,7 @@ function LandingQrDrawer({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={qrDataUrl}
-              alt="QR code to download BookAI Android app"
+              alt="QR code for Book AI on Google Play"
               width={160}
               height={160}
               className="mx-auto h-40 w-40"
@@ -186,15 +174,13 @@ function LandingQrDrawer({
           )}
         </div>
 
-        <p className="mt-2 text-center text-[11px] text-[#6b6b6b]">
-          Android · v{version}
-        </p>
         <a
-          href={downloadHref}
-          download="bookai.apk"
-          className="mt-2 flex h-9 w-full items-center justify-center rounded-full bg-[#111] text-[12px] font-medium text-white transition-colors hover:bg-[#2a2a2a]"
+          href={PLAY_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex h-9 w-full items-center justify-center rounded-full bg-[#111] text-[12px] font-medium text-white transition-colors hover:bg-[#2a2a2a]"
         >
-          Download APK
+          Get it on Google Play
         </a>
       </div>
     </aside>
@@ -206,18 +192,12 @@ export function AppDownloadDrawer() {
   const { ready, isPhone, isLarge } = useViewport();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [landingExpanded, setLandingExpanded] = useState(true);
-  const [downloadHref, setDownloadHref] = useState(apkUrl());
-  const version = appVersion();
   const isLanding = pathname === "/";
   const useCornerQr = isLanding && isLarge && !isPhone;
   const qrDataUrl = useQrDataUrl(
-    downloadHref,
+    PLAY_STORE_URL,
     sheetOpen && !useCornerQr && !isPhone
   );
-
-  useEffect(() => {
-    setDownloadHref(apkUrl());
-  }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -254,8 +234,6 @@ export function AppDownloadDrawer() {
           rememberDismiss(LANDING_QR_STORAGE_KEY);
           setLandingExpanded(false);
         }}
-        downloadHref={downloadHref}
-        version={version}
       />
     );
   }
@@ -278,8 +256,8 @@ export function AppDownloadDrawer() {
           </SheetTitle>
           <SheetDescription className="max-w-[340px] text-[14px] leading-relaxed text-[#697386]">
             {isPhone
-              ? "Install the Android app on this phone. Updates can arrive over the air."
-              : "Scan the QR code with your phone, or download the APK. Updates can arrive over the air."}
+              ? "Install the official Book AI app from Google Play."
+              : "Scan the QR code with your phone to open Book AI on Google Play."}
           </SheetDescription>
         </SheetHeader>
 
@@ -290,7 +268,7 @@ export function AppDownloadDrawer() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={qrDataUrl}
-                  alt="QR code to download BookAI Android app"
+                  alt="QR code for Book AI on Google Play"
                   width={180}
                   height={180}
                   className="h-[180px] w-[180px]"
@@ -303,36 +281,15 @@ export function AppDownloadDrawer() {
             </div>
           )}
 
-          <p className="text-[12px] text-[#697386]">Version {version}</p>
-
-          <div className="flex w-full flex-col gap-2 sm:flex-row">
-            <a
-              href={downloadHref}
-              download="bookai.apk"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-[#0a2540] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#143556]"
-              onClick={() => rememberDismiss(SHEET_STORAGE_KEY)}
-            >
-              Download APK
-            </a>
-            {!isPhone && (
-              <a
-                href="/download"
-                className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-[#e6ebf1] bg-white px-5 text-[14px] font-medium text-[#0a2540] transition-colors hover:bg-[#f6f9fc]"
-                onClick={() => rememberDismiss(SHEET_STORAGE_KEY)}
-              >
-                Open download page
-              </a>
-            )}
-            {isPhone && (
-              <a
-                href={downloadHref}
-                className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-[#e6ebf1] bg-white px-5 text-[14px] font-medium text-[#0a2540] transition-colors hover:bg-[#f6f9fc]"
-                onClick={() => rememberDismiss(SHEET_STORAGE_KEY)}
-              >
-                Direct install link
-              </a>
-            )}
-          </div>
+          <a
+            href={PLAY_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#0a2540] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#143556] sm:w-auto sm:min-w-[240px]"
+            onClick={() => rememberDismiss(SHEET_STORAGE_KEY)}
+          >
+            Get it on Google Play
+          </a>
 
           <button
             type="button"
