@@ -83,7 +83,7 @@ export function PreviewStats({
   rows: { label: string; value: string }[];
 }) {
   return (
-    <dl className="divide-y divide-[#eef1f5]">
+    <dl className="divide-y divide-[#f0f2f6]">
       {rows.map((row) => (
         <div
           key={row.label}

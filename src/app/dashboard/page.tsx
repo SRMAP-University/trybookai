@@ -126,7 +126,7 @@ export default async function DashboardPage() {
           )}
           <Link
             href="/dashboard/books/new"
-            className="inline-flex h-8 items-center rounded-md border border-[#e6ebf1] bg-white px-3 text-[13px] font-medium text-[#635bff] transition-colors hover:border-[#635bff]/30 hover:bg-[#f6f9fc]"
+            className="inline-flex h-8 items-center rounded-full bg-[#f0efff] px-3.5 text-[13px] font-medium text-[#635bff] transition-colors hover:bg-[#e6e3ff]"
           >
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Create new
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
       </div>
 
       {totalBooks === 0 ? (
-        <div className="rounded-lg border border-dashed border-[#e6ebf1] px-6 py-14 text-center">
+        <div className="rounded-3xl bg-[#f7f8fb] px-6 py-14 text-center">
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#f0efff] text-[#635bff]">
             <BookOpen className="h-5 w-5" />
           </div>
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
             Use the prompt box above or start from a blank premise.
           </p>
           <Button
-            className="mt-6 h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+            className="mt-6 h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
             asChild
           >
             <Link href="/dashboard/books/new">
@@ -172,8 +172,8 @@ export default async function DashboardPage() {
       <div
         className={
           onTrial
-            ? "rounded-lg border border-[#f0e0a8] bg-[#fffbeb] px-4 py-3.5"
-            : "rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] px-4 py-3.5"
+            ? "rounded-2xl bg-[#fff6d6] px-5 py-4"
+            : "rounded-2xl bg-[#f6f9fc] px-5 py-4"
         }
       >
         <div className="flex flex-wrap items-center justify-between gap-2">

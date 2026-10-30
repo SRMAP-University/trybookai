@@ -132,10 +132,10 @@ export function GenerationReviewDialog({
                   setRating(opt.rating);
                 }}
                 className={cn(
-                  "rounded-xl border px-2 py-3 text-center transition-colors",
+                  "rounded-xl px-2 py-3 text-center transition-colors",
                   sentiment === opt.sentiment
-                    ? "border-[#635bff] bg-[#f0efff]"
-                    : "border-[#e6ebf1] bg-white hover:bg-[#f6f9fc]"
+                    ? "bg-[#f0efff] ring-2 ring-[#635bff]/50"
+                    : "bg-[#f7f8fb] ring-1 ring-transparent hover:bg-[#f0f2f7]"
                 )}
               >
                 <p className="text-[13px] font-medium text-[#0a2540]">
@@ -161,13 +161,19 @@ export function GenerationReviewDialog({
           />
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-[#e6ebf1] px-5 py-3">
-          <Button variant="ghost" size="sm" onClick={dismiss} disabled={saving}>
+        <div className="flex items-center justify-end gap-2 px-5 pb-4 pt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full px-3"
+            onClick={dismiss}
+            disabled={saving}
+          >
             Not now
           </Button>
           <Button
             size="sm"
-            className="bg-[#0a2540] hover:bg-[#143556]"
+            className="rounded-full bg-[#0a2540] px-3.5 hover:bg-[#143556]"
             onClick={() => void submit()}
             disabled={saving}
           >

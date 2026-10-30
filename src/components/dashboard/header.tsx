@@ -46,7 +46,7 @@ export function DashboardHeader() {
       .toUpperCase() || "U";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-[#e6ebf1] bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-20 bg-white/85 backdrop-blur-md">
       <div className="flex h-14 items-center justify-between gap-3 px-4 lg:h-16 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <Link
@@ -71,13 +71,13 @@ export function DashboardHeader() {
             <>
               <Button
                 variant="ghost"
-                className="h-8 px-2 text-[13px] text-[#0a2540] hover:bg-[#f6f9fc] sm:h-9 sm:px-3"
+                className="h-8 rounded-full px-2 text-[13px] text-[#0a2540] hover:bg-[#f6f9fc] sm:h-9 sm:px-3"
                 asChild
               >
                 <Link href="/login?callbackUrl=/dashboard">Sign in</Link>
               </Button>
               <Button
-                className="h-8 rounded-md bg-[#635bff] px-3 text-[13px] hover:bg-[#5851e5] sm:h-9 sm:px-4"
+                className="h-8 rounded-full bg-[#635bff] px-3.5 text-[13px] hover:bg-[#5851e5] sm:h-9 sm:px-4"
                 asChild
               >
                 <Link href="/register?callbackUrl=/dashboard">Get started</Link>
@@ -89,7 +89,7 @@ export function DashboardHeader() {
               {isFree ? (
                 <UpgradeButton
                   plan="PRO"
-                  className="h-8 rounded-md bg-[#635bff] px-3 text-[13px] hover:bg-[#5851e5] sm:h-9 sm:px-4"
+                  className="h-8 rounded-full bg-[#635bff] px-3.5 text-[13px] hover:bg-[#5851e5] sm:h-9 sm:px-4"
                 >
                   <Sparkles className="mr-1.5 h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Upgrade to Pro</span>
@@ -98,7 +98,7 @@ export function DashboardHeader() {
               ) : (
                 <Button
                   variant="outline"
-                  className="h-8 rounded-md border-[#e6ebf1] px-3 text-[13px] text-[#0a2540] hover:bg-[#f6f9fc] sm:h-9"
+                  className="h-8 rounded-full border-transparent bg-[#f6f9fc] px-3.5 text-[13px] text-[#0a2540] hover:bg-[#eef0f5] sm:h-9"
                   asChild
                 >
                   <Link href="/dashboard/billing">

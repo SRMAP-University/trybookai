@@ -42,9 +42,9 @@ type Analytics = {
 
 const jobStatusStyles: Record<string, string> = {
   PENDING: "text-[#697386]",
-  RUNNING: "text-[#9a6700] bg-[#fcf5e0] px-2 py-0.5 rounded",
-  COMPLETED: "text-[#0e6245] bg-[#cbf4c9] px-2 py-0.5 rounded",
-  FAILED: "text-[#df1b41] bg-[#fde8e8] px-2 py-0.5 rounded",
+  RUNNING: "text-[#9a6700] bg-[#fcf5e0] px-2 py-0.5 rounded-full",
+  COMPLETED: "text-[#0e6245] bg-[#cbf4c9] px-2 py-0.5 rounded-full",
+  FAILED: "text-[#df1b41] bg-[#fde8e8] px-2 py-0.5 rounded-full",
 };
 
 function TrackingPageContent() {
@@ -90,14 +90,14 @@ function TrackingPageContent() {
         <Button
           variant="outline"
           onClick={load}
-          className="h-9 border-[#e6ebf1] text-[13px]"
+          className="h-9 rounded-full border-transparent bg-[#f6f9fc] px-4 text-[13px] hover:bg-[#eef0f5]"
         >
           <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
           Refresh
         </Button>
       </div>
 
-      <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[#e6ebf1] bg-[#e6ebf1] lg:grid-cols-4">
+      <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: "Active jobs", value: data.summary.activeJobs },
           { label: "In progress books", value: inProgress.length },
@@ -107,7 +107,7 @@ function TrackingPageContent() {
             value: data.summary.completedBooks,
           },
         ].map((item) => (
-          <div key={item.label} className="bg-white px-5 py-4">
+          <div key={item.label} className="rounded-2xl bg-[#f7f8fb] px-5 py-4">
             <p className="text-[12px] font-medium uppercase tracking-wider text-[#697386]">
               {item.label}
             </p>
@@ -123,7 +123,7 @@ function TrackingPageContent() {
           Books in progress
         </h2>
         {inProgress.length === 0 ? (
-          <div className="mt-4 rounded-lg border border-dashed border-[#e6ebf1] px-6 py-10 text-center text-[14px] text-[#697386]">
+          <div className="mt-4 rounded-3xl bg-[#f7f8fb] px-6 py-10 text-center text-[14px] text-[#697386]">
             No books generating right now.
           </div>
         ) : (
@@ -132,7 +132,7 @@ function TrackingPageContent() {
               <Link
                 key={book.id}
                 href={`/dashboard/books/${book.id}`}
-                className="block rounded-lg border border-[#e6ebf1] bg-white p-4 hover:border-[#635bff]/40"
+                className="block rounded-2xl bg-white p-4 shadow-soft transition-shadow hover:shadow-soft-lg"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -159,10 +159,10 @@ function TrackingPageContent() {
         <h2 className="text-[15px] font-medium text-[#0a2540]">
           Generation activity
         </h2>
-        <div className="mt-4 overflow-hidden rounded-lg border border-[#e6ebf1]">
+        <div className="mt-4 overflow-hidden rounded-2xl bg-white shadow-soft">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-[#e6ebf1] bg-[#f6f9fc]">
+              <tr className="bg-[#f6f9fc]">
                 <th className="px-4 py-3 text-[12px] font-medium uppercase tracking-wider text-[#697386]">
                   Book
                 </th>
@@ -191,7 +191,7 @@ function TrackingPageContent() {
                 recentJobs.map((job) => (
                   <tr
                     key={job.id}
-                    className="border-b border-[#e6ebf1] last:border-0"
+                    className="border-b border-[#f0f2f6] last:border-0"
                   >
                     <td className="px-4 py-3">
                       <Link

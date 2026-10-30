@@ -33,7 +33,7 @@ export function GlobalGenerationWidget() {
         <button
           type="button"
           onClick={() => setCollapsed(false)}
-          className="flex w-full items-center gap-2.5 rounded-full border border-[#e6ebf1] bg-white px-4 py-2.5 text-left shadow-[0_12px_40px_rgba(10,37,64,0.14)]"
+          className="flex w-full items-center gap-2.5 rounded-full bg-white px-4 py-2.5 text-left shadow-[0_0_0_1px_rgba(10,37,64,0.04),0_12px_40px_rgba(10,37,64,0.14)]"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ebe9ff] text-[#635bff]">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -46,8 +46,8 @@ export function GlobalGenerationWidget() {
           </span>
         </button>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[#e6ebf1] bg-white shadow-[0_16px_48px_rgba(10,37,64,0.16)]">
-          <div className="flex items-center justify-between gap-2 border-b border-[#eef1f5] bg-[#fafbfc] px-4 py-3">
+        <div className="overflow-hidden rounded-3xl bg-white shadow-[0_0_0_1px_rgba(10,37,64,0.04),0_16px_48px_rgba(10,37,64,0.16)]">
+          <div className="flex items-center justify-between gap-2 bg-[#f7f8fb] px-4 py-3">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-[#635bff]" />
               <p className="text-[13px] font-semibold text-[#0a2540]">{total} generating</p>
@@ -114,8 +114,8 @@ export function HeaderJobsIndicator() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" aria-hidden onClick={() => setOpen(false)} />
-          <div className="absolute inset-x-2 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-[#e6ebf1] bg-white shadow-[0_16px_48px_rgba(10,37,64,0.18)]">
-            <div className="flex items-center justify-between border-b border-[#eef1f5] bg-[#fafbfc] px-4 py-2.5">
+          <div className="absolute inset-x-2 top-full z-50 mt-2 overflow-hidden rounded-3xl bg-white shadow-[0_0_0_1px_rgba(10,37,64,0.04),0_16px_48px_rgba(10,37,64,0.18)]">
+            <div className="flex items-center justify-between bg-[#f7f8fb] px-4 py-2.5">
               <p className="text-[13px] font-semibold text-[#0a2540]">
                 {total} generating · {pct}%
               </p>

@@ -98,7 +98,7 @@ export function DashboardSidebar() {
     usage?.plan === "FREE" && !usage?.hasStripeSubscription && !onTrial;
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col border-r border-[#e6ebf1] bg-white lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col bg-[#f7f8fb] lg:flex">
       <div className="flex h-16 items-center px-5">
         <Link
           href="/dashboard"
@@ -123,10 +123,10 @@ export function DashboardSidebar() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2.5 rounded-md px-3 py-2 text-[14px] transition-colors",
+                      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors",
                       active
-                        ? "bg-[#f0efff] font-medium text-[#635bff]"
-                        : "text-[#425466] hover:bg-[#f6f9fc] hover:text-[#0a2540]"
+                        ? "bg-[#ebe9ff] font-medium text-[#635bff]"
+                        : "text-[#425466] hover:bg-[#eef0f5] hover:text-[#0a2540]"
                     )}
                   >
                     <item.icon className="h-4 w-4 shrink-0" />
@@ -139,14 +139,14 @@ export function DashboardSidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-[#e6ebf1] px-3 pt-3">
+      <div className="px-3 pt-2">
         <Link
           href="/download#pwa"
           className={cn(
-            "mb-2 flex items-center gap-2.5 rounded-md px-3 py-2 text-[14px] transition-colors",
+            "mb-1 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors",
             pathname.startsWith("/download")
-              ? "bg-[#f0efff] font-medium text-[#635bff]"
-              : "text-[#635bff] hover:bg-[#f0efff] hover:text-[#5851e5]"
+              ? "bg-[#ebe9ff] font-medium text-[#635bff]"
+              : "text-[#635bff] hover:bg-[#ebe9ff] hover:text-[#5851e5]"
           )}
         >
           <Download className="h-4 w-4 shrink-0" />
@@ -155,7 +155,7 @@ export function DashboardSidebar() {
         <Link
           href="/download"
           className={cn(
-            "mb-2 flex items-center gap-2.5 rounded-md px-3 py-2 text-[14px] transition-colors",
+            "mb-2 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors",
             isActive(pathname, "/download")
               ? "bg-[#f0fdf6] font-medium text-[#2bb673]"
               : "text-[#3ddc84] hover:bg-[#f0fdf6] hover:text-[#2bb673]"
@@ -169,10 +169,10 @@ export function DashboardSidebar() {
       <div className="p-3 pt-0">
         <div
           className={cn(
-            "rounded-md border px-2.5 py-2",
+            "rounded-xl px-3 py-2.5",
             onTrial
-              ? "border-[#f0e0a8] bg-[#fffbeb]"
-              : "border-[#e6ebf1] bg-[#f6f9fc]"
+              ? "bg-[#fff6d6]"
+              : "bg-white shadow-[0_1px_3px_rgba(10,37,64,0.06)]"
           )}
         >
           <div className="flex items-center justify-between gap-2">
@@ -288,7 +288,7 @@ export function MobileDashboardNav() {
   return (
     // 64px tall (plus the iPhone home-indicator area); fixed elements that sit
     // above it use bottom-[calc(4rem+env(safe-area-inset-bottom))].
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[#e6ebf1] bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_-12px_rgba(10,37,64,0.25)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-20 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_-12px_rgba(10,37,64,0.25)] lg:hidden">
       <div className="flex h-16">
         {mobileNav.map((item) => {
           const active = isActive(pathname, item.href);

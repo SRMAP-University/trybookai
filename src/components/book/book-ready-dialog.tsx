@@ -49,7 +49,7 @@ export function BookReadyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[420px] overflow-hidden border-0 bg-[#0d1524] p-0 text-white">
+      <DialogContent className="max-w-[420px] overflow-hidden rounded-3xl border-0 bg-[#0d1524] p-0 text-white">
         <div className="relative isolate px-6 pb-6 pt-9 text-center">
           <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_20%,#2d3b57_0%,#0d1524_70%)]" />
           <div className="book-rise mx-auto w-[148px]">

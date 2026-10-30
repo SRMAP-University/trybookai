@@ -320,7 +320,7 @@ export function StoryReelPanel({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 border-[#e6ebf1] text-[12px]"
+            className="h-8 rounded-full border-transparent bg-[#f6f9fc] px-3.5 text-[12px] hover:bg-[#eef0f5]"
             onClick={() => onCreateOpenChange(true)}
           >
             <Plus className="mr-1 h-3.5 w-3.5" />
@@ -330,9 +330,9 @@ export function StoryReelPanel({
       </div>
 
       {!loaded ? (
-        <div className="h-28 animate-pulse rounded-xl border border-[#e6ebf1] bg-[#f6f9fc]" />
+        <div className="h-28 animate-pulse rounded-2xl bg-[#f6f9fc]" />
       ) : reels.length === 0 ? (
-        <div className="flex flex-col items-start gap-4 rounded-xl border border-[#e6ebf1] bg-[#f6f9fc] p-5 sm:flex-row sm:items-center">
+        <div className="flex flex-col items-start gap-4 rounded-3xl bg-[#f7f8fb] p-5 sm:flex-row sm:items-center">
           <div className="relative h-[92px] w-[110px] shrink-0" aria-hidden>
             <span className="absolute left-1 top-3 h-[76px] w-[43px] -rotate-[8deg] rounded-md bg-linear-to-br from-[#1d2b4f] to-[#c27a3a] shadow-md" />
             <span className="absolute left-[34px] top-0 h-[82px] w-[46px] rounded-md bg-linear-to-br from-[#0b2d36] to-[#36e0a5] shadow-lg" />
@@ -346,7 +346,7 @@ export function StoryReelPanel({
             </p>
           </div>
           <Button
-            className="h-9 shrink-0 bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+            className="h-9 shrink-0 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
             onClick={() => onCreateOpenChange(true)}
           >
             <Clapperboard className="mr-1.5 h-4 w-4" />
@@ -364,7 +364,7 @@ export function StoryReelPanel({
               0
             );
             return (
-              <article key={reel.id} className="rounded-xl border border-[#e6ebf1] bg-white p-4">
+              <article key={reel.id} className="rounded-2xl bg-white p-4 shadow-soft">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-[14px] font-semibold text-[#0a2540]">{reel.title}</p>
@@ -379,7 +379,7 @@ export function StoryReelPanel({
                     {ready.length > 0 && (
                       <Button
                         size="sm"
-                        className="h-8 bg-[#635bff] text-[12px] hover:bg-[#5851e5]"
+                        className="h-8 rounded-full bg-[#635bff] px-3.5 text-[12px] hover:bg-[#5851e5]"
                         onClick={() => setPlayer({ reelId: reel.id, episode: ready[0].number })}
                       >
                         <Play className="mr-1 h-3.5 w-3.5" />
@@ -388,7 +388,7 @@ export function StoryReelPanel({
                     )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Reel actions">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0" aria-label="Reel actions">
                           <Ellipsis className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -448,12 +448,12 @@ export function StoryReelPanel({
                 )}
 
                 {reel.status === "FAILED" && reel.errorMessage && (
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[#fde8e8]/60 px-3 py-2">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#fde8e8]/60 px-3 py-2">
                     <p className="text-[12px] text-[#df1b41]">{reel.errorMessage}</p>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 border-[#f5c2cc] text-[12px]"
+                      className="h-7 rounded-full border-[#f5c2cc] text-[12px]"
                       onClick={() => retry(reel)}
                     >
                       <RotateCcw className="mr-1 h-3 w-3" />
@@ -476,7 +476,7 @@ export function StoryReelPanel({
                             ? setPlayer({ reelId: reel.id, episode: episode.number })
                             : setBoard({ reelId: reel.id, episode: episode.number })
                         }
-                        className="group relative aspect-[9/16] overflow-hidden rounded-lg bg-[#0a2540] text-left"
+                        className="group relative aspect-[9/16] overflow-hidden rounded-xl bg-[#0a2540] text-left"
                         aria-label={`${done ? "Play" : "View"} ${episode.title}`}
                       >
                         {poster ? (

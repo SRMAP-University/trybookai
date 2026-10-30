@@ -38,6 +38,9 @@
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) * 1.25);
   --radius-xl: calc(var(--radius) * 1.5);
+  /* Soft cards: a faint edge plus a low, wide shadow instead of a hard border. */
+  --shadow-soft: 0 0 0 1px rgba(10, 37, 64, 0.04), 0 1px 2px rgba(10, 37, 64, 0.04), 0 8px 24px -12px rgba(10, 37, 64, 0.14);
+  --shadow-soft-lg: 0 0 0 1px rgba(99, 91, 255, 0.12), 0 2px 4px rgba(10, 37, 64, 0.04), 0 16px 36px -14px rgba(10, 37, 64, 0.2);
 }
 
 :root {
@@ -59,7 +62,7 @@
   --border: #e6ebf1;
   --input: #e6ebf1;
   --ring: #635bff;
-  --radius: 0.375rem;
+  --radius: 0.625rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #0a2540;
   --sidebar-primary: #635bff;

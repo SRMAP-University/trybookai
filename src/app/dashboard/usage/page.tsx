@@ -114,7 +114,7 @@ function UsagePageContent() {
           {error ?? "Could not load usage"}
         </p>
         <Button
-          className="mt-4"
+          className="mt-4 rounded-full px-4"
           variant="outline"
           onClick={() => window.location.reload()}
         >
@@ -145,7 +145,7 @@ function UsagePageContent() {
           </p>
         </div>
         <Button
-          className="h-9 rounded-md bg-[#635bff] text-[13px] hover:bg-[#5851e5]"
+          className="h-9 rounded-full bg-[#635bff] px-4 text-[13px] hover:bg-[#5851e5]"
           asChild
         >
           <Link href="/dashboard/billing">Manage plan</Link>
@@ -164,7 +164,7 @@ function UsagePageContent() {
         </div>
       )}
 
-      <div className="mt-8 rounded-lg border border-[#e6ebf1] bg-white p-6">
+      <div className="mt-8 rounded-2xl bg-white p-6 shadow-soft">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[12px] font-medium uppercase tracking-wider text-[#697386]">
@@ -214,7 +214,7 @@ function UsagePageContent() {
         <Progress value={data.summary.usagePercent} className="mt-5 h-2" />
       </div>
 
-      <div className="mt-6 rounded-lg border border-[#e6ebf1] bg-white p-6">
+      <div className="mt-6 rounded-2xl bg-white p-6 shadow-soft">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[12px] font-medium uppercase tracking-wider text-[#697386]">
@@ -251,7 +251,7 @@ function UsagePageContent() {
         />
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[#e6ebf1] bg-[#e6ebf1] lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           {
             label: "Pages generated",
@@ -270,7 +270,7 @@ function UsagePageContent() {
             value: `${data.summary.completedChapters}/${data.summary.totalChapters}`,
           },
         ].map((item) => (
-          <div key={item.label} className="bg-white px-5 py-4">
+          <div key={item.label} className="rounded-2xl bg-[#f7f8fb] px-5 py-4">
             <p className="text-[12px] font-medium uppercase tracking-wider text-[#697386]">
               {item.label}
             </p>
@@ -282,7 +282,7 @@ function UsagePageContent() {
       </div>
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
+        <div className="rounded-2xl bg-white p-5 shadow-soft">
           <h2 className="text-[15px] font-medium text-[#0a2540]">
             Activity · last 14 days
           </h2>
@@ -310,7 +310,7 @@ function UsagePageContent() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
+        <div className="rounded-2xl bg-white p-5 shadow-soft">
           <h2 className="text-[15px] font-medium text-[#0a2540]">
             Status breakdown
           </h2>
@@ -348,11 +348,11 @@ function UsagePageContent() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
+        <div className="rounded-2xl bg-white p-5 shadow-soft">
           <h2 className="text-[15px] font-medium text-[#0a2540]">
             Top books by pages
           </h2>
-          <div className="mt-4 divide-y divide-[#e6ebf1]">
+          <div className="mt-4 divide-y divide-[#f0f2f6]">
             {topBooks.length === 0 ? (
               <p className="py-6 text-[14px] text-[#697386]">No books yet.</p>
             ) : (
@@ -379,7 +379,7 @@ function UsagePageContent() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#e6ebf1] bg-white p-5">
+        <div className="rounded-2xl bg-white p-5 shadow-soft">
           <h2 className="text-[15px] font-medium text-[#0a2540]">
             Genre mix
           </h2>

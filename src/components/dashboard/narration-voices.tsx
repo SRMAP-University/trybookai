@@ -109,7 +109,7 @@ export function VoicePreviewButton({
       onClick={toggle}
       aria-label={`${playing ? "Stop" : "Play"} ${voice.name} sample`}
       className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#e6ebf1] text-[#635bff] transition-colors hover:border-[#c9c5ff] hover:bg-[#f8f7ff]",
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#635bff] shadow-[0_1px_3px_rgba(10,37,64,0.12)] transition-colors hover:bg-[#f0efff]",
         className
       )}
     >
@@ -139,10 +139,10 @@ export function MusicLevelPicker({
             aria-checked={value === level.id}
             onClick={() => onChange(level.id)}
             className={cn(
-              "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors",
+              "rounded-full px-3 py-1.5 text-[12px] font-medium ring-1 transition-colors",
               value === level.id
-                ? "border-[#635bff] bg-[#f0efff] text-[#635bff]"
-                : "border-[#e6ebf1] text-[#425466] hover:border-[#c9c5ff]"
+                ? "bg-[#f0efff] text-[#635bff] ring-[#635bff]/40"
+                : "bg-[#f7f8fb] text-[#425466] ring-transparent hover:bg-[#f0f2f7]"
             )}
           >
             {level.label}
