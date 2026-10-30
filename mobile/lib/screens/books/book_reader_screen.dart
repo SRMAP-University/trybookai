@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:bookai_mobile/models/book_content.dart';
 import 'package:bookai_mobile/providers/books_provider.dart';
+import 'package:bookai_mobile/services/reader_memory.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/manuscript_view.dart';
 
@@ -103,6 +104,17 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       _pages = PageController(initialPage: index);
       _loading = false;
     });
+    _rememberPlace(index);
+  }
+
+  void _rememberPlace(int index) {
+    final book = _book;
+    if (book == null || index >= _chapters.length) return;
+    ReaderMemory.remember(
+      book.id,
+      _chapters[index].number,
+      book.chapters.length,
+    );
   }
 
   void _goTo(int index) {
@@ -117,6 +129,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
   void _onPage(int index) {
     setState(() => _index = index);
     _write(_posKey, _chapters[index].id);
+    _rememberPlace(index);
   }
 
   void _setPalette(ReaderPalette p) {
@@ -217,7 +230,8 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
       onPageChanged: _onPage,
       itemBuilder: (context, i) {
         final c = _chapters[i];
-        final multi = c.sections.where((s) => s.title.trim().isNotEmpty).length > 1;
+        final multi =
+            c.sections.where((s) => s.title.trim().isNotEmpty).length > 1;
         return SingleChildScrollView(
           key: PageStorageKey('chapter_${c.id}'),
           padding: const EdgeInsets.fromLTRB(22, 8, 22, 28),
@@ -419,7 +433,10 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
                 children: [
                   Text(
                     'Page',
-                    style: TextStyle(fontWeight: FontWeight.w800, color: p.text),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: p.text,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -463,7 +480,10 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
                   const SizedBox(height: 20),
                   Text(
                     'Text size',
-                    style: TextStyle(fontWeight: FontWeight.w800, color: p.text),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: p.text,
+                    ),
                   ),
                   Row(
                     children: [
