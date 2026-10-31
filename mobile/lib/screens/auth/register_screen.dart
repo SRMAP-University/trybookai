@@ -55,9 +55,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (ok) {
       context.go(auth.pendingOnboarding ? '/books/new' : '/home');
     } else if (auth.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(auth.error!)));
     }
   }
 
@@ -67,19 +67,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final busy = auth.loading || _googleLoading;
 
     return AuthScaffold(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded),
-        onPressed: () => context.go('/login'),
-      ),
+      onBack: () => context.go('/login'),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const AuthHero(headline: 'Create account'),
-              const SizedBox(height: 28),
+              const AuthHero(
+                eyebrow: 'New to BookAI?',
+                title: 'Start writing',
+                subtitle: 'Turn one idea into a whole book.',
+              ),
+              const SizedBox(height: 14),
+              const Divider(height: 1, color: AppColors.border),
+              const SizedBox(height: 24),
               GoogleSignInButton(
                 onPressed: busy ? null : _google,
                 loading: _googleLoading,
@@ -127,9 +130,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     : const Text('Create account'),
               ),
               const SizedBox(height: 16),
-              const AuthLegalNotice(
-                actionLabel: 'By creating an account',
-              ),
+              const AuthLegalNotice(actionLabel: 'By creating an account'),
               const SizedBox(height: 20),
               TextButton(
                 onPressed: () => context.go('/login'),

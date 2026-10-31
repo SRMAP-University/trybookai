@@ -1,13 +1,10 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:bookai_mobile/models/models.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/book_cover_3d.dart';
-
-/// A cover to show in the Home header.
-typedef HeroCover = ({String title, String? coverImage, String? slug});
+import 'package:bookai_mobile/widgets/cover_hero.dart';
 
 /// Fades and slides its child up once, after [delay].
 class Reveal extends StatefulWidget {
@@ -184,134 +181,19 @@ class HomeLink extends StatelessWidget {
 
 /// Greeting with a few books floating beside it. Starting a book lives in
 /// the floating New book button, so this stays quiet.
-class HomeHero extends StatefulWidget {
+class HomeHero extends StatelessWidget {
   const HomeHero({super.key, required this.name, required this.covers});
 
   final String? name;
   final List<HeroCover> covers;
 
   @override
-  State<HomeHero> createState() => _HomeHeroState();
-}
-
-class _HomeHeroState extends State<HomeHero>
-    with SingleTickerProviderStateMixin {
-  late final _float = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 3800),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (AppMotion.reduced(context)) {
-      _float.value = 0.5;
-    } else if (!_float.isAnimating) {
-      _float.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _float.dispose();
-    super.dispose();
-  }
-
-  String get _greeting {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
-  @override
   Widget build(BuildContext context) {
-    const placeholders = <HeroCover>[
-      (title: 'Your next story', coverImage: null, slug: null),
-      (title: 'Once upon a time', coverImage: null, slug: null),
-      (title: 'Chapter one', coverImage: null, slug: null),
-    ];
-    final covers = [...widget.covers, ...placeholders].take(3).toList();
-
-    return SizedBox(
-      height: 172,
-      child: Stack(
-        children: [
-          Positioned(
-            right: -4,
-            top: 0,
-            bottom: 0,
-            width: 150,
-            child: AnimatedBuilder(
-              animation: _float,
-              builder: (_, _) =>
-                  _bookStack(covers, Curves.easeInOut.transform(_float.value)),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 150),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _greeting,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  widget.name ?? 'Writer',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppType.display(size: 40),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'What story will you write today?',
-                  style: TextStyle(
-                    color: AppColors.textBody,
-                    fontSize: 15,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bookStack(List<HeroCover> covers, double t) {
-    // Back left, back right, then the biggest one in front.
-    final layout = [
-      (left: 4.0, top: 48.0, width: 58.0, angle: -0.18, bob: -5 * t),
-      (left: 78.0, top: 52.0, width: 56.0, angle: 0.16, bob: 5 * (1 - t)),
-      (left: 34.0, top: 24.0, width: 72.0, angle: -0.03, bob: 7 * t - 3),
-    ];
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        for (var i = 0; i < covers.length && i < layout.length; i++)
-          Positioned(
-            left: layout[i].left,
-            top: layout[i].top + layout[i].bob,
-            child: Transform.rotate(
-              angle: layout[i].angle + 0.02 * math.sin(t * math.pi),
-              child: BookCover3D(
-                title: covers[i].title,
-                coverImage: covers[i].coverImage,
-                slug: covers[i].slug,
-                width: layout[i].width,
-                ribbon: i == 2,
-              ),
-            ),
-          ),
-      ],
+    return CoverHero(
+      eyebrow: greetingNow(),
+      title: name ?? 'Writer',
+      subtitle: 'What story will you write today?',
+      covers: covers,
     );
   }
 }
