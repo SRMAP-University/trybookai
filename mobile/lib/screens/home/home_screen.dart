@@ -18,6 +18,7 @@ import 'package:bookai_mobile/screens/home/home_widgets.dart';
 import 'package:bookai_mobile/services/reader_memory.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/book_shelf.dart';
+import 'package:bookai_mobile/widgets/cover_hero.dart';
 import 'package:bookai_mobile/widgets/skeleton.dart';
 
 /// Cover width on Home's shelves (covers only, so they can be generous).

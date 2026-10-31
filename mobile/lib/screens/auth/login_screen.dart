@@ -34,9 +34,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ok) {
       context.go('/home');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error ?? 'Login failed')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(auth.error ?? 'Login failed')));
     }
   }
 
@@ -49,9 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ok) {
       context.go('/home');
     } else if (auth.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(auth.error!)));
     }
   }
 
@@ -62,14 +62,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return AuthScaffold(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const AuthHero(headline: 'Sign in'),
-              const SizedBox(height: 28),
+              const AuthHero(
+                title: 'Welcome back',
+                subtitle: 'Sign in to keep writing your books.',
+              ),
+              const SizedBox(height: 14),
+              const Divider(height: 1, color: AppColors.border),
+              const SizedBox(height: 24),
               GoogleSignInButton(
                 onPressed: busy ? null : _google,
                 loading: _googleLoading,

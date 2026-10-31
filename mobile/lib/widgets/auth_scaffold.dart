@@ -1,19 +1,20 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:bookai_mobile/providers/public_books_provider.dart';
+import 'package:bookai_mobile/screens/home/home_stats.dart';
 import 'package:bookai_mobile/theme/app_theme.dart';
 import 'package:bookai_mobile/widgets/bookai_logo.dart';
+import 'package:bookai_mobile/widgets/cover_hero.dart';
 
-/// Shared atmospheric shell for sign-in / sign-up.
+/// Sign-in and sign-up, laid out like Home: the logo on Home's navy strip,
+/// and the form on a white sheet below it.
 class AuthScaffold extends StatefulWidget {
-  const AuthScaffold({
-    super.key,
-    required this.child,
-    this.leading,
-  });
+  const AuthScaffold({super.key, required this.child, this.onBack});
 
   final Widget child;
-  final Widget? leading;
+
+  /// Shows a back button before the logo.
+  final VoidCallback? onBack;
 
   @override
   State<AuthScaffold> createState() => _AuthScaffoldState();
@@ -30,15 +31,13 @@ class _AuthScaffoldState extends State<AuthScaffold>
     parent: _motion,
     curve: const Interval(0, 0.55, curve: Curves.easeOut),
   );
-  late final Animation<Offset> _slide = Tween<Offset>(
-    begin: const Offset(0, 0.04),
-    end: Offset.zero,
-  ).animate(
-    CurvedAnimation(
-      parent: _motion,
-      curve: const Interval(0.1, 0.75, curve: Curves.easeOutCubic),
-    ),
-  );
+  late final Animation<Offset> _slide =
+      Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(
+        CurvedAnimation(
+          parent: _motion,
+          curve: const Interval(0.1, 0.75, curve: Curves.easeOutCubic),
+        ),
+      );
 
   @override
   void dispose() {
@@ -48,69 +47,110 @@ class _AuthScaffoldState extends State<AuthScaffold>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _AuthBackdrop()),
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (widget.leading != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: widget.leading,
+    const dock = DockTheme.navy;
+    final onBack = widget.onBack;
+    return AnnotatedRegion(
+      value: dock.overlay,
+      child: Scaffold(
+        backgroundColor: dock.base,
+        body: Padding(
+          padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: homePeekHeight,
+                child: Padding(
+                  padding: EdgeInsets.only(left: onBack == null ? 20 : 12),
+                  child: Row(
+                    children: [
+                      if (onBack != null) ...[
+                        IconButton(
+                          tooltip: 'Back',
+                          onPressed: onBack,
+                          style: IconButton.styleFrom(
+                            backgroundColor: dock.wash,
+                            foregroundColor: dock.ink,
+                            fixedSize: const Size(40, 40),
+                          ),
+                          icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      BookAiLogo(height: 24, color: dock.ink),
+                    ],
                   ),
-                Expanded(
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: SlideTransition(
-                      position: _slide,
-                      child: widget.child,
+                ),
+              ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  child: ColoredBox(
+                    color: AppColors.white,
+                    child: SafeArea(
+                      top: false,
+                      child: FadeTransition(
+                        opacity: _fade,
+                        child: SlideTransition(
+                          position: _slide,
+                          child: widget.child,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class AuthHero extends StatelessWidget {
+/// The top of the sheet, in Home's style, with books from Discover floating
+/// beside it.
+class AuthHero extends StatefulWidget {
   const AuthHero({
     super.key,
-    required this.headline,
-    this.subtitle,
+    this.eyebrow,
+    required this.title,
+    required this.subtitle,
   });
 
-  final String headline;
-  final String? subtitle;
+  /// Defaults to "Good morning" and so on, like Home.
+  final String? eyebrow;
+  final String title;
+  final String subtitle;
+
+  @override
+  State<AuthHero> createState() => _AuthHeroState();
+}
+
+class _AuthHeroState extends State<AuthHero> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final pub = context.read<PublicBooksProvider>();
+      if (pub.books.isEmpty && !pub.loading) pub.load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const BookAiLogo(height: 36),
-        const SizedBox(height: 20),
-        Text(
-          headline,
-          style: AppType.display(size: 36),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            subtitle!,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.4,
-              color: AppColors.textMuted,
-            ),
-          ),
-        ],
+    final pub = context.watch<PublicBooksProvider>();
+    return CoverHero(
+      eyebrow: widget.eyebrow ?? greetingNow(),
+      title: widget.title,
+      subtitle: widget.subtitle,
+      titleLines: 2,
+      covers: [
+        for (final b in pub.books.where((b) => b.coverImage != null).take(3))
+          (title: b.title, coverImage: b.coverImage, slug: b.slug),
       ],
     );
   }
@@ -157,91 +197,4 @@ class _AuthPasswordFieldState extends State<AuthPasswordField> {
       validator: widget.validator,
     );
   }
-}
-
-class _AuthBackdrop extends StatelessWidget {
-  const _AuthBackdrop();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFF7F9FC),
-            Color(0xFFEEF2F8),
-            Color(0xFFE8EEF6),
-            Color(0xFFF4F1FF),
-          ],
-          stops: [0, 0.35, 0.7, 1],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -80,
-            right: -60,
-            child: _Blob(
-              size: 220,
-              color: AppColors.primary.withValues(alpha: 0.10),
-            ),
-          ),
-          Positioned(
-            bottom: -40,
-            left: -50,
-            child: _Blob(
-              size: 180,
-              color: AppColors.navy.withValues(alpha: 0.06),
-            ),
-          ),
-          Positioned.fill(
-            child: CustomPaint(painter: _PageLinesPainter()),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Blob extends StatelessWidget {
-  const _Blob({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
-    );
-  }
-}
-
-class _PageLinesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.navy.withValues(alpha: 0.035)
-      ..strokeWidth = 1;
-
-    for (var i = 0; i < 7; i++) {
-      final y = size.height * (0.22 + i * 0.08);
-      final wobble = math.sin(i * 0.9) * 12;
-      canvas.drawLine(
-        Offset(24 + wobble, y),
-        Offset(size.width - 32 - wobble, y),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,39 +1,41 @@
-import 'package:bookai_mobile/theme/app_theme.dart';
+import 'package:bookai_mobile/screens/home/home_stats.dart';
+import 'package:bookai_mobile/widgets/bookai_logo.dart';
 import 'package:flutter/material.dart';
 
 /// Shown while restoring the session so logged-in users never flash Login.
+/// It picks up from the launch splash: Home's navy with the white mark in
+/// the same place, plus a small spinner.
 class BootScreen extends StatelessWidget {
   const BootScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: AppColors.white,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'BookAI',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -1,
-                  color: AppColors.navy,
-                ),
+    const dock = DockTheme.navy;
+    return AnnotatedRegion(
+      value: dock.overlay,
+      child: Scaffold(
+        backgroundColor: dock.base,
+        body: Stack(
+          children: [
+            Center(
+              child: BookAiLogo(
+                height: 128,
+                showWordmark: false,
+                color: dock.ink,
               ),
-              SizedBox(height: 28),
-              SizedBox(
-                width: 28,
-                height: 28,
+            ),
+            Align(
+              alignment: const Alignment(0, 0.32),
+              child: SizedBox(
+                width: 24,
+                height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  color: AppColors.primary,
+                  color: dock.accent,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
