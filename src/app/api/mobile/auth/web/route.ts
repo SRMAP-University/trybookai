@@ -33,6 +33,8 @@ export async function GET(request: NextRequest) {
     app,
     challenge,
     state,
+    // When it started, so a cookie left behind goes stale (mobileFinishUrl).
+    t: String(Date.now()),
   })}`;
 
   // Start signed out of the website in this browser. Signed in as someone

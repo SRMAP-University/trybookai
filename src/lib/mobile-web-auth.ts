@@ -13,6 +13,13 @@ const APP_SCHEMES = new Set(["trybookai", "trybookai-dev"]);
 
 export const MOBILE_FINISH_PATH = "/api/mobile/auth/web/finish";
 
+/**
+ * How long a sign-in the app started still counts. NextAuth keeps its
+ * destination in a cookie, and one left by a sign-in the app gave up on must
+ * not send later website visits back to the app.
+ */
+export const MOBILE_SIGN_IN_MS = 15 * 60 * 1000;
+
 export function isAppScheme(value: string | null): value is string {
   return value !== null && APP_SCHEMES.has(value);
 }
@@ -56,7 +63,10 @@ export function expiredCookie(name: string) {
   };
 }
 
-/** [callbackUrl] as the app's finish step on this host, or null if it isn't. */
+/**
+ * [callbackUrl] as the app's finish step on this host, or null if it isn't
+ * one, or the sign-in it belongs to started too long ago.
+ */
 export function mobileFinishUrl(callbackUrl: string | null | undefined, base: URL) {
   if (!callbackUrl) return null;
   let target: URL;
@@ -66,6 +76,8 @@ export function mobileFinishUrl(callbackUrl: string | null | undefined, base: UR
     return null;
   }
   if (target.pathname !== MOBILE_FINISH_PATH) return null;
+  const started = Number(target.searchParams.get("t"));
+  if (!started || Date.now() - started > MOBILE_SIGN_IN_MS) return null;
   const url = new URL(MOBILE_FINISH_PATH, base);
   url.search = target.search;
   return url;
