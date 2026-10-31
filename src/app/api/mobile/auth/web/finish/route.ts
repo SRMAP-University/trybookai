@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
   };
 
   if (!isPkceValue(challenge)) return back({ error: "invalid_request" });
+  // Google sign-in failed: say so, whatever session this browser still has.
+  if (params.has("error")) return back({ error: "google_failed" });
 
   const session = await auth();
   const userId = session?.user?.id;
