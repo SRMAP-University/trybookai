@@ -6,6 +6,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { BarChart, StackedSentiment, StatCard } from "@/components/admin/charts";
 import { CountryFlag } from "@/components/admin/country-flag";
 import { Button } from "@/components/ui/button";
+import { timeAgo } from "@/lib/admin-format";
 import { cn } from "@/lib/utils";
 
 type ClientCounts = {
@@ -15,6 +16,33 @@ type ClientCounts = {
   unknown: number;
 };
 
+type InProgress = {
+  total: number;
+  queued: number;
+  outlining: number;
+  writing: number;
+  noLiveJob: number;
+  users: number;
+  byUser: Array<{
+    userId: string;
+    email: string;
+    name: string | null;
+    count: number;
+  }>;
+  books: Array<{
+    id: string;
+    title: string;
+    stage: "queued" | "outlining" | "writing";
+    hasLiveJob: boolean;
+    progress: number;
+    currentPages: number;
+    targetPages: number;
+    createdVia: string;
+    updatedAt: string;
+    user: { id: string; email: string; name: string | null; plan: string };
+  }>;
+};
+
 type Overview = {
   summary: {
     users: number;
@@ -22,6 +50,7 @@ type Overview = {
     completedBooks: number;
     failedBooks: number;
     activeJobs: number;
+    inProgressBooks: number;
     signups24h: number;
     signups7d: number;
     completionRate: number;
@@ -39,6 +68,7 @@ type Overview = {
     books7d: ClientCounts;
     jobs7d: ClientCounts;
   };
+  inProgress: InProgress;
   sentiment: Record<string, number>;
   gaps: Array<{
     severity: string;
@@ -88,26 +118,65 @@ const severityColor: Record<string, string> = {
   low: "border-[#e6ebf1] bg-white text-[#425466]",
 };
 
+const stageStyle: Record<InProgress["books"][number]["stage"], string> = {
+  queued: "bg-[#f0f3f7] text-[#697386]",
+  outlining: "bg-[#ebe9ff] text-[#635bff]",
+  writing: "bg-[#e8faf0] text-[#0e6245]",
+};
+
+const clientLabel: Record<string, string> = {
+  ios: "iOS",
+  android: "Android",
+  web: "Web",
+  unknown: "App",
+};
+
+async function fetchOverview(): Promise<
+  { data: Overview; error?: undefined } | { data?: undefined; error: string }
+> {
+  try {
+    const res = await fetch("/api/adarsh/overview");
+    if (!res.ok) {
+      return {
+        error: res.status === 403 ? "Admin access required" : "Failed to load",
+      };
+    }
+    return { data: (await res.json()) as Overview };
+  } catch {
+    return { error: "Failed to load" };
+  }
+}
+
 export default function AdarshOverviewPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchedAt, setFetchedAt] = useState(0);
 
-  async function load() {
-    setLoading(true);
-    setError(null);
-    const res = await fetch("/api/adarsh/overview");
-    if (!res.ok) {
-      setError(res.status === 403 ? "Admin access required" : "Failed to load");
-      setLoading(false);
-      return;
+  function apply(result: Awaited<ReturnType<typeof fetchOverview>>) {
+    if (result.data) {
+      setData(result.data);
+      setError(null);
+    } else {
+      setError(result.error);
     }
-    setData(await res.json());
+    setFetchedAt(Date.now());
     setLoading(false);
   }
 
+  async function load() {
+    setLoading(true);
+    apply(await fetchOverview());
+  }
+
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    void fetchOverview().then((result) => {
+      if (!cancelled) apply(result);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading && !data) {
@@ -152,13 +221,19 @@ export default function AdarshOverviewPage() {
           value={s.books}
           hint={`${s.completionRate}% complete · ${s.failRate}% failed`}
         />
-        <StatCard label="Active jobs" value={s.activeJobs} hint="Queued / running" />
+        <StatCard
+          label="Books in progress"
+          value={s.inProgressBooks}
+          hint={`${s.activeJobs} generation job${s.activeJobs === 1 ? "" : "s"} queued / running`}
+        />
         <StatCard
           label="Avg sentiment"
           value={s.avgScore}
           hint="Higher = happier users"
         />
       </div>
+
+      <InProgressSection data={data.inProgress} now={fetchedAt} />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -363,6 +438,189 @@ export default function AdarshOverviewPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function InProgressSection({
+  data,
+  now,
+}: {
+  data: InProgress;
+  now: number;
+}) {
+  const tiles: Array<{
+    label: string;
+    value: number;
+    dot?: string;
+    hint?: string;
+    warn?: boolean;
+  }> = [
+    { label: "Queued", value: data.queued, dot: "#a3acb9", hint: "Waiting for a slot" },
+    { label: "Outlining", value: data.outlining, dot: "#635bff", hint: "Planning chapters" },
+    { label: "Writing", value: data.writing, dot: "#0e6245", hint: "Writing pages" },
+    {
+      label: "No live job",
+      value: data.noLiveJob,
+      hint: "Recovery will mark failed",
+      warn: data.noLiveJob > 0,
+    },
+  ];
+
+  return (
+    <section className="rounded-xl border border-[#e6ebf1] bg-white p-4 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-[14px] font-semibold">In progress now</h2>
+          <p className="text-[12px] text-[#697386]">
+            Books outlining or writing right now
+            {data.total > 0
+              ? ` · ${data.users} user${data.users === 1 ? "" : "s"}`
+              : ""}
+          </p>
+        </div>
+        <Link href="/adarsh/books" className="text-[12px] text-[#635bff]">
+          Generations
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="col-span-2 rounded-lg border border-[#e6ebf1] bg-[#f6f9fc] px-3 py-2.5 sm:col-span-1">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[#a3acb9]">
+            In progress
+          </p>
+          <p className="mt-0.5 text-[28px] font-semibold leading-tight tracking-[-0.03em] tabular-nums text-[#0a2540]">
+            {data.total}
+          </p>
+        </div>
+        {tiles.map((t) => (
+          <div
+            key={t.label}
+            className={cn(
+              "rounded-lg border px-3 py-2.5",
+              t.warn
+                ? "border-[#fcf5e0] bg-[#fffbeb]"
+                : "border-[#e6ebf1]"
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              {t.dot ? (
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: t.dot }}
+                />
+              ) : null}
+              <span
+                className={cn(
+                  "text-[11px]",
+                  t.warn ? "text-[#9a6700]" : "text-[#697386]"
+                )}
+              >
+                {t.label}
+              </span>
+            </div>
+            <p className="mt-1 text-[18px] font-semibold tabular-nums text-[#0a2540]">
+              {t.value}
+            </p>
+            {t.hint ? (
+              <p className="text-[11px] text-[#a3acb9]">{t.hint}</p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {data.total === 0 ? (
+        <p className="mt-4 text-[13px] text-[#697386]">
+          Nothing is generating right now.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#a3acb9]">
+              Books
+              {data.total > data.books.length
+                ? ` · latest ${data.books.length} of ${data.total}`
+                : ""}
+            </p>
+            <ul className="divide-y divide-[#e6ebf1] rounded-lg border border-[#e6ebf1]">
+              {data.books.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1 basis-[200px]">
+                    <Link
+                      href={`/adarsh/books/${b.id}`}
+                      className="block truncate text-[13px] font-medium text-[#0a2540] hover:text-[#635bff]"
+                    >
+                      {b.title || "Untitled"}
+                    </Link>
+                    <p className="truncate text-[11px] text-[#697386]">
+                      {b.user.email} · {clientLabel[b.createdVia] ?? "Web"} ·{" "}
+                      {b.user.plan}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize",
+                        stageStyle[b.stage]
+                      )}
+                    >
+                      {b.stage}
+                    </span>
+                    {!b.hasLiveJob ? (
+                      <span
+                        className="inline-flex rounded-full bg-[#fcf5e0] px-2 py-0.5 text-[11px] font-medium text-[#9a6700]"
+                        title="No queued or running generation job"
+                      >
+                        no live job
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="w-[120px]">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[#f0f3f7]">
+                      <div
+                        className="h-full rounded-full bg-[#635bff]"
+                        style={{
+                          width: `${Math.min(100, Math.max(0, b.progress))}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-0.5 text-[11px] tabular-nums text-[#697386]">
+                      {b.progress}% · {b.currentPages}/{b.targetPages}p
+                    </p>
+                  </div>
+                  <span className="w-[64px] text-right text-[11px] text-[#a3acb9]">
+                    {now ? timeAgo(b.updatedAt, now) : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#a3acb9]">
+              By user
+            </p>
+            <ul className="space-y-1.5">
+              {data.byUser.map((u) => (
+                <li
+                  key={u.userId}
+                  className="flex items-center justify-between gap-3 text-[13px]"
+                >
+                  <span className="min-w-0 truncate text-[#425466]" title={u.email}>
+                    {u.name ? `${u.name} · ` : ""}
+                    {u.email}
+                  </span>
+                  <span className="shrink-0 tabular-nums font-medium text-[#0a2540]">
+                    {u.count}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

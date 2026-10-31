@@ -109,7 +109,9 @@ export function scoreUser(user: UserRow, books: BookRow[], now = new Date()): Us
   );
   const paused = books.filter((b) => b.status === "PAUSED");
   const drafts = books.filter((b) => b.status === "DRAFT");
-  const pagesLimit = user.pagesLimit + (user.pagesBonus || 0);
+  // Stored pagesLimit already includes purchased add-on pages
+  // (limitsFromPlanAndBonuses); the app checks pagesLimit - pagesUsed.
+  const pagesLimit = user.pagesLimit;
   const pageUtil = pagesLimit > 0 ? user.pagesUsed / pagesLimit : 0;
 
   const lastBook = [...books].sort(
