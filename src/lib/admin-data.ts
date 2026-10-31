@@ -1,4 +1,7 @@
+import type { BookStatus, Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { AUDIO_STUDIO_GENRE } from "@/lib/audio-studio";
+import { SONG_STUDIO_GENRE } from "@/lib/song-studio";
 import {
   buildProductGaps,
   scoreUser,
@@ -7,73 +10,166 @@ import {
   type UserInsight,
 } from "@/lib/admin-insights";
 
+/** Same rule as /api/jobs/active and the dashboard: still generating. */
+const IN_PROGRESS_BOOK_STATUSES: BookStatus[] = ["OUTLINING", "GENERATING"];
+
+/** Audio / Song Studio drafts are stored as books but aren't written books. */
+const STUDIO_GENRES = [AUDIO_STUDIO_GENRE, SONG_STUDIO_GENRE];
+
+async function loadInProgressBooks() {
+  const books = await db.book.findMany({
+    where: { status: { in: IN_PROGRESS_BOOK_STATUSES } },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      progress: true,
+      currentPages: true,
+      targetPages: true,
+      createdVia: true,
+      createdAt: true,
+      updatedAt: true,
+      user: { select: { id: true, email: true, name: true, plan: true } },
+      // Live job = QUEUED / RUNNING, as in recoverStaleGenerationJobs.
+      generationJobs: {
+        where: { status: { in: ["QUEUED", "RUNNING"] } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { status: true },
+      },
+    },
+  });
+
+  const rows = books.map((b) => {
+    const job = b.generationJobs[0];
+    // Same phases the book watcher reports: queued, then outlining / writing.
+    const stage: "queued" | "outlining" | "writing" =
+      job?.status === "QUEUED"
+        ? "queued"
+        : b.status === "OUTLINING"
+          ? "outlining"
+          : "writing";
+    return {
+      id: b.id,
+      title: b.title,
+      status: b.status,
+      stage,
+      hasLiveJob: Boolean(job),
+      progress: b.progress,
+      currentPages: b.currentPages,
+      targetPages: b.targetPages,
+      createdVia: b.createdVia,
+      createdAt: b.createdAt.toISOString(),
+      updatedAt: b.updatedAt.toISOString(),
+      user: b.user,
+    };
+  });
+
+  const byUser = new Map<
+    string,
+    { userId: string; email: string; name: string | null; count: number }
+  >();
+  for (const r of rows) {
+    const cur = byUser.get(r.user.id) ?? {
+      userId: r.user.id,
+      email: r.user.email,
+      name: r.user.name,
+      count: 0,
+    };
+    cur.count += 1;
+    byUser.set(r.user.id, cur);
+  }
+
+  return {
+    total: rows.length,
+    queued: rows.filter((r) => r.stage === "queued").length,
+    outlining: rows.filter((r) => r.stage === "outlining").length,
+    writing: rows.filter((r) => r.stage === "writing").length,
+    noLiveJob: rows.filter((r) => !r.hasLiveJob).length,
+    users: byUser.size,
+    byUser: [...byUser.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    books: rows.slice(0, 30),
+  };
+}
+
 export async function loadAdminOverview() {
   const now = new Date();
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const [users, books, jobGroups, recentJobs, statusGroups, planGroups] =
-    await Promise.all([
-      db.user.findMany({
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          plan: true,
-          pagesUsed: true,
-          pagesLimit: true,
-          pagesBonus: true,
-          audioMinutesUsed: true,
-          stripeCustomerId: true,
-          stripeSubId: true,
-          trialEndsAt: true,
-          hasUsedPremiumTrial: true,
-          createdAt: true,
-          updatedAt: true,
-          brandName: true,
-          authorName: true,
-          countryCode: true,
-          _count: { select: { pushTokens: true, books: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      db.book.findMany({
-        select: {
-          id: true,
-          userId: true,
-          title: true,
-          status: true,
-          progress: true,
-          currentPages: true,
-          targetPages: true,
-          coverImage: true,
-          errorMessage: true,
-          updatedAt: true,
-          completedAt: true,
-          createdAt: true,
-          createdVia: true,
-          generateAudiobookOnComplete: true,
-          genre: true,
-          _count: { select: { chapters: true, generationJobs: true } },
-        },
-      }),
-      db.generationJob.groupBy({
-        by: ["status"],
-        _count: { _all: true },
-      }),
-      db.generationJob.findMany({
-        where: { createdAt: { gte: weekAgo } },
-        select: {
-          status: true,
-          createdAt: true,
-          completedAt: true,
-          error: true,
-          payload: true,
-        },
-      }),
-      db.book.groupBy({ by: ["status"], _count: { _all: true } }),
-      db.user.groupBy({ by: ["plan"], _count: { _all: true } }),
-    ]);
+  const [
+    users,
+    books,
+    jobGroups,
+    recentJobs,
+    statusGroups,
+    planGroups,
+    inProgress,
+  ] = await Promise.all([
+    db.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        plan: true,
+        pagesUsed: true,
+        pagesLimit: true,
+        pagesBonus: true,
+        audioMinutesUsed: true,
+        stripeCustomerId: true,
+        stripeSubId: true,
+        trialEndsAt: true,
+        hasUsedPremiumTrial: true,
+        createdAt: true,
+        updatedAt: true,
+        brandName: true,
+        authorName: true,
+        countryCode: true,
+        _count: { select: { pushTokens: true, books: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.book.findMany({
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        status: true,
+        progress: true,
+        currentPages: true,
+        targetPages: true,
+        coverImage: true,
+        errorMessage: true,
+        updatedAt: true,
+        completedAt: true,
+        createdAt: true,
+        createdVia: true,
+        generateAudiobookOnComplete: true,
+        genre: true,
+        _count: { select: { chapters: true, generationJobs: true } },
+      },
+    }),
+    db.generationJob.groupBy({
+      by: ["status"],
+      _count: { _all: true },
+    }),
+    db.generationJob.findMany({
+      where: { createdAt: { gte: weekAgo } },
+      select: {
+        status: true,
+        createdAt: true,
+        completedAt: true,
+        error: true,
+        payload: true,
+      },
+    }),
+    db.book.groupBy({ by: ["status"], _count: { _all: true } }),
+    db.user.groupBy({ by: ["plan"], _count: { _all: true } }),
+    loadInProgressBooks(),
+  ]);
 
   const bookIds = books.map((b) => b.id);
   const [failedJobCounts, audioCounts, chapterDoneCounts] = await Promise.all([
@@ -284,6 +380,7 @@ export async function loadAdminOverview() {
         jobGroups
           .filter((g) => ["PENDING", "QUEUED", "RUNNING"].includes(g.status))
           .reduce((s, g) => s + g._count._all, 0) ?? 0,
+      inProgressBooks: inProgress.total,
       signups24h: users.filter((u) => u.createdAt >= dayAgo).length,
       signups7d: users.filter((u) => u.createdAt >= weekAgo).length,
       completionRate,
@@ -305,6 +402,7 @@ export async function loadAdminOverview() {
       books7d: createdVia7d,
       jobs7d: jobsByClient7d,
     },
+    inProgress,
     sentiment,
     gaps,
     daily,
@@ -385,46 +483,135 @@ function topImprovements(insights: UserInsight[], gaps: ImprovementGap[]) {
   return [...fromGaps, ...fromUsers].slice(0, 12);
 }
 
-export async function loadAdminUsers(q?: string) {
-  const query = q?.trim() || undefined;
-  const countryFilter =
-    query && /^[A-Za-z]{2}$/.test(query) ? query.toUpperCase() : undefined;
+const ADMIN_USERS_PAGE_SIZE = 50;
 
-  const users = await db.user.findMany({
-    where: query
-      ? {
-          OR: [
-            { email: { contains: query, mode: "insensitive" } },
-            { name: { contains: query, mode: "insensitive" } },
-            ...(countryFilter ? [{ countryCode: countryFilter }] : []),
-          ],
-        }
-      : undefined,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      plan: true,
-      pagesUsed: true,
-      pagesLimit: true,
-      pagesBonus: true,
-      audioMinutesUsed: true,
-      audioMinutesLimit: true,
-      stripeCustomerId: true,
-      stripeSubId: true,
-      trialEndsAt: true,
-      hasUsedPremiumTrial: true,
-      createdAt: true,
-      updatedAt: true,
-      brandName: true,
-      authorName: true,
-      countryCode: true,
-      signupVia: true,
-      _count: { select: { books: true, pushTokens: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+const USER_SORTS = {
+  newest: [{ createdAt: "desc" }, { id: "desc" }],
+  oldest: [{ createdAt: "asc" }, { id: "asc" }],
+  pages: [{ pagesUsed: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+} satisfies Record<string, Prisma.UserOrderByWithRelationInput[]>;
+
+type AdminUserSort = keyof typeof USER_SORTS;
+const USER_SORT_KEYS = Object.keys(USER_SORTS) as AdminUserSort[];
+
+const PAID_FILTERS = ["all", "paying", "trial", "comped", "free"] as const;
+type AdminPaidFilter = (typeof PAID_FILTERS)[number];
+
+/**
+ * How the account pays right now. A Stripe sub is the only paid source;
+ * Premium trials are ENTERPRISE and lapse to Free in syncUserTrialState.
+ */
+function paidStatus(
+  user: { plan: string; stripeSubId: string | null; trialEndsAt: Date | null },
+  now: Date
+) {
+  const onTrial = Boolean(user.trialEndsAt && user.trialEndsAt > now);
+  if (user.stripeSubId) return onTrial ? "stripe_trial" : "paying";
+  if (onTrial) return "trial";
+  if (user.trialEndsAt && user.plan === "ENTERPRISE") return "trial_ended";
+  if (user.plan !== "FREE") return "comped";
+  return "free";
+}
+
+/** Server-side version of paidStatus, so filters page correctly. */
+function paidWhere(
+  paid: AdminPaidFilter,
+  now: Date
+): Prisma.UserWhereInput | undefined {
+  const noActiveTrial: Prisma.UserWhereInput = {
+    OR: [{ trialEndsAt: null }, { trialEndsAt: { lte: now } }],
+  };
+  switch (paid) {
+    case "paying":
+      return { stripeSubId: { not: null }, ...noActiveTrial };
+    case "trial":
+      return { trialEndsAt: { gt: now } };
+    case "comped":
+      return {
+        stripeSubId: null,
+        plan: { not: "FREE" },
+        OR: [
+          { trialEndsAt: null },
+          { trialEndsAt: { lte: now }, plan: { not: "ENTERPRISE" } },
+        ],
+      };
+    case "free":
+      return {
+        stripeSubId: null,
+        OR: [
+          { plan: "FREE", ...noActiveTrial },
+          { plan: "ENTERPRISE", trialEndsAt: { lte: now } },
+        ],
+      };
+    default:
+      return undefined;
+  }
+}
+
+function userSearchWhere(q?: string): Prisma.UserWhereInput | undefined {
+  const query = q?.trim();
+  if (!query) return undefined;
+  const countryFilter = /^[A-Za-z]{2}$/.test(query)
+    ? query.toUpperCase()
+    : undefined;
+  return {
+    OR: [
+      { email: { contains: query, mode: "insensitive" } },
+      { name: { contains: query, mode: "insensitive" } },
+      { id: query },
+      ...(countryFilter ? [{ countryCode: countryFilter }] : []),
+    ],
+  };
+}
+
+export async function loadAdminUsers(
+  options: { q?: string; page?: number; sort?: string; paid?: string } = {}
+) {
+  const now = new Date();
+  const sort = USER_SORT_KEYS.find((k) => k === options.sort) ?? "newest";
+  const paid = PAID_FILTERS.find((k) => k === options.paid) ?? "all";
+  const pageSize = ADMIN_USERS_PAGE_SIZE;
+  const page =
+    options.page && Number.isFinite(options.page)
+      ? Math.max(1, Math.floor(options.page))
+      : 1;
+
+  const filters = [userSearchWhere(options.q), paidWhere(paid, now)].filter(
+    (w): w is Prisma.UserWhereInput => Boolean(w)
+  );
+  const where: Prisma.UserWhereInput = filters.length ? { AND: filters } : {};
+
+  const [total, users] = await Promise.all([
+    db.user.count({ where }),
+    db.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        plan: true,
+        pagesUsed: true,
+        pagesLimit: true,
+        pagesBonus: true,
+        audioMinutesUsed: true,
+        audioMinutesLimit: true,
+        stripeCustomerId: true,
+        stripeSubId: true,
+        trialEndsAt: true,
+        hasUsedPremiumTrial: true,
+        createdAt: true,
+        updatedAt: true,
+        brandName: true,
+        authorName: true,
+        countryCode: true,
+        signupVia: true,
+        _count: { select: { books: true, pushTokens: true } },
+      },
+      orderBy: USER_SORTS[sort],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
 
   const userIds = users.map((u) => u.id);
   const books = userIds.length
@@ -434,6 +621,7 @@ export async function loadAdminUsers(q?: string) {
           id: true,
           userId: true,
           status: true,
+          genre: true,
           progress: true,
           currentPages: true,
           targetPages: true,
@@ -492,7 +680,8 @@ export async function loadAdminUsers(q?: string) {
     string,
     Array<{
       id: string;
-      status: string;
+      status: BookStatus;
+      genre: string | null;
       progress: number;
       currentPages: number;
       targetPages: number;
@@ -515,6 +704,7 @@ export async function loadAdminUsers(q?: string) {
     (booksByUser[b.userId] ||= []).push({
       id: b.id,
       status: b.status,
+      genre: b.genre,
       progress: b.progress,
       currentPages: b.currentPages,
       targetPages: b.targetPages,
@@ -534,7 +724,8 @@ export async function loadAdminUsers(q?: string) {
     });
   }
 
-  return users.map((u) => {
+  const rows = users.map((u) => {
+    const userBooks = booksByUser[u.id] ?? [];
     const insight = scoreUser(
       {
         id: u.id,
@@ -555,21 +746,42 @@ export async function loadAdminUsers(q?: string) {
         authorName: u.authorName,
         pushTokens: u._count.pushTokens,
       },
-      booksByUser[u.id] ?? []
+      userBooks,
+      now
+    );
+    // Book counts are written books, like the user's own dashboard.
+    const written = userBooks.filter(
+      (b) => !STUDIO_GENRES.includes(b.genre ?? "")
+    );
+    const signupVia = inferSignupVia(
+      u.signupVia,
+      u._count.pushTokens,
+      userBooks
     );
     return {
       ...insight,
+      books: written.length,
+      completed: written.filter((b) => b.status === "COMPLETED").length,
+      failed: written.filter((b) => b.status === "FAILED").length,
+      inProgress: written.filter((b) =>
+        IN_PROGRESS_BOOK_STATUSES.includes(b.status)
+      ).length,
+      studioDrafts: userBooks.length - written.length,
+      pagesBonus: u.pagesBonus,
       audioMinutesUsed: u.audioMinutesUsed,
       audioMinutesLimit: u.audioMinutesLimit,
-      hasSub: Boolean(u.stripeSubId),
+      paidStatus: paidStatus(u, now),
+      trialEndsAt: u.trialEndsAt?.toISOString() ?? null,
       countryCode: u.countryCode,
-      signupVia: inferSignupVia(
-        u.signupVia,
-        u._count.pushTokens,
-        booksByUser[u.id] ?? []
-      ),
+      authorName: u.authorName,
+      pushTokens: u._count.pushTokens,
+      signupVia,
+      // Older accounts predate signupVia; their source is inferred.
+      signupViaGuessed: signupVia !== "unknown" && signupVia !== u.signupVia,
     };
   });
+
+  return { users: rows, total, page, pageSize, sort, paid };
 }
 
 function inferSignupVia(

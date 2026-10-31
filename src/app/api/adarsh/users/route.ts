@@ -12,10 +12,15 @@ export async function GET(request: Request) {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const q = new URL(request.url).searchParams.get("q") ?? undefined;
+  const params = new URL(request.url).searchParams;
   try {
-    const users = await loadAdminUsers(q || undefined);
-    return NextResponse.json({ users });
+    const result = await loadAdminUsers({
+      q: params.get("q") || undefined,
+      page: Number(params.get("page")) || 1,
+      sort: params.get("sort") || undefined,
+      paid: params.get("paid") || undefined,
+    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[adarsh/users GET]", error);
     return NextResponse.json(
